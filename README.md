@@ -2,6 +2,12 @@
 
 ## Learning Motion Without Memorizing Who Moves
 
+Tutorials:
+
+- [CoDy-JEPA 10-Week Execution Plan](tutorials/cody-jepa-10-week-plan.md)
+- [Week 2 HAIC + GaitLU-1M Tutorial Track](tutorials/week2-haic-gaitlu-index.md)
+- [Health&Gait Dataset Handling Tutorial](tutorials/healthxgait-guide.md)
+
 CoDy-JEPA is a self-supervised video method for articulated systems: people walking, hands gesturing, robot arms reaching, or assistive devices moving with a user. Its main claim is simple. A useful motion model should learn **how the system moves** without hiding too much information about **who or what is moving** inside the motion representation.
 
 This matters because video datasets often contain shortcuts: decision rules that work on familiar benchmark splits but fail when users, scenes, or cameras change [6]. In a gait dataset, one person may always appear in one room and walk at one speed. A standard model can then learn "this room means slow walking" instead of learning gait phase or cadence. CoDy-JEPA attacks that failure mode by splitting each clip into two latent summaries and training them with a counterfactual prediction task.
