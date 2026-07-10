@@ -56,8 +56,8 @@ The target comes from a slowly updated target encoder, as in JEPA-style learning
 
 $$
 \mathcal{L}_{\text{pred}} =
-\left\lVert \operatorname{norm}(\hat{S}_{\text{dyn}}(B,t+k)) -
-\operatorname{sg}\left(\operatorname{norm}(\bar{S}_{\text{dyn}}(B,t+k))\right)\right\rVert_2^2 .
+\left\lVert \mathrm{norm}(\hat{S}_{\text{dyn}}(B,t+k)) -
+\mathrm{sg}\left(\mathrm{norm}(\bar{S}_{\text{dyn}}(B,t+k))\right)\right\rVert_2^2 .
 $$
 
 Here `sg` means stop-gradient. The model predicts a latent future summary rather than reconstructing RGB frames. That is the JEPA idea: learn by predicting representations, so the model can focus on predictable semantic and physical structure instead of every pixel detail [1, 2]. This differs from masked reconstruction methods such as MAE and VideoMAE, which learn strong features but still train against image or video reconstruction targets [4, 5].
@@ -69,8 +69,8 @@ CI-TSI makes identity and motion less reliable as a paired shortcut. If A gives 
 Prediction alone is not enough, because both streams could still duplicate the same information. CoDy-JEPA therefore uses HSIC, the Hilbert-Schmidt Independence Criterion, to penalize dependence between minibatch summaries [7]. For a batch of $n$ clips, define Gram matrices $K_{ij}=k(S_{\text{attr}}^i,S_{\text{attr}}^j)$ and $L_{ij}=l(S_{\text{dyn}}^i,S_{\text{dyn}}^j)$. With $H=I_n-\frac{1}{n}\mathbf{1}\mathbf{1}^\top$,
 
 $$
-\operatorname{HSIC}(S_{\text{attr}},S_{\text{dyn}})=
-\frac{1}{(n-1)^2}\operatorname{tr}(KHLH).
+\mathrm{HSIC}(S_{\text{attr}},S_{\text{dyn}})=
+\frac{1}{(n-1)^2}\mathrm{tr}(KHLH).
 $$
 
 If two examples are close in `S_attr` exactly when they are close in `S_dyn`, HSIC is large. Minimizing it discourages systematic overlap, such as identity leaking into the motion stream. To avoid trivial constant summaries, CoDy-JEPA also uses VICReg-style variance and covariance safeguards, following the broader redundancy-reduction lesson behind VICReg and Barlow Twins [8, 9]:
@@ -78,7 +78,7 @@ If two examples are close in `S_attr` exactly when they are close in `S_dyn`, HS
 $$
 \begin{gathered}
 \mathcal{L} = \mathcal{L}_{\text{pred}} \\
-{}+ \lambda_h \operatorname{HSIC}(S_{\text{attr}},S_{\text{dyn}}) \\
+{}+ \lambda_h \mathrm{HSIC}(S_{\text{attr}},S_{\text{dyn}}) \\
 {}+ \lambda_v \mathcal{L}_{\text{var}} \\
 {}+ \lambda_c \mathcal{L}_{\text{cov}} .
 \end{gathered}
