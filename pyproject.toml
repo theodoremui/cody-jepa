@@ -16,3 +16,10 @@ dependencies = [
     "torchvision>=0.28.0",
     "tqdm>=4.68.4",
 ]
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["src"]

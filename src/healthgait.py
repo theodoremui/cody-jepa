@@ -1,0 +1,41 @@
+try:
+    from cody_jepa.data.healthgait import (
+        DEFAULT_BATCH_SIZE,
+        DEFAULT_CLIP_LENGTH,
+        DEFAULT_IMAGE_SIZE,
+        DEFAULT_MANIFEST_SEED,
+        DEFAULT_MODALITY,
+        build_healthgait_datasets,
+        build_healthgait_loaders,
+        find_repo_root,
+        healthgait_manifest_path,
+        preview_manifest,
+    )
+except ModuleNotFoundError:
+    from src.cody_jepa.data.healthgait import (
+        DEFAULT_BATCH_SIZE,
+        DEFAULT_CLIP_LENGTH,
+        DEFAULT_IMAGE_SIZE,
+        DEFAULT_MANIFEST_SEED,
+        DEFAULT_MODALITY,
+        build_healthgait_datasets,
+        build_healthgait_loaders,
+        find_repo_root,
+        healthgait_manifest_path,
+        preview_manifest,
+    )
+
+
+__all__ = [
+    "DEFAULT_BATCH_SIZE",
+    "DEFAULT_CLIP_LENGTH",
+    "DEFAULT_IMAGE_SIZE",
+    "DEFAULT_MANIFEST_SEED",
+    "DEFAULT_MODALITY",
+    "build_healthgait_datasets",
+    "build_healthgait_loaders",
+    "find_repo_root",
+    "healthgait_manifest_path",
+    "preview_manifest",
+]
+

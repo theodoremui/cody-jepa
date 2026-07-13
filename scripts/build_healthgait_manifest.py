@@ -39,36 +39,36 @@ for trial_dir in sorted((root / modality).glob("PA*/**/*")):
         "num_frames": len(frames),
     })
 
-    subjects = sorted({row["subject_id"] for row in rows})
-    rng = random.Random(seed)
-    rng.shuffle(subjects)
+subjects = sorted({row["subject_id"] for row in rows})
+rng = random.Random(seed)
+rng.shuffle(subjects)
 
-    n_val = max(1, round(val_fraction * len(subjects)))
-    val_subjects = set(subjects[:n_val])
+n_val = max(1, round(val_fraction * len(subjects)))
+val_subjects = set(subjects[:n_val])
 
-    for row in rows:
-        row["split"] = "val" if row["subject_id"] in val_subjects else "train"
+for row in rows:
+    row["split"] = "val" if row["subject_id"] in val_subjects else "train"
 
-    out = Path(f"data/healthgait/manifests/{modality}_subject_split_seed{seed}.csv")
-    out.parent.mkdir(parents=True, exist_ok=True)
+out = Path(f"data/healthgait/manifests/{modality}_subject_split_seed{seed}.csv")
+out.parent.mkdir(parents=True, exist_ok=True)
 
-    with out.open("w", newline="") as f:
-        writer = csv.DictWriter(f, fieldnames=[
-            "subject_id",
-            "modality",
-            "gait_system",
-            "trial",
-            "frame_dir",
-            "num_frames",
-            "split",
-        ])
-        writer.writeheader()
-        writer.writerows(rows)
+with out.open("w", newline="") as f:
+    writer = csv.DictWriter(f, fieldnames=[
+        "subject_id",
+        "modality",
+        "gait_system",
+        "trial",
+        "frame_dir",
+        "num_frames",
+        "split",
+    ])
+    writer.writeheader()
+    writer.writerows(rows)
 
-    train_subjects = {row["subject_id"] for row in rows if row["split"] == "train"}
-    val_subjects = {row["subject_id"] for row in rows if row["split"] == "val"}
+train_subjects = {row["subject_id"] for row in rows if row["split"] == "train"}
+val_subjects = {row["subject_id"] for row in rows if row["split"] == "val"}
 
-    print(f"wrote {len(rows)} clips to {out}")
-    print(f"train subjects: {len(train_subjects)}")
-    print(f"val subjects: {len(val_subjects)}")
-    print(f"overlap: {train_subjects & val_subjects}")
+print(f"wrote {len(rows)} clips to {out}")
+print(f"train subjects: {len(train_subjects)}")
+print(f"val subjects: {len(val_subjects)}")
+print(f"overlap: {train_subjects & val_subjects}")
