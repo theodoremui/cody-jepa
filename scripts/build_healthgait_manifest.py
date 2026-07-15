@@ -1,6 +1,16 @@
 from pathlib import Path
 import csv
+import json
 import random
+import sys
+
+
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
+SRC_ROOT = PROJECT_ROOT / "src"
+if str(SRC_ROOT) not in sys.path:
+    sys.path.insert(0, str(SRC_ROOT))
+
+from cody_jepa.data import summarize_healthgait_manifest, write_healthgait_metadata_summary
 
 root = Path("data/healthgait/raw/Health_Gait")
 modality = "silhouette"
@@ -72,3 +82,17 @@ print(f"wrote {len(rows)} clips to {out}")
 print(f"train subjects: {len(train_subjects)}")
 print(f"val subjects: {len(val_subjects)}")
 print(f"overlap: {train_subjects & val_subjects}")
+
+summary = summarize_healthgait_manifest(
+    out,
+    repo_root=PROJECT_ROOT,
+    clip_length=min_frames,
+)
+summary_paths = write_healthgait_metadata_summary(
+    summary,
+    PROJECT_ROOT / "data" / "healthgait" / "diagnostics",
+    "healthgait_manifest_summary",
+)
+print(json.dumps(summary, indent=2, sort_keys=True))
+print(f"summary JSON: {summary_paths['json']}")
+print(f"summary CSV:  {summary_paths['csv']}")

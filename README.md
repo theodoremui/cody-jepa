@@ -1,4 +1,4 @@
-# CoDy-JEPA Proposal, v3
+# CoDy-JEPA: Counterfactual-Dynamical Joint-Embedding Predictive Architecture
 
 ## Learning Motion Without Memorizing Who Moves
 
