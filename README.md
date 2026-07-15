@@ -72,11 +72,9 @@ If A supplies the body and B supplies the stride rhythm, the association “Pers
 As in JEPA-style learning [1, 2], the target is produced by a slowly updated target encoder. The predictor matches a normalized latent future rather than reconstructing RGB frames:
 
 $$
-\mathcal L_{\mathrm{pred}}=
-\left\lVert
-\operatorname{norm}(\hat S_{\mathrm{dyn}}(B,t+k))-
-\operatorname{sg}\!\left(\operatorname{norm}(\bar S_{\mathrm{dyn}}(B,t+k))\right)
-\right\rVert_2^2.
+\mathcal{L}_{\text{pred}} =
+\left\lVert \mathrm{norm}(\hat{S}_{\text{dyn}}(B,t+k)) -
+\mathrm{sg}\left(\mathrm{norm}(\bar{S}_{\text{dyn}}(B,t+k))\right)\right\rVert_2^2 .
 $$
 
 Here, `sg` means stop-gradient. Latent prediction lets the objective focus on predictable semantic and physical structure instead of every pixel. This differs from MAE and VideoMAE, whose training targets are reconstructed image or video content [4, 5].
@@ -86,18 +84,19 @@ Here, `sg` means stop-gradient. Latent prediction lets the objective focus on pr
 Prediction alone does not prevent both streams from storing the same information. CoDy-JEPA therefore penalizes their statistical dependence with the Hilbert-Schmidt Independence Criterion (HSIC) [7]. For a batch of $n$ clips, let $K$ and $L$ be kernel Gram matrices for `S_attr` and `S_dyn`, and let $H=I_n-\frac{1}{n}\mathbf1\mathbf1^\top$:
 
 $$
-\operatorname{HSIC}(S_{\mathrm{attr}},S_{\mathrm{dyn}})=
-\frac{1}{(n-1)^2}\operatorname{tr}(KHLH).
+\mathrm{HSIC}(S_{\text{attr}},S_{\text{dyn}})=
+\frac{1}{(n-1)^2}\mathrm{tr}(KHLH).
 $$
 
 Minimizing HSIC discourages the streams from organizing examples in the same way. VICReg-style variance and covariance terms keep dimensions active and reduce within-stream redundancy [8, 9]. The complete objective is
 
 $$
-\mathcal L=
-\mathcal L_{\mathrm{pred}}+
-\lambda_h\operatorname{HSIC}(S_{\mathrm{attr}},S_{\mathrm{dyn}})+
-\lambda_v\mathcal L_{\mathrm{var}}+
-\lambda_c\mathcal L_{\mathrm{cov}}.
+\begin{gathered}
+\mathcal{L} = \mathcal{L}_{\text{pred}} \\
+{}+ \lambda_h \mathrm{HSIC}(S_{\text{attr}},S_{\text{dyn}}) \\
+{}+ \lambda_v \mathcal{L}_{\text{var}} \\
+{}+ \lambda_c \mathcal{L}_{\text{cov}} .
+\end{gathered}
 $$
 
 Each term has a distinct job: predict future motion, reduce cross-stream overlap, prevent constant representations, and avoid redundant latent dimensions.

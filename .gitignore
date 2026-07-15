@@ -15,5 +15,5 @@ checkpoints/
 *.pth
 *.ckpt
 /tutorials/
-/notes/
-/images/
+notes/
+images/
