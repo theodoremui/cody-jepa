@@ -1,131 +1,283 @@
-# CoDy-JEPA: Counterfactual-Dynamical Joint-Embedding Predictive Architecture
+# CoDy-JEPA
 
-## Learning Motion Without Memorizing Who Moves
+## Learning motion without memorizing who moves
 
-Tutorials:
+CoDy-JEPA (Counterfactual-Dynamical Joint-Embedding Predictive Architecture) is a research project for learning motion representations from unlabeled video. Its goal is to represent **how an articulated system moves** while limiting how much identity, appearance, or environment information leaks into that motion representation.
 
-- [CoDy-JEPA 10-Week Execution Plan](tutorials/cody-jepa-10-week-plan.md)
-- [Week 2 HAIC + GaitLU-1M Tutorial Track](tutorials/week2-haic-gaitlu-index.md)
-- [Health&Gait Dataset Handling Tutorial](tutorials/healthxgait-guide.md)
+The method is intended for people walking, hands gesturing, robot arms reaching, and other systems whose structure changes slowly while their state changes over time.
 
-CoDy-JEPA is a self-supervised video method for articulated systems: people walking, hands gesturing, robot arms reaching, or assistive devices moving with a user. Its main claim is simple. A useful motion model should learn **how the system moves** without hiding too much information about **who or what is moving** inside the motion representation.
+> **Project status:** this repository currently contains the CoDy-JEPA research design and a tested Health&Gait silhouette data pipeline. It does not yet contain the CoDy-JEPA encoder, predictor, losses, or training loop. The runnable code prepares reproducible `[B, T, C, H, W]` batches, validates subject-disjoint splits, generates motion diagnostics, and exports a placeholder schema for future representation probes.
 
-This matters because video datasets often contain shortcuts: decision rules that work on familiar benchmark splits but fail when users, scenes, or cameras change [6]. In a gait dataset, one person may always appear in one room and walk at one speed. A standard model can then learn "this room means slow walking" instead of learning gait phase or cadence. CoDy-JEPA attacks that failure mode by splitting each clip into two latent summaries and training them with a counterfactual prediction task.
+## Why CoDy-JEPA?
+
+Video models can solve the wrong problem for the right score. If one person always appears in one room and walks at one speed, a model may associate the room or identity with speed instead of learning gait phase and cadence. This is **shortcut learning**: the model exploits a correlation that works on a familiar split but fails when the person, camera, or environment changes [6].
+
+CoDy-JEPA addresses this failure mode with two latent summaries:
+
+- `S_attr`, the **attribute stream**, represents comparatively stable information such as body proportions, clothing, viewpoint, background, robot morphology, or tool shape.
+- `S_dyn`, the **dynamics stream**, represents changing state such as pose transitions, gait phase, cadence, velocity, contact state, or gesture phase.
+
+This split is an inductive bias, not a claim that structure and motion are naturally independent. Body shape can constrain gait, for example. Unsupervised data alone cannot guarantee a uniquely disentangled representation [10], so the separation must be tested with leakage probes and transfer experiments. The counterfactual intervention is motivated by the broader goal of learning representations organized around causal factors rather than incidental correlations [11].
 
 ![Stable and dynamic factorization](images/05-v3-factorization.svg)
 
-The two summaries have different jobs. `S_attr` is the **stable attribute summary**: body proportions, clothing, camera view, background, robot morphology, or tool shape. `S_dyn` is the **dynamics summary**: pose transition, gait phase, cadence, velocity, contact state, or gesture phase. These factors are not perfectly independent in the real world. For example, body shape constrains walking style. The proposal treats the split as a useful inductive bias, not as a claim that nature gives clean labels for structure and motion.
-
 ## Method
 
-Let a video clip be $x_{1:T}$, where $T$ is the number of frames. A video encoder $f_\theta$ maps it to spatiotemporal tokens:
+CoDy-JEPA combines temporal token routing, counterfactual token swapping, latent future prediction, and redundancy reduction.
+
+### 1. Encode and route video tokens
+
+For a clip $x_{1:T}$, a video encoder $f_\theta$ produces spatiotemporal tokens
 
 $$
 z_{t,p}=f_\theta(x_{1:T})_{t,p},
 $$
 
-where $t$ indexes time and $p$ indexes the token slot being tracked within each frame. In a patch-based video transformer, $p$ can mean a spatial image patch, such as the lower-left region containing a foot. In a pose-based model, $p$ can mean a body part or joint, such as the left knee. In a learned-token model, $p$ can mean a slot that the network learns to attach to a recurring visual factor. CoDy-JEPA estimates how much each token slot changes over time:
+where $t$ is time and $p$ identifies a patch, joint, body part, or learned token slot. The temporal variation of each slot is
 
 $$
-\bar z_p = \frac{1}{T}\sum_{t=1}^{T} z_{t,p}, \qquad
-v_p = \frac{1}{T}\sum_{t=1}^{T}\lVert z_{t,p}-\bar z_p\rVert_2^2 .
+\bar z_p=\frac{1}{T}\sum_{t=1}^{T}z_{t,p}, \qquad
+v_p=\frac{1}{T}\sum_{t=1}^{T}\lVert z_{t,p}-\bar z_p\rVert_2^2.
 $$
 
-Low-variation tokens are routed toward the attribute encoder $g_a$. High-variation tokens are routed toward the dynamics encoder $g_d$:
+Low-variation tokens are routed toward an attribute encoder $g_a$; high-variation tokens are routed toward a dynamics encoder $g_d$:
 
 $$
-S_{\text{attr}} = g_a(\left\lbrace z_{t,p}: v_p \le \tau_a \right\rbrace), \qquad
-S_{\text{dyn}}(1:t) = g_d(\left\lbrace z_{s,p}: s \le t,\ v_p \ge \tau_d \right\rbrace).
+S_{\mathrm{attr}}=g_a\!\left(\{z_{t,p}:v_p\le\tau_a\}\right), \qquad
+S_{\mathrm{dyn}}(1{:}t)=g_d\!\left(\{z_{s,p}:s\le t,\ v_p\ge\tau_d\}\right).
 $$
 
-In a walking clip, the stable stream may receive torso shape, clothing, and camera view. The dynamics stream may receive alternating foot positions and knee motion. In a robot clip, stable tokens may describe link lengths and the gripper, while dynamic tokens describe joint phase and contact.
+In a gait clip, torso shape may enter the stable stream while alternating foot and knee positions enter the dynamic stream. Temporal variation is only an initial routing signal: a static room can still be a nuisance, and slow movement can still be dynamics. The probes described below determine whether the learned split is useful.
 
-The core intervention is **Cross-Instance Token-Swapping Intervention**, or CI-TSI. Choose two clips, A and B, from the same broad domain. CoDy-JEPA builds a counterfactual context by combining stable attributes from A with motion history from B:
+### 2. Break identity-motion shortcuts
 
-$$
-C_{A \leftarrow B} = [S_{\text{attr}}(A), S_{\text{dyn}}(B,1:t)].
-$$
-
-The predictor $q_\psi$ must forecast the future dynamics of B, not future pixels:
+The core intervention is **Cross-Instance Token-Swapping Intervention (CI-TSI)**. Given clips A and B from the same broad domain, CoDy-JEPA combines A's stable context with B's motion history:
 
 $$
-\hat{S}_{\text{dyn}}(B,t+k)=q_\psi(C_{A \leftarrow B}, k).
+C_{A\leftarrow B}=[S_{\mathrm{attr}}(A),S_{\mathrm{dyn}}(B,1{:}t)].
 $$
 
-The target comes from a slowly updated target encoder, as in JEPA-style learning:
+The predictor must forecast B's future dynamics:
 
 $$
-\mathcal{L}_{\text{pred}} =
-\left\lVert \mathrm{norm}(\hat{S}_{\text{dyn}}(B,t+k)) -
-\mathrm{sg}\left(\mathrm{norm}(\bar{S}_{\text{dyn}}(B,t+k))\right)\right\rVert_2^2 .
+\hat S_{\mathrm{dyn}}(B,t+k)=q_\psi(C_{A\leftarrow B},k).
 $$
 
-Here `sg` means stop-gradient. The model predicts a latent future summary rather than reconstructing RGB frames. That is the JEPA idea: learn by predicting representations, so the model can focus on predictable semantic and physical structure instead of every pixel detail [1, 2]. This differs from masked reconstruction methods such as MAE and VideoMAE, which learn strong features but still train against image or video reconstruction targets [4, 5].
+If A supplies the body and B supplies the stride rhythm, the association “Person A usually walks slowly” no longer solves the task. The predictor must retain motion from B and use A only as context.
 
-![Counterfactual objective](images/06-v3-objective.svg)
+![Counterfactual prediction objective](images/06-v3-objective.svg)
 
-CI-TSI makes identity and motion less reliable as a paired shortcut. If A gives the body and B gives the stride rhythm, then "Person A usually walks slowly" no longer solves the task. The model must preserve the motion information from B while treating A's stable context as a condition, not as the answer.
+### 3. Predict representations, not pixels
 
-Prediction alone is not enough, because both streams could still duplicate the same information. CoDy-JEPA therefore uses HSIC, the Hilbert-Schmidt Independence Criterion, to penalize dependence between minibatch summaries [7]. For a batch of $n$ clips, define Gram matrices $K_{ij}=k(S_{\text{attr}}^i,S_{\text{attr}}^j)$ and $L_{ij}=l(S_{\text{dyn}}^i,S_{\text{dyn}}^j)$. With $H=I_n-\frac{1}{n}\mathbf{1}\mathbf{1}^\top$,
-
-$$
-\mathrm{HSIC}(S_{\text{attr}},S_{\text{dyn}})=
-\frac{1}{(n-1)^2}\mathrm{tr}(KHLH).
-$$
-
-If two examples are close in `S_attr` exactly when they are close in `S_dyn`, HSIC is large. Minimizing it discourages systematic overlap, such as identity leaking into the motion stream. To avoid trivial constant summaries, CoDy-JEPA also uses VICReg-style variance and covariance safeguards, following the broader redundancy-reduction lesson behind VICReg and Barlow Twins [8, 9]:
+As in JEPA-style learning [1, 2], the target is produced by a slowly updated target encoder. The predictor matches a normalized latent future rather than reconstructing RGB frames:
 
 $$
-\begin{gathered}
-\mathcal{L} = \mathcal{L}_{\text{pred}} \\
-{}+ \lambda_h \mathrm{HSIC}(S_{\text{attr}},S_{\text{dyn}}) \\
-{}+ \lambda_v \mathcal{L}_{\text{var}} \\
-{}+ \lambda_c \mathcal{L}_{\text{cov}} .
-\end{gathered}
+\mathcal L_{\mathrm{pred}}=
+\left\lVert
+\operatorname{norm}(\hat S_{\mathrm{dyn}}(B,t+k))-
+\operatorname{sg}\!\left(\operatorname{norm}(\bar S_{\mathrm{dyn}}(B,t+k))\right)
+\right\rVert_2^2.
 $$
 
-The variance term keeps each latent dimension active across the batch. The covariance term reduces redundant dimensions within a stream. Together, these terms express the desired behavior: predict future motion, separate stable and dynamic information, and keep both summaries noncollapsed.
+Here, `sg` means stop-gradient. Latent prediction lets the objective focus on predictable semantic and physical structure instead of every pixel. This differs from MAE and VideoMAE, whose training targets are reconstructed image or video content [4, 5].
 
-## Experiments
+### 4. Separate the streams without collapse
 
-The main experiment should use unlabeled articulated video for pretraining and labels only for evaluation. Human gait is the clean first domain because it has clear stable factors, clear dynamic factors, and real HCI relevance. Silhouette data can be used first to reduce privacy and background leakage. RGB, pose, depth, and robot video can be added after the basic factorization is stable. MC-JEPA is the closest JEPA-family comparison because it explicitly studies motion and content features, while CoDy-JEPA makes the separation and leakage tests the main claim [3].
+Prediction alone does not prevent both streams from storing the same information. CoDy-JEPA therefore penalizes their statistical dependence with the Hilbert-Schmidt Independence Criterion (HSIC) [7]. For a batch of $n$ clips, let $K$ and $L$ be kernel Gram matrices for `S_attr` and `S_dyn`, and let $H=I_n-\frac{1}{n}\mathbf1\mathbf1^\top$:
 
-Evaluation should not ask only whether the training loss decreases. It should ask what information each stream contains after the encoders are frozen.
+$$
+\operatorname{HSIC}(S_{\mathrm{attr}},S_{\mathrm{dyn}})=
+\frac{1}{(n-1)^2}\operatorname{tr}(KHLH).
+$$
+
+Minimizing HSIC discourages the streams from organizing examples in the same way. VICReg-style variance and covariance terms keep dimensions active and reduce within-stream redundancy [8, 9]. The complete objective is
+
+$$
+\mathcal L=
+\mathcal L_{\mathrm{pred}}+
+\lambda_h\operatorname{HSIC}(S_{\mathrm{attr}},S_{\mathrm{dyn}})+
+\lambda_v\mathcal L_{\mathrm{var}}+
+\lambda_c\mathcal L_{\mathrm{cov}}.
+$$
+
+Each term has a distinct job: predict future motion, reduce cross-stream overlap, prevent constant representations, and avoid redundant latent dimensions.
+
+## Evaluation
+
+Training loss alone cannot show that the streams learned the intended information. After pretraining, freeze both encoders and fit linear or shallow probes:
+
+| Probe target | Desired `S_attr` result | Desired `S_dyn` result |
+| --- | --- | --- |
+| Subject identity or body shape | High | Low |
+| Robot morphology or tool shape | High | Low |
+| Gait phase, cadence, or speed | Low | High |
+| Action or contact state | Low | High |
+| Camera, room, or dataset source | Measure and control | Low |
+
+The central measurement is the **leakage gap**: `S_dyn` should predict motion variables well and identity variables poorly. Transfer probes should be trained on one set of subjects, views, or robot embodiments and evaluated on held-out ones.
+
+The proposed ablations are:
+
+1. A single-stream V-JEPA-style predictor and the motion-content separation studied by MC-JEPA [3].
+2. A dual-stream model without CI-TSI.
+3. CoDy-JEPA without HSIC.
+4. CoDy-JEPA without variance and covariance safeguards.
+
+A strong result combines competitive future-dynamics prediction, less wrong-stream leakage, and better low-label transfer. A result in which swapping reduces identity leakage but harms motion prediction is also informative because it exposes the separation-performance tradeoff directly.
 
 ![Evaluation matrix](images/07-v3-evaluation.svg)
 
-Use linear or shallow probes:
+## Quick start
 
-| Probe target | `S_attr` expected result | `S_dyn` expected result |
-| --- | --- | --- |
-| Subject identity, body shape, robot morphology | High | Low |
-| Gait phase, cadence, speed, action state | Low | High |
-| Camera, room, dataset source | Low or controlled | Low or controlled |
+### Requirements
 
-The central metric is the **leakage gap**. For example, if `S_dyn` predicts gait phase well but predicts identity poorly, that supports the claim. If `S_dyn` predicts both gait phase and identity, the model may still be using shortcuts. Transfer tests should then train probes on one set of users, views, or robot embodiments and evaluate on held-out ones. CoDy-JEPA should be compared with four baselines: a single-stream V-JEPA-style predictor, a dual-stream model without CI-TSI, a model without HSIC, and a model without variance or covariance safeguards.
+- Git
+- [uv](https://docs.astral.sh/uv/)
+- Python 3.10 or newer; `uv` will create and manage the project environment
 
-The strongest result would show three things at once: competitive future-dynamics prediction, lower wrong-stream leakage than baselines, and better low-label transfer to new users or contexts. A weaker but still useful result would be diagnostic: if CI-TSI lowers identity leakage but hurts dynamics prediction, the method has found the tradeoff that future work must solve.
+Clone the repository and install the locked dependencies:
+
+```bash
+git clone https://github.com/theodoremui/cody-jepa.git
+cd cody-jepa
+uv sync
+```
+
+Run the test suite:
+
+```bash
+uv run python -m unittest discover -s tests -v
+```
+
+The tests use generated fixtures, so they do not require the Health&Gait dataset.
+
+### Prepare Health&Gait
+
+The dataset is not distributed with this repository. Download the [Health&Gait v1.0 dataset from Zenodo](https://doi.org/10.5281/zenodo.14039922). The full dataset is a 26.8 GB multipart archive: `Health_Gait.z01` through `Health_Gait.z25` plus `Health_Gait.zip`. Keep every part in the same directory and extract from `Health_Gait.zip` into `data/healthgait/raw/`.
+
+After extraction, silhouette trials should follow this structure:
+
+```text
+data/healthgait/raw/Health_Gait/
+└── silhouette/
+    └── PA000/
+        ├── FGS/
+        │   └── WJ_1_YOLOV8/
+        │       ├── 001.jpg
+        │       └── ...
+        └── UGS/
+            └── ...
+```
+
+`FGS` and `UGS` denote fast and usual gait speed. Once the frames are in place, build a deterministic, subject-disjoint train/validation manifest:
+
+```bash
+uv run python scripts/build_healthgait_manifest.py
+```
+
+The script writes:
+
+- `data/healthgait/manifests/silhouette_subject_split_seed0.csv`
+- metadata summaries under `data/healthgait/diagnostics/`
+
+The manifest records one trial per row. It contains the subject, modality, gait system, trial, frame directory, frame count, and split. Keeping the split in a manifest makes the experiment auditable and prevents the same subject from appearing in both training and validation.
+
+### Load a batch
+
+```python
+from pathlib import Path
+
+from cody_jepa.data import HealthGaitLoaderConfig, build_healthgait_loaders_from_config
+
+root = Path.cwd()
+config = HealthGaitLoaderConfig(
+    manifest_csv=root / "data/healthgait/manifests/silhouette_subject_split_seed0.csv",
+    repo_root=root,
+    clip_length=16,
+    image_size=(224, 224),
+    batch_size=4,
+    seed=0,
+)
+
+train_loader, val_loader = build_healthgait_loaders_from_config(config)
+batch = next(iter(train_loader))
+
+print(batch["video"].shape)  # [B, T, C, H, W] = [4, 16, 1, 224, 224]
+print(batch["video"].min().item(), batch["video"].max().item())  # 0.0 to 1.0
+```
+
+The default policy selects deterministic pseudo-random windows for training and center windows for validation. A training loop should call `train_loader.dataset.set_epoch(epoch)` at the start of each epoch to change training windows reproducibly. Subject and trial metadata are provided for diagnostics; they are not labels for the self-supervised objective.
+
+### Explore the data pipeline
+
+Launch the notebook:
+
+```bash
+uv run jupyter lab notebooks/healthgait_manifest_loader.ipynb
+```
+
+The notebook walks through:
+
+- manifest validation and metadata summaries;
+- train and validation datasets;
+- `[B, T, C, H, W]` DataLoader batches;
+- deterministic temporal-window sampling;
+- clip contact sheets and frame-difference diagnostics;
+- motion-energy summaries; and
+- placeholder `S_attr` and `S_dyn` probe exports.
+
+The placeholder exports contain deterministic clip statistics, not learned CoDy-JEPA representations. They establish the table schema that later model checkpoints should produce.
+
+## Data-pipeline guarantees
+
+`HealthGaitManifestDataset` validates the full manifest before yielding samples. It rejects:
+
+- missing required columns or unsupported split names;
+- missing frame directories;
+- differences between declared and actual frame counts;
+- trials shorter than the requested clip length;
+- empty training or validation splits; and
+- subjects shared between training and validation.
+
+Each sample is a normalized grayscale tensor shaped `[T, C, H, W]` plus its source metadata. Frames are loaded only when requested, so the full dataset is not held in memory.
+
+## Repository layout
+
+```text
+cody-jepa/
+├── images/                         # Method and evaluation diagrams
+├── notebooks/
+│   └── healthgait_manifest_loader.ipynb
+├── scripts/
+│   └── build_healthgait_manifest.py
+├── src/cody_jepa/data/             # Dataset, loaders, and diagnostics
+├── tests/                          # Fixture-based data-pipeline tests
+├── pyproject.toml                  # Project metadata and dependencies
+└── README.md
+```
+
+Large datasets, model outputs, and checkpoints are intentionally excluded from version control.
 
 ## References
 
-[1] Mahmoud Assran, Quentin Duval, Ishan Misra, Piotr Bojanowski, Pascal Vincent, Michael Rabbat, Yann LeCun, Nicolas Ballas. [Self-Supervised Learning from Images with a Joint-Embedding Predictive Architecture](https://arxiv.org/abs/2301.08243). arXiv, 2023.
+[1] Mahmoud Assran et al. [Self-Supervised Learning from Images with a Joint-Embedding Predictive Architecture](https://arxiv.org/abs/2301.08243). 2023.
 
-[2] Adrien Bardes, Quentin Garrido, Jean Ponce, Xinlei Chen, Michael Rabbat, Yann LeCun, Mahmoud Assran, Nicolas Ballas. [Revisiting Feature Prediction for Learning Visual Representations from Video](https://arxiv.org/abs/2404.08471). arXiv, 2024.
+[2] Adrien Bardes et al. [Revisiting Feature Prediction for Learning Visual Representations from Video](https://arxiv.org/abs/2404.08471). 2024.
 
-[3] Adrien Bardes, Jean Ponce, Yann LeCun. [MC-JEPA: A Joint-Embedding Predictive Architecture for Self-Supervised Learning of Motion and Content Features](https://arxiv.org/abs/2307.12698). arXiv, 2023.
+[3] Adrien Bardes, Jean Ponce, and Yann LeCun. [MC-JEPA: A Joint-Embedding Predictive Architecture for Self-Supervised Learning of Motion and Content Features](https://arxiv.org/abs/2307.12698). 2023.
 
-[4] Kaiming He, Xinlei Chen, Saining Xie, Yanghao Li, Piotr Dollar, Ross Girshick. [Masked Autoencoders Are Scalable Vision Learners](https://arxiv.org/abs/2111.06377). arXiv, 2021.
+[4] Kaiming He et al. [Masked Autoencoders Are Scalable Vision Learners](https://arxiv.org/abs/2111.06377). 2021.
 
-[5] Zhan Tong, Yibing Song, Jue Wang, Limin Wang. [VideoMAE: Masked Autoencoders are Data-Efficient Learners for Self-Supervised Video Pre-Training](https://arxiv.org/abs/2203.12602). arXiv, 2022.
+[5] Zhan Tong et al. [VideoMAE: Masked Autoencoders are Data-Efficient Learners for Self-Supervised Video Pre-Training](https://arxiv.org/abs/2203.12602). 2022.
 
-[6] Robert Geirhos, Jorn-Henrik Jacobsen, Claudio Michaelis, Richard Zemel, Wieland Brendel, Matthias Bethge, Felix A. Wichmann. [Shortcut Learning in Deep Neural Networks](https://arxiv.org/abs/2004.07780). arXiv, 2020.
+[6] Robert Geirhos et al. [Shortcut Learning in Deep Neural Networks](https://arxiv.org/abs/2004.07780). 2020.
 
-[7] Arthur Gretton, Ralf Herbrich, Alexander Smola, Olivier Bousquet, Bernhard Scholkopf. [Kernel Methods for Measuring Independence](https://www.jmlr.org/papers/v6/gretton05a.html). Journal of Machine Learning Research, 2005.
+[7] Arthur Gretton et al. [Kernel Methods for Measuring Independence](https://www.jmlr.org/papers/v6/gretton05a.html). 2005.
 
-[8] Adrien Bardes, Jean Ponce, Yann LeCun. [VICReg: Variance-Invariance-Covariance Regularization for Self-Supervised Learning](https://arxiv.org/abs/2105.04906). arXiv, 2021.
+[8] Adrien Bardes, Jean Ponce, and Yann LeCun. [VICReg: Variance-Invariance-Covariance Regularization for Self-Supervised Learning](https://arxiv.org/abs/2105.04906). 2021.
 
-[9] Jure Zbontar, Li Jing, Ishan Misra, Yann LeCun, Stephane Deny. [Barlow Twins: Self-Supervised Learning via Redundancy Reduction](https://arxiv.org/abs/2103.03230). arXiv, 2021.
+[9] Jure Zbontar et al. [Barlow Twins: Self-Supervised Learning via Redundancy Reduction](https://arxiv.org/abs/2103.03230). 2021.
 
-[10] Francesco Locatello, Stefan Bauer, Mario Lucic, Gunnar Ratsch, Sylvain Gelly, Bernhard Scholkopf, Olivier Bachem. [Challenging Common Assumptions in the Unsupervised Learning of Disentangled Representations](https://arxiv.org/abs/1811.12359). arXiv, 2018.
+[10] Francesco Locatello et al. [Challenging Common Assumptions in the Unsupervised Learning of Disentangled Representations](https://arxiv.org/abs/1811.12359). 2018.
 
-[11] Bernhard Scholkopf, Francesco Locatello, Stefan Bauer, Nan Rosemary Ke, Nal Kalchbrenner, Anirudh Goyal, Yoshua Bengio. [Towards Causal Representation Learning](https://arxiv.org/abs/2102.11107). arXiv, 2021.
+[11] Bernhard Schölkopf et al. [Towards Causal Representation Learning](https://arxiv.org/abs/2102.11107). 2021.
