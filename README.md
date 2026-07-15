@@ -40,11 +40,11 @@ $$
 v_p=\frac{1}{T}\sum_{t=1}^{T}\lVert z_{t,p}-\bar z_p\rVert_2^2.
 $$
 
-Low-variation tokens are routed toward an attribute encoder $g_a$; high-variation tokens are routed toward a dynamics encoder $g_d$:
+Low-variation tokens are routed toward the attribute encoder $g_a$. High-variation tokens are routed toward the dynamics encoder $g_d$:
 
 $$
-S_{\mathrm{attr}}=g_a\!\left(\{z_{t,p}:v_p\le\tau_a\}\right), \qquad
-S_{\mathrm{dyn}}(1{:}t)=g_d\!\left(\{z_{s,p}:s\le t,\ v_p\ge\tau_d\}\right).
+S_{\text{attr}} = g_a(\left\lbrace z_{t,p}: v_p \le \tau_a \right\rbrace), \qquad
+S_{\text{dyn}}(1:t) = g_d(\left\lbrace z_{s,p}: s \le t,\ v_p \ge \tau_d \right\rbrace).
 $$
 
 In a gait clip, torso shape may enter the stable stream while alternating foot and knee positions enter the dynamic stream. Temporal variation is only an initial routing signal: a static room can still be a nuisance, and slow movement can still be dynamics. The probes described below determine whether the learned split is useful.

@@ -1,0 +1,82 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="620" viewBox="0 0 1280 620" role="img" aria-labelledby="title desc">
+  <title id="title">CoDy-JEPA counterfactual objective</title>
+  <desc id="desc">Stable attributes from clip A combine with dynamics from clip B. The predictor forecasts future dynamics and compares them with a target encoder while regularizers shape the streams.</desc>
+  <defs>
+    <marker id="arrow" markerWidth="12" markerHeight="12" refX="10" refY="6" orient="auto" markerUnits="strokeWidth">
+      <path d="M2,2 L10,6 L2,10 Z" fill="#334155"/>
+    </marker>
+    <style>
+      text { font-family: Inter, Arial, sans-serif; }
+      .title { font-size: 26px; font-weight: 700; fill: #0f172a; }
+      .body { font-size: 15px; fill: #334155; }
+      .label { font-size: 16px; font-weight: 700; fill: #0f172a; }
+      .small { font-size: 13px; fill: #475569; }
+      .formula { font-size: 16px; fill: #111827; font-family: "STIX Two Math", "Cambria Math", "Times New Roman", serif; font-style: italic; }
+      .roman { font-style: normal; }
+      .op { font-style: normal; font-family: Inter, Arial, sans-serif; }
+      .sub { font-size: 11px; baseline-shift: sub; }
+      .route { fill: none; stroke: #334155; stroke-width: 3; stroke-linecap: round; stroke-linejoin: round; marker-end: url(#arrow); }
+      .soft { fill: none; stroke: #64748b; stroke-width: 2.5; stroke-linecap: round; stroke-linejoin: round; marker-end: url(#arrow); }
+    </style>
+  </defs>
+
+  <rect width="1280" height="620" fill="#f8fafc"/>
+  <text x="48" y="52" class="title">Counterfactual prediction in latent space</text>
+  <text x="48" y="82" class="body">Stable context from A is paired with motion history from B. The target is still B's future dynamics.</text>
+
+  <g>
+    <rect x="64" y="142" width="246" height="130" rx="8" fill="#ecfdf5" stroke="#10b981" stroke-width="2"/>
+    <text x="96" y="180" class="label">Clip A</text>
+    <text x="96" y="210" class="small">stable tokens</text>
+    <text x="96" y="236" class="formula">S<tspan class="sub">attr</tspan>(A)</text>
+  </g>
+
+  <g>
+    <rect x="64" y="342" width="246" height="130" rx="8" fill="#fff7ed" stroke="#f97316" stroke-width="2"/>
+    <text x="96" y="380" class="label">Clip B</text>
+    <text x="96" y="410" class="small">past dynamics</text>
+    <text x="96" y="436" class="formula">S<tspan class="sub">dyn</tspan>(B, 1:t)</text>
+  </g>
+
+  <path class="route" d="M322 207 H370 V286 H420"/>
+  <path class="route" d="M322 407 H370 V330 H420"/>
+
+  <g>
+    <rect x="440" y="244" width="292" height="132" rx="8" fill="#ffffff" stroke="#06b6d4" stroke-width="2"/>
+    <text x="472" y="282" class="label">Counterfactual context</text>
+    <text x="472" y="312" class="small">Body or scene from A</text>
+    <text x="472" y="334" class="small">with motion history from B.</text>
+    <text x="472" y="360" class="formula">C<tspan class="sub">A←B</tspan></text>
+  </g>
+
+  <path class="route" d="M744 310 H790 V210 H842"/>
+
+  <g>
+    <rect x="862" y="132" width="300" height="136" rx="8" fill="#ffffff" stroke="#cbd5e1" stroke-width="2"/>
+    <text x="894" y="170" class="label">JEPA predictor</text>
+    <text x="894" y="200" class="small">Forecast B's future motion.</text>
+    <text x="894" y="226" class="formula">Ŝ<tspan class="sub">dyn</tspan>(B, t + k)</text>
+  </g>
+
+  <g>
+    <rect x="862" y="352" width="300" height="136" rx="8" fill="#ffffff" stroke="#cbd5e1" stroke-width="2"/>
+    <text x="894" y="390" class="label">Target encoder</text>
+    <text x="894" y="420" class="small">Stop-gradient future target.</text>
+    <text x="894" y="446" class="formula"><tspan class="op">sg</tspan>(S̄<tspan class="sub">dyn</tspan>(B, t + k))</text>
+  </g>
+
+  <path class="soft" d="M310 436 H790 V420 H842"/>
+
+  <g>
+    <rect x="944" y="288" width="218" height="46" rx="8" fill="#eef2ff" stroke="#818cf8" stroke-width="2"/>
+    <text x="984" y="318" class="label">Compare</text>
+  </g>
+  <path class="soft" d="M1012 270 V284"/>
+  <path class="soft" d="M1012 350 V338"/>
+
+  <g>
+    <rect x="64" y="520" width="1098" height="76" rx="8" fill="#ffffff" stroke="#cbd5e1" stroke-width="2"/>
+    <text x="94" y="552" class="formula">ℒ = ℒ<tspan class="sub">pred</tspan> + λ<tspan class="sub">h</tspan><tspan class="op"> HSIC</tspan>(S<tspan class="sub">attr</tspan>, S<tspan class="sub">dyn</tspan>) + λ<tspan class="sub">v</tspan>ℒ<tspan class="sub">var</tspan> + λ<tspan class="sub">c</tspan>ℒ<tspan class="sub">cov</tspan></text>
+    <text x="94" y="578" class="small">Prediction makes the future useful. HSIC separates streams. Variance and covariance terms prevent collapse.</text>
+  </g>
+</svg>
