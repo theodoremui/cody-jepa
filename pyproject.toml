@@ -12,10 +12,25 @@ dependencies = [
     "pandas>=2.3.3",
     "pillow>=12.3.0",
     "python-dotenv>=1.2.2",
-    "torch>=2.13.0",
-    "torchvision>=0.28.0",
+    "torch==2.6.0 ; sys_platform != 'linux' or platform_machine != 'x86_64'",
+    "torch==2.6.0+cu124 ; sys_platform == 'linux' and platform_machine == 'x86_64'",
+    "torchvision==0.21.0 ; sys_platform != 'linux' or platform_machine != 'x86_64'",
+    "torchvision==0.21.0+cu124 ; sys_platform == 'linux' and platform_machine == 'x86_64'",
     "tqdm>=4.68.4",
 ]
+
+[tool.uv.sources]
+torch = [
+    { index = "pytorch-cu124", marker = "sys_platform == 'linux' and platform_machine == 'x86_64'" },
+]
+torchvision = [
+    { index = "pytorch-cu124", marker = "sys_platform == 'linux' and platform_machine == 'x86_64'" },
+]
+
+[[tool.uv.index]]
+name = "pytorch-cu124"
+url = "https://download.pytorch.org/whl/cu124"
+explicit = true
 
 [build-system]
 requires = ["setuptools>=68"]

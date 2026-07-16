@@ -14,5 +14,6 @@ checkpoints/
 *.pt
 *.pth
 *.ckpt
-/tutorials/
+/tutorials/*
+!/tutorials/train-cody-jepa-on-haic.md
 notes/
