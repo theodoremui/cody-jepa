@@ -21,10 +21,18 @@ The current default training config is:
 | `img_size` | `72` | Each frame is resized to `72x72`. |
 | `patch_size` | `24` | Each frame is split into `24x24` patches. |
 | `num_tokens` | `144` | `16 * (72 / 24)^2 = 16 * 9` tokens per clip. |
-| `batch_size` | `16` | Sixteen clips are loaded per training step. |
-| `steps` | `1500` | Training stops after 1500 optimizer steps. |
+| `batch_size` | `64` | Sixty-four clips are loaded per training step. |
+| `num_epochs` | `25` | The training loop can make up to 25 passes over the training split. |
+| `steps` | `1500` | Maximum optimizer steps before the loop stops early. |
 | `lr` | `1e-4` | Adam learning rate. |
-| `ema_tau` | `0.999` | Target encoder exponential moving average rate. |
+| `ema_tau` | `0.9995` | Target encoder exponential moving average rate. |
+| `num_workers` | `8` | Eight CPU worker processes load and decode image batches. |
+| `pin_memory` | `True` | DataLoader prepares CPU tensors for faster transfer to CUDA. |
+
+Two details matter for HAIC:
+
+- Training ends when either limit is reached: `num_epochs=25` full passes or `steps=1500` optimizer updates. With the current manifest and `batch_size=64`, the 25-epoch limit will usually happen first.
+- With `batch_size=64` and `num_frames=16`, one training step reads `64 * 16 = 1024` silhouette frames before the GPU receives a batch.
 
 The notebook's `train_jepa` function chooses a device automatically. If CUDA is available, it uses the GPU. If CUDA is not available, it falls back to Apple MPS or CPU.
 
@@ -260,11 +268,18 @@ exit
 
 You are now back on the HAIC head node.
 
-## 8. Decide What You Want To Save
+## 8. Confirm What The Notebook Saves
 
-The notebook currently prints `result`, but printing a Python model is not the same as saving model weights. A batch job will end after execution, so save the trained state dictionaries before the kernel exits.
+The current notebook already saves the trained state dictionaries after the final training cell. This matters because a batch job ends when notebook execution finishes; anything only stored in Python memory disappears.
 
-Add this cell immediately after the final training cell in [`notebooks/01-cody-jepa.ipynb`](../notebooks/01-cody-jepa.ipynb). It saves the final model state and the full metric history:
+Confirm that this cell appears immediately after:
+
+```python
+result = train_jepa(CONFIG, train_loader, val_loader)
+result
+```
+
+The checkpoint cell should look like this:
 
 ```python
 OUTPUT_DIR = PROJECT_ROOT / "outputs" / "cody-jepa-haic"
@@ -290,11 +305,17 @@ The repo ignores `outputs/` and `*.pt`, so the checkpoint will stay local to HAI
 
 Important: this cell saves the final weights only. The local notebook experiment had its best validation loss around epoch 4, while the final epoch was worse. The saved `history` lets you see which epoch was best, but it does not restore the model weights from that earlier epoch.
 
-For the first HAIC replication run, keep the default notebook so you can compare the full curve. For a run where you want the currently best known weights without editing the training loop, set:
+For the first HAIC replication run, keep the default notebook so you can compare the full curve. For a shorter run that stops near epoch 4 with the current `batch_size=64`, use:
 
 ```python
 CONFIG["num_epochs"] = 4
-CONFIG["steps"] = 628
+CONFIG["steps"] = 160
+```
+
+Why `160`? The current training split is about 40 batches per epoch at `batch_size=64`, so 4 epochs is about `4 * 40 = 160` optimizer steps. If your manifest changes, recompute this as:
+
+```text
+steps = desired_epochs * ceil(number_of_training_clips / batch_size)
 ```
 
 Longer term, the better fix is to save a best-validation checkpoint inside `train_jepa`.
@@ -389,10 +410,14 @@ Replace `123456` with your job id.
 Expected training output looks like:
 
 ```text
-epoch 01 | step 0157 | train loss ... | val loss ...
-epoch 02 | step 0314 | train loss ... | val loss ...
+epoch 01 | step 0040 | train loss ... | val loss ...
+epoch 02 | step 0080 | train loss ... | val loss ...
 ...
 ```
+
+Those step counts are approximate for the current manifest and `batch_size=64`. If your data split changes, the step count per epoch changes too.
+
+The first `nvidia-smi` in the Slurm script runs before the notebook starts. It is normal for that early check to show `No running processes found`; it only proves that the GPU is allocated and currently idle. The GPU should show a Python process after the notebook reaches the full training cell.
 
 Stop watching the log with `Ctrl-C`. This does not cancel the job.
 
@@ -505,10 +530,16 @@ uv sync
 
 ### The notebook runs on CPU
 
-Search the notebook for a forced CPU device:
+Search the notebook for forced CPU usage:
 
 ```bash
 grep -n 'device="cpu"' notebooks/01-cody-jepa.ipynb
+```
+
+The notebook has a small smoke test that intentionally uses `device="cpu"`. That is fine. The important full-training cell should be:
+
+```python
+result = train_jepa(CONFIG, train_loader, val_loader)
 ```
 
 If the final full-training cell includes `device="cpu"`, remove that argument.
@@ -525,18 +556,20 @@ This requires the extracted dataset under `data/healthgait/raw/Health_Gait/`.
 
 ### The job ends but there is no checkpoint
 
-The notebook probably does not have the checkpoint-saving cell from Section 8. Add it and rerun the batch job.
+Use the latest repo version and confirm the checkpoint-saving cell from Section 8 executed after training. If the cell is missing or appears before `result = train_jepa(...)`, fix the notebook and rerun the batch job.
 
 ### The job is slow even on GPU
 
 Possible causes:
 
-- The DataLoader uses `num_workers=0`, which is simple but can underfeed the GPU.
+- The DataLoader still has to read and decode 1024 JPEG frames for every `batch_size=64` training step.
 - Frames are loaded as JPEGs one clip at a time.
 - The notebook runs diagnostics and visualizations before training.
 - The model is small, so the GPU may not be fully utilized.
 
-For the first run, correctness matters more than utilization. After the first successful run, consider increasing `num_workers`, moving repeated diagnostics out of the training notebook, or converting the notebook code into a script.
+The current notebook sets `num_workers=8` and `pin_memory=True`, which is the right first HAIC setting for `--cpus-per-task=8`. If the GPU is still idle most of the time, the bottleneck is probably JPEG loading or the pre-training notebook cells, not CUDA visibility.
+
+For the first run, correctness matters more than utilization. After the first successful run, consider moving repeated diagnostics out of the training notebook, caching clips in a more training-friendly format, or converting the notebook code into a script.
 
 ## 14. A Clean First Experiment Checklist
 
@@ -548,7 +581,8 @@ Before submitting:
 - [ ] `uv sync` succeeds on a compute node.
 - [ ] `torch.cuda.is_available()` prints `True` inside a GPU allocation.
 - [ ] The final training cell does not force `device="cpu"`.
-- [ ] The checkpoint-saving cell exists after training.
+- [ ] The checkpoint-saving cell exists after training and writes to `outputs/cody-jepa-haic/`.
+- [ ] `LOADER_CONFIG` uses `num_workers=8` and `pin_memory=True`.
 - [ ] The Slurm script has your real `--account=<ACCOUNT>`.
 
 After the job:
