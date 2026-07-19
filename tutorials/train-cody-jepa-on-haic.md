@@ -322,12 +322,20 @@ Longer term, the better fix is to save a best-validation checkpoint inside `trai
 
 ## 9. Submit The Notebook As A Batch Job
 
-Create a Slurm script from the repo root on the HAIC head node:
+Create the job directories from the repo root on the HAIC head node:
 
 ```bash
 cd /hai/scratch/$USER/cody-jepa
 mkdir -p slurm logs notebook-runs outputs/cody-jepa-haic
 ```
+
+Sync the Python environment before submitting the GPU job:
+
+```bash
+uv sync --frozen
+```
+
+This should finish before Slurm allocates a GPU. The batch job below uses `uv run --no-sync`, which means: use the existing `.venv` exactly as-is and do not spend paid GPU time resolving or installing packages. If this command fails because the environment is missing or stale, run `uv sync --frozen` again before resubmitting.
 
 Create `slurm/train-cody-jepa-notebook.sbatch`:
 
@@ -335,9 +343,9 @@ Create `slurm/train-cody-jepa-notebook.sbatch`:
 cat > slurm/train-cody-jepa-notebook.sbatch <<'SH'
 #!/bin/bash
 #SBATCH --job-name=cody-jepa
-#SBATCH --account=<ACCOUNT>
+#SBATCH --account=mind
 #SBATCH --partition=hai
-#SBATCH --gres=gpu:1
+#SBATCH --gres=gpu:h100:1
 #SBATCH --cpus-per-task=8
 #SBATCH --mem=64G
 #SBATCH --time=24:00:00
@@ -345,39 +353,58 @@ cat > slurm/train-cody-jepa-notebook.sbatch <<'SH'
 
 set -euo pipefail
 
+export PATH="$HOME/.local/bin:$PATH"
+
 cd /hai/scratch/$USER/cody-jepa
+mkdir -p logs notebook-runs outputs/cody-jepa-haic
+
+export PYTHONUNBUFFERED=1
+export MPLBACKEND=Agg
+export OMP_NUM_THREADS=1
+export MKL_NUM_THREADS=1
+export NUMEXPR_NUM_THREADS=1
 
 echo "job id: ${SLURM_JOB_ID:-unknown}"
 echo "host: $(hostname)"
 echo "started: $(date)"
+echo "repo: $(pwd)"
 
+echo "checking gpu: $(date)"
 nvidia-smi
 
-uv sync
-
-uv run python - <<'PY'
+echo "checking python environment: $(date)"
+uv run --no-sync python - <<'PY'
 import torch
 print("torch:", torch.__version__)
 print("torch cuda build:", torch.version.cuda)
 print("cuda:", torch.cuda.is_available())
-if torch.cuda.is_available():
-    print("gpu:", torch.cuda.get_device_name(0))
-else:
+if not torch.cuda.is_available():
     raise SystemExit("CUDA is not available; refusing to run notebook on CPU")
+print("gpu:", torch.cuda.get_device_name(0))
 PY
 
-uv run jupyter nbconvert \
+echo "starting notebook: $(date)"
+uv run --no-sync jupyter nbconvert \
   --to notebook \
   --execute notebooks/01-cody-jepa.ipynb \
   --output-dir notebook-runs \
   --output 01-cody-jepa-haic.executed.ipynb \
-  --ExecutePreprocessor.timeout=-1
+  --ExecutePreprocessor.timeout=-1 \
+  --Application.log_level=INFO
 
 echo "finished: $(date)"
 SH
 ```
 
-Edit the file and replace `<ACCOUNT>` with your HAIC account.
+This example uses the `mind` account and requests one H100 GPU. If HAIC gives you a different Slurm account, replace `mind` with that account name. Do not include angle brackets.
+
+Important: the final `SH` line is only part of the shell command that creates the file. If you open `slurm/train-cody-jepa-notebook.sbatch` in an editor later, the file should end with:
+
+```bash
+echo "finished: $(date)"
+```
+
+It should not contain a standalone `SH` line.
 
 Submit the job:
 
