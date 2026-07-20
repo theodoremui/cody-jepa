@@ -6,7 +6,7 @@ CoDy-JEPA (Counterfactual-Dynamical Joint-Embedding Predictive Architecture) is 
 
 The method is intended for people walking, hands gesturing, robot arms reaching, and other systems whose structure changes slowly while their state changes over time.
 
-> **Project status:** this repository currently contains the CoDy-JEPA research design and a tested Health&Gait silhouette data pipeline. It does not yet contain the CoDy-JEPA encoder, predictor, losses, or training loop. The runnable code prepares reproducible `[B, T, C, H, W]` batches, validates subject-disjoint splits, generates motion diagnostics, and exports a placeholder schema for future representation probes.
+> **Project status:** this repository contains the CoDy-JEPA research design, a strict Health&Gait silhouette data pipeline, and a tested single-stream masked-JEPA prototype. The prototype validates the training infrastructure and representation-learning signal; it is not yet the final dual-stream, counterfactual CoDy-JEPA model. The runnable pipeline prepares reproducible `[B, T, C, H, W]` batches, validates subject-disjoint data provenance, trains with resumable checkpoints, monitors collapse and context dependence, and exports a placeholder schema for later representation probes.
 
 ## Why CoDy-JEPA?
 
