@@ -71,8 +71,37 @@ Then run:
 
 ```bash
 nvidia-smi
+uv run python - <<'PY'
+import json
+import sys
+import torch
+
+torch.zeros(1, device="cuda").add_(1)
+torch.cuda.synchronize()
+print(json.dumps({
+    "cuda_compute_capability": torch.cuda.get_device_capability(),
+    "cuda_device_name": torch.cuda.get_device_name(),
+    "cuda_preflight": "passed",
+    "python_executable": sys.executable,
+    "torch_cuda_arch_list": torch.cuda.get_arch_list(),
+    "torch_cuda_version": torch.version.cuda,
+    "torch_version": torch.__version__,
+}, indent=2, sort_keys=True))
+PY
 uv run python -m unittest discover -s tests -v
 ```
+
+If the CUDA probe reports `no kernel image is available for execution on the
+device`, the notebook is loading an incompatible or stale PyTorch build. Repair
+the locked environment and rerun the same probe before decoding the dataset:
+
+```bash
+uv sync --frozen --reinstall-package torch --reinstall-package torchvision
+```
+
+Do not launch a separate system or Conda Jupyter process for this run. Use the
+project environment through `uv run`, and check `sys.executable` in the probe if
+an interactive notebook still selects the wrong kernel.
 
 Execute the notebook once with its default `RUN_FULL_TRAINING = False`. This validates the real manifest, sampled image integrity, subject isolation, and model geometry; it also decodes one deterministic clip from every train and validation sequence to reject blank or static sources, then runs a tiny CPU training loop without starting the expensive job:
 
@@ -101,7 +130,7 @@ Keep `CONFIG["required_device"] = "cuda"`. This makes a missing GPU fail immedia
 
 The flag is defined before dataset construction. Enabling it automatically changes the loader from sampled verification/fingerprinting to decoding and content-hashing every frame. The full job refuses to start unless both production integrity modes are active, so a corrupt nonsampled frame fails before optimization and exact resume is bound to every frame byte.
 
-If `outputs/single-stream-jepa-healthgait-v3/latest.pt` already exists, the notebook refuses to overwrite it unless you explicitly resume or choose a new output directory.
+If `outputs/single-stream-jepa/latest.pt` already exists, the notebook refuses to overwrite it unless you explicitly resume or choose a new output directory.
 
 ## Submit a batch job
 
@@ -120,7 +149,7 @@ Create `slurm/train-single-stream-jepa.sbatch`:
 
 set -euo pipefail
 cd /hai/scratch/$USER/cody-jepa
-mkdir -p logs notebook-runs outputs/single-stream-jepa-healthgait-v3
+mkdir -p logs notebook-runs outputs/single-stream-jepa
 
 nvidia-smi
 MPLCONFIGDIR=/tmp/mpl \
@@ -158,9 +187,9 @@ Expected artifacts:
 
 ```text
 notebook-runs/single-stream-jepa-haic.executed.ipynb
-outputs/single-stream-jepa-healthgait-v3/latest.pt
-outputs/single-stream-jepa-healthgait-v3/best_loss.pt
-outputs/single-stream-jepa-healthgait-v3/best_healthy.pt
+outputs/single-stream-jepa/latest.pt
+outputs/single-stream-jepa/best_loss.pt
+outputs/single-stream-jepa/best_healthy.pt
 logs/single-stream-jepa-<JOBID>.out
 ```
 
@@ -168,22 +197,26 @@ Inspect checkpoint metadata without loading it onto the GPU:
 
 ```bash
 uv run python - <<'PY'
+import json
 from pathlib import Path
 from cody_jepa.single_stream_jepa import load_checkpoint
 
+metadata = {}
 for name in ("latest.pt", "best_loss.pt", "best_healthy.pt"):
-    path = Path("outputs/single-stream-jepa-healthgait-v3") / name
+    path = Path("outputs/single-stream-jepa") / name
     if not path.exists():
-        print(name, "not written yet")
+        metadata[name] = {"status": "not_written_yet"}
         continue
     checkpoint = load_checkpoint(path)
-    print(name, {
-        "epoch": checkpoint["completed_epochs"],
-        "step": checkpoint["global_step"],
+    metadata[name] = {
         "best_epoch": checkpoint["best_epoch"],
         "best_val_loss": checkpoint["best_val_loss"],
-        "dataset": checkpoint["data_contract"]["train_dataset"]["dataset_sha256"],
-    })
+        "dataset_sha256": checkpoint["data_contract"]["train_dataset"]["dataset_sha256"],
+        "epoch": checkpoint["completed_epochs"],
+        "step": checkpoint["global_step"],
+        "status": "written",
+    }
+print(json.dumps(metadata, indent=2, sort_keys=True))
 PY
 ```
 

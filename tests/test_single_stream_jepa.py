@@ -4,6 +4,7 @@ import random
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 import torch
 from torch.utils.data import DataLoader, Dataset
@@ -17,6 +18,7 @@ from cody_jepa.single_stream_jepa import (
     multiblock_mask,
     optimizer_param_groups,
     representation_diagnostics,
+    resolve_device,
     subject_aware_context_sources,
     train_jepa,
     validate_resume_state,
@@ -103,6 +105,26 @@ def tiny_loaders(seed=7):
 
 
 class SingleStreamJEPATest(unittest.TestCase):
+    def test_cuda_kernel_preflight_reports_incompatible_torch_build(self):
+        with (
+            patch("torch.cuda.is_available", return_value=True),
+            patch(
+                "torch.zeros",
+                side_effect=RuntimeError(
+                    "CUDA error: no kernel image is available for execution on the device"
+                ),
+            ),
+            patch("torch.cuda.get_device_name", return_value="NVIDIA H100 80GB HBM3"),
+            patch("torch.cuda.get_device_capability", return_value=(9, 0)),
+            patch("torch.cuda.get_arch_list", return_value=["sm_70", "sm_80"]),
+        ):
+            with self.assertRaisesRegex(RuntimeError, "cuda_compute_capability=sm_90") as caught:
+                resolve_device("cuda")
+        message = str(caught.exception)
+        self.assertIn("torch_cuda_arch_list=['sm_70', 'sm_80']", message)
+        self.assertIn("uv sync --frozen --reinstall-package torch", message)
+        self.assertIn("python_executable=", message)
+
     def test_multiblock_masks_are_deterministic_disjoint_and_full_tubes(self):
         cfg = tiny_config()
         first = multiblock_mask(cfg, 3, random.Random(11))

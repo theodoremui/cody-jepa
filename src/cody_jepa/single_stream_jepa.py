@@ -17,6 +17,7 @@ import contextlib
 import math
 import os
 import random
+import sys
 import time
 import uuid
 
@@ -525,20 +526,67 @@ def _make_scaler(cfg, device):
     )
 
 
+def _validate_cuda_runtime(device):
+    try:
+        probe = torch.zeros(1, device=device)
+        probe.add_(1)
+        torch.cuda.synchronize(device)
+    except RuntimeError as error:
+        device_name = torch.cuda.get_device_name(device)
+        capability = torch.cuda.get_device_capability(device)
+        architectures = (
+            torch.cuda.get_arch_list() if hasattr(torch.cuda, "get_arch_list") else []
+        )
+        torch_cuda = getattr(torch.version, "cuda", None)
+        original_error = str(error)
+        incompatible_build = any(
+            signature in original_error.lower()
+            for signature in (
+                "no kernel image is available",
+                "invalid device function",
+                "not compatible with the current pytorch installation",
+            )
+        )
+        remediation = (
+            "This usually means the notebook kernel is using an incompatible or "
+            "stale PyTorch installation. On HAIC, run `uv sync --frozen "
+            "--reinstall-package torch --reinstall-package torchvision`, then "
+            "launch the notebook through `uv run --no-sync jupyter ...` and "
+            "restart the kernel."
+            if incompatible_build
+            else "The CUDA runtime failed before training; inspect the original "
+            "error below and the active notebook interpreter."
+        )
+        raise RuntimeError(
+            "CUDA is visible, but this PyTorch build cannot execute a kernel on "
+            f"{device_name} (cuda_compute_capability=sm_{capability[0]}{capability[1]}). "
+            f"torch_version={torch.__version__}, torch_cuda_version={torch_cuda}, "
+            f"torch_cuda_arch_list={architectures or 'unknown'}, "
+            f"python_executable={sys.executable}. {remediation} "
+            f"original_cuda_error={original_error}"
+        ) from error
+
+
 def resolve_device(required_device="auto"):
     if required_device == "cuda":
         if not torch.cuda.is_available():
             raise RuntimeError("this full run requires CUDA, but CUDA is unavailable")
-        return torch.device("cuda")
-    if required_device == "cpu":
-        return torch.device("cpu")
-    if required_device != "auto":
-        return torch.device(required_device)
-    if torch.cuda.is_available():
-        return torch.device("cuda")
-    if hasattr(torch.backends, "mps") and torch.backends.mps.is_available():
-        return torch.device("mps")
-    return torch.device("cpu")
+        device = torch.device("cuda")
+    elif required_device == "cpu":
+        device = torch.device("cpu")
+    elif required_device != "auto":
+        device = torch.device(required_device)
+    elif torch.cuda.is_available():
+        device = torch.device("cuda")
+    elif hasattr(torch.backends, "mps") and torch.backends.mps.is_available():
+        device = torch.device("mps")
+    else:
+        device = torch.device("cpu")
+    if device.type == "cuda":
+        if not torch.cuda.is_available():
+            raise RuntimeError("CUDA was requested, but CUDA is unavailable")
+        _validate_cuda_runtime(device)
+    return device
 
 
 def validate_training_config(cfg, train_loader):
@@ -1009,7 +1057,9 @@ def train_jepa(
     updates_per_epoch = validate_training_config(cfg, train_loader)
     seed = int(cfg.get("seed", 0))
     torch.manual_seed(seed)
-    device = resolve_device(cfg.get("required_device", "auto")) if device is None else torch.device(device)
+    device = resolve_device(
+        cfg.get("required_device", "auto") if device is None else device
+    )
     if device.type == "cuda":
         torch.backends.cuda.matmul.allow_tf32 = bool(cfg.get("tf32", False))
         torch.backends.cudnn.allow_tf32 = bool(cfg.get("tf32", False))
@@ -1262,15 +1312,16 @@ def train_jepa(
                 _atomic_torch_save(payload, Path(checkpoint_dir) / "best_healthy.pt")
 
         val_text = (
-            f" | val {val_metrics['loss']:.4f}, rank {val_metrics['effective_rank']:.1f}, "
-            f"shuffle-gap {val_metrics['context_shuffle_loss_gap']:.4f}"
+            f" | val_loss={val_metrics['loss']:.4f}, "
+            f"effective_rank={val_metrics['effective_rank']:.1f}, "
+            f"context_shuffle_loss_gap={val_metrics['context_shuffle_loss_gap']:.4f}"
             if val_metrics is not None
             else ""
         )
         print(
-            f"epoch {completed_epochs:03d} | step {global_step:05d} | "
-            f"lr {last_lr:.2e} | train {metrics['train_loss']:.4f}, "
-            f"cos {metrics['train_cosine']:.4f}{val_text}"
+            f"epoch={completed_epochs:03d} | step={global_step:05d} | "
+            f"lr={last_lr:.2e} | train_loss={metrics['train_loss']:.4f}, "
+            f"train_cosine={metrics['train_cosine']:.4f}{val_text}"
         )
 
     if global_step >= max_steps:
@@ -1343,6 +1394,7 @@ __all__ = [
     "multiblock_mask",
     "optimizer_param_groups",
     "representation_diagnostics",
+    "resolve_device",
     "train_jepa",
     "validate_resume_state",
     "video_from_batch",
