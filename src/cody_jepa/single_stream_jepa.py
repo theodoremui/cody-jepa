@@ -539,6 +539,8 @@ def _validate_cuda_runtime(device):
         )
         torch_cuda = getattr(torch.version, "cuda", None)
         original_error = str(error)
+        required_arch = f"sm_{capability[0]}{capability[1]}"
+        has_required_arch = required_arch in architectures
         incompatible_build = any(
             signature in original_error.lower()
             for signature in (
@@ -548,11 +550,14 @@ def _validate_cuda_runtime(device):
             )
         )
         remediation = (
-            "This usually means the notebook kernel is using an incompatible or "
-            "stale PyTorch installation. On HAIC, run `uv sync --frozen "
-            "--reinstall-package torch --reinstall-package torchvision`, then "
-            "launch the notebook through `uv run --no-sync jupyter ...` and "
-            "restart the kernel."
+            "This usually means the notebook kernel loaded a PyTorch build that "
+            f"does not include a runnable CUDA kernel for {required_arch}. If "
+            "HAIC allocated an H100/Hopper GPU, reinstall the locked project "
+            "environment with `uv sync --frozen --reinstall-package torch "
+            "--reinstall-package torchvision`, then launch the notebook through "
+            "`uv run --no-sync jupyter ...` and restart the kernel. If HAIC "
+            "allocated a newer Blackwell GPU, use a PyTorch CUDA 12.8+ build "
+            "or request a Hopper/H100 node."
             if incompatible_build
             else "The CUDA runtime failed before training; inspect the original "
             "error below and the active notebook interpreter."
@@ -562,6 +567,7 @@ def _validate_cuda_runtime(device):
             f"{device_name} (cuda_compute_capability=sm_{capability[0]}{capability[1]}). "
             f"torch_version={torch.__version__}, torch_cuda_version={torch_cuda}, "
             f"torch_cuda_arch_list={architectures or 'unknown'}, "
+            f"torch_has_required_cuda_arch={has_required_arch}, "
             f"python_executable={sys.executable}. {remediation} "
             f"original_cuda_error={original_error}"
         ) from error

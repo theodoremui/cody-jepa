@@ -122,7 +122,9 @@ class SingleStreamJEPATest(unittest.TestCase):
                 resolve_device("cuda")
         message = str(caught.exception)
         self.assertIn("torch_cuda_arch_list=['sm_70', 'sm_80']", message)
+        self.assertIn("torch_has_required_cuda_arch=False", message)
         self.assertIn("uv sync --frozen --reinstall-package torch", message)
+        self.assertIn("PyTorch CUDA 12.8+ build", message)
         self.assertIn("python_executable=", message)
 
     def test_multiblock_masks_are_deterministic_disjoint_and_full_tubes(self):

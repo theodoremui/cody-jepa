@@ -76,15 +76,20 @@ import json
 import sys
 import torch
 
+capability = torch.cuda.get_device_capability()
+required_arch = f"sm_{capability[0]}{capability[1]}"
+torch_cuda_arch_list = torch.cuda.get_arch_list()
 torch.zeros(1, device="cuda").add_(1)
 torch.cuda.synchronize()
 print(json.dumps({
-    "cuda_compute_capability": torch.cuda.get_device_capability(),
+    "cuda_compute_capability": capability,
     "cuda_device_name": torch.cuda.get_device_name(),
     "cuda_preflight": "passed",
     "python_executable": sys.executable,
-    "torch_cuda_arch_list": torch.cuda.get_arch_list(),
+    "required_cuda_arch": required_arch,
+    "torch_cuda_arch_list": torch_cuda_arch_list,
     "torch_cuda_version": torch.version.cuda,
+    "torch_has_required_cuda_arch": required_arch in torch_cuda_arch_list,
     "torch_version": torch.__version__,
 }, indent=2, sort_keys=True))
 PY
@@ -92,16 +97,24 @@ uv run python -m unittest discover -s tests -v
 ```
 
 If the CUDA probe reports `no kernel image is available for execution on the
-device`, the notebook is loading an incompatible or stale PyTorch build. Repair
-the locked environment and rerun the same probe before decoding the dataset:
+device`, compare `cuda_compute_capability` with `torch_cuda_arch_list`:
+
+- If HAIC allocated an H100/Hopper GPU and the required architecture is missing,
+  the notebook is loading an incompatible or stale PyTorch build. Repair the
+  locked environment and rerun the same probe before decoding the dataset:
 
 ```bash
 uv sync --frozen --reinstall-package torch --reinstall-package torchvision
 ```
 
+- If HAIC allocated a newer Blackwell GPU, the current locked PyTorch 2.6.0
+  CUDA 12.4 environment is the wrong binary family for that node. Request a
+  Hopper/H100 node for this locked run, or update the project pins to a PyTorch
+  CUDA 12.8+ build and regenerate `uv.lock` before training.
+
 Do not launch a separate system or Conda Jupyter process for this run. Use the
-project environment through `uv run`, and check `sys.executable` in the probe if
-an interactive notebook still selects the wrong kernel.
+project environment through `uv run`, and check `python_executable` in the probe
+if an interactive notebook still selects the wrong kernel.
 
 Execute the notebook once with its default `RUN_FULL_TRAINING = False`. This validates the real manifest, sampled image integrity, subject isolation, and model geometry; it also decodes one deterministic clip from every train and validation sequence to reject blank or static sources, then runs a tiny CPU training loop without starting the expensive job:
 
