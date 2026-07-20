@@ -60,7 +60,7 @@ Request a short interactive GPU allocation using the account and partition assig
 srun \
   --account=<ACCOUNT> \
   --partition=hai-interactive \
-  --gres=gpu:1 \
+  --gres=gpu:h100:1 \
   --cpus-per-task=8 \
   --mem=64G \
   --time=04:00:00 \
@@ -116,9 +116,23 @@ Do not launch a separate system or Conda Jupyter process for this run. Use the
 project environment through `uv run`, and check `python_executable` in the probe
 if an interactive notebook still selects the wrong kernel.
 
-Execute the notebook once with its default `RUN_FULL_TRAINING = False`. This validates the real manifest, sampled image integrity, subject isolation, and model geometry; it also decodes one deterministic clip from every train and validation sequence to reject blank or static sources, then runs a tiny CPU training loop without starting the expensive job:
+After the CUDA probe and tests pass, leave the GPU shell. Execute the notebook
+once in a CPU-only Slurm allocation, without `--gres` and without the training
+flag. This validates the real manifest, sampled image integrity, subject
+isolation, and model geometry. It also decodes one deterministic clip from
+every train and validation sequence to reject blank or static sources, then
+runs a tiny CPU training loop without occupying an allocated GPU:
 
 ```bash
+exit
+srun \
+  --account=<ACCOUNT> \
+  --partition=hai-interactive \
+  --cpus-per-task=8 \
+  --mem=64G \
+  --time=01:00:00 \
+  --pty bash
+cd /hai/scratch/$USER/cody-jepa
 mkdir -p notebook-runs
 MPLCONFIGDIR=/tmp/mpl \
 uv run jupyter nbconvert \
@@ -133,13 +147,17 @@ Do not continue if preflight raises an error. In particular, the loader refuses 
 
 ## Enable the full run
 
-Near the top of the notebook, change only:
+Set `CODY_JEPA_RUN_FULL_TRAINING=1` in the job environment. Do not edit the
+notebook. Full training defaults `CODY_JEPA_RUN_DATA_AUDIT` to `0`, because the
+all-sequence audit was already completed above. The training path still checks
+the full manifest, every frame name and size, sampled frame bytes, subject
+isolation, and a real batch. It then runs one production-size BF16
+forward/backward step on the allocated GPU before starting epoch 1.
 
-```python
-RUN_FULL_TRAINING = True
-```
-
-Keep `CONFIG["required_device"] = "cuda"`. This makes a missing GPU fail immediately instead of silently starting a multi-day CPU run. Keep `compile=False` for the first successful eager run; compilation is an optional later benchmark.
+Keep `CONFIG["required_device"] = "cuda"`. This makes a missing GPU fail
+immediately instead of silently starting a multi-day CPU run. Keep
+`compile=False` for the first successful eager run; compilation is an optional
+later benchmark.
 
 If you later test `compile=True`, run it only after the eager CUDA run has
 completed a short checkpoint. `torch.compile` on CUDA uses TorchInductor and
@@ -167,7 +185,11 @@ print("torch.compile CUDA smoke test: passed")
 PY
 ```
 
-The flag is defined before dataset construction. Enabling it automatically changes the loader from sampled verification/fingerprinting to decoding and content-hashing every frame. The full job refuses to start unless both production integrity modes are active, so a corrupt nonsampled frame fails before optimization and exact resume is bound to every frame byte.
+Exhaustive certification of all 321,247 frames is intentionally separate from
+GPU training. To run it as a one-time I/O job, set
+`CODY_JEPA_RUN_EXHAUSTIVE_DATA_AUDIT=1` and leave
+`CODY_JEPA_RUN_FULL_TRAINING=0`. Do not combine those flags in an H100 job: the
+exhaustive mode opens every image and reads every frame byte before model work.
 
 If `outputs/single-stream-jepa/latest.pt` already exists, the notebook refuses to overwrite it unless you explicitly resume or choose a new output directory.
 
@@ -180,10 +202,10 @@ Create `slurm/train-single-stream-jepa.sbatch`:
 #SBATCH --job-name=single-stream-jepa
 #SBATCH --account=<ACCOUNT>
 #SBATCH --partition=hai
-#SBATCH --gres=gpu:1
+#SBATCH --gres=gpu:h100:1
 #SBATCH --cpus-per-task=8
 #SBATCH --mem=64G
-#SBATCH --time=24:00:00
+#SBATCH --time=72:00:00
 #SBATCH --output=logs/single-stream-jepa-%j.out
 
 set -euo pipefail
@@ -191,12 +213,26 @@ cd /hai/scratch/$USER/cody-jepa
 mkdir -p logs notebook-runs outputs/single-stream-jepa
 
 nvidia-smi
+gpu_name=$(nvidia-smi --query-gpu=name --format=csv,noheader | head -1)
+case "$gpu_name" in
+  *H100*) ;;
+  *) echo "Expected an H100, got: $gpu_name" >&2; exit 2 ;;
+esac
+nvidia-smi \
+  --query-gpu=timestamp,name,utilization.gpu,memory.used,memory.total \
+  --format=csv --loop=60 > "logs/gpu-${SLURM_JOB_ID}.csv" &
+gpu_monitor_pid=$!
+trap 'kill "$gpu_monitor_pid" 2>/dev/null || true' EXIT
+
+CODY_JEPA_RUN_FULL_TRAINING=1 \
+CODY_JEPA_RUN_DATA_AUDIT=0 \
+CODY_JEPA_RUN_EXHAUSTIVE_DATA_AUDIT=0 \
 MPLCONFIGDIR=/tmp/mpl \
 uv run --no-sync jupyter nbconvert \
   --to notebook \
   --execute notebooks/single-stream-jepa.ipynb \
   --output-dir notebook-runs \
-  --output single-stream-jepa-haic.executed.ipynb \
+  --output "single-stream-jepa-${SLURM_JOB_ID}.executed.ipynb" \
   --ExecutePreprocessor.timeout=-1
 ```
 
@@ -207,29 +243,43 @@ mkdir -p logs notebook-runs
 sbatch slurm/train-single-stream-jepa.sbatch
 squeue -u "$USER"
 tail -f logs/single-stream-jepa-<JOBID>.out
+tail -f logs/gpu-<JOBID>.csv
 ```
 
 ## Resume an interrupted run
 
-The notebook writes `latest.pt` only after a complete epoch, so the saved DataLoader, mask, Torch, optimizer, scaler, and EMA states share one exact boundary. Set:
+The notebook writes `latest.pt` only after a complete epoch, so the saved
+DataLoader, mask, Torch, optimizer, scaler, and EMA states share one exact
+boundary. Resume without editing the notebook:
 
-```python
-RUN_FULL_TRAINING = True
-RESUME_CHECKPOINT = OUTPUT_DIR / "latest.pt"
+```bash
+CODY_JEPA_RUN_FULL_TRAINING=1 \
+CODY_JEPA_RESUME_CHECKPOINT=outputs/single-stream-jepa/latest.pt \
+MPLCONFIGDIR=/tmp/mpl \
+uv run --no-sync jupyter nbconvert \
+  --to notebook \
+  --execute notebooks/single-stream-jepa.ipynb \
+  --output-dir notebook-runs \
+  --output "single-stream-jepa-${SLURM_JOB_ID}.resumed.ipynb" \
+  --ExecutePreprocessor.timeout=-1
 ```
 
-Resume validation rejects a changed architecture, mask policy, optimizer behavior, loader contract, manifest hash, or frame-inventory fingerprint. This prevents accidentally mixing datasets or training policies in one run.
+Resume validation rejects a changed architecture, mask policy, optimizer
+behavior, loader contract, manifest hash, or frame-inventory fingerprint. The
+fingerprint covers every frame name and size plus sampled frame contents. Use
+the separate exhaustive audit when a byte-for-byte certification is required.
 
 ## Inspect results
 
 Expected artifacts:
 
 ```text
-notebook-runs/single-stream-jepa-haic.executed.ipynb
+notebook-runs/single-stream-jepa-<JOBID>.executed.ipynb
 outputs/single-stream-jepa/latest.pt
 outputs/single-stream-jepa/best_loss.pt
 outputs/single-stream-jepa/best_healthy.pt
 logs/single-stream-jepa-<JOBID>.out
+logs/gpu-<JOBID>.csv
 ```
 
 Inspect checkpoint metadata without loading it onto the GPU:
