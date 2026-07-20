@@ -7,6 +7,9 @@ pillow>=12.3.0
 python-dotenv>=1.2.2
 tqdm>=4.68.4
 
+[:platform_machine == "x86_64" and sys_platform == "linux"]
+triton==3.2.0
+
 [:sys_platform != "linux" or platform_machine != "x86_64"]
 torch==2.6.0
 torchvision==0.21.0

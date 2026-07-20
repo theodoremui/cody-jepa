@@ -1,6 +1,7 @@
 README.md
 pyproject.toml
 src/cody_jepa/__init__.py
+src/cody_jepa/single_stream_jepa.py
 src/cody_jepa.egg-info/PKG-INFO
 src/cody_jepa.egg-info/SOURCES.txt
 src/cody_jepa.egg-info/dependency_links.txt
@@ -12,3 +13,4 @@ src/cody_jepa/data/healthgait.py
 src/cody_jepa/data/healthgait_diagnostics.py
 tests/test_healthgait_dataset.py
 tests/test_healthgait_diagnostics.py
+tests/test_single_stream_jepa.py

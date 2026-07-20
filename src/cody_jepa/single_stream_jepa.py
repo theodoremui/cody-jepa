@@ -14,6 +14,7 @@ from collections.abc import Mapping, Sequence
 from dataclasses import asdict, dataclass
 from pathlib import Path
 import contextlib
+import importlib.util
 import math
 import os
 import random
@@ -1041,11 +1042,45 @@ def validate_resume_state(state, cfg, mask_groups, data_contract):
             raise ValueError(f"checkpoint config mismatch for {key!r}")
 
 
-def _maybe_compile(module, cfg):
+def _validate_compile_runtime(device):
+    if device.type != "cuda":
+        return
+    try:
+        from torch.utils._triton import has_triton
+
+        triton_available = bool(has_triton())
+    except Exception:
+        triton_available = False
+    if triton_available:
+        return
+
+    triton_spec = importlib.util.find_spec("triton")
+    triton_version = None
+    if triton_spec is not None:
+        try:
+            import triton
+
+            triton_version = getattr(triton, "__version__", "unknown")
+        except Exception as error:
+            triton_version = f"import_failed:{error!r}"
+    raise RuntimeError(
+        "compile=True requested CUDA torch.compile, but TorchInductor cannot "
+        "use Triton in this environment. Run this HAIC training job with "
+        "CONFIG['compile'] = False, or repair the environment with "
+        "`uv sync --frozen --reinstall-package torch --reinstall-package triton` "
+        "and rerun a small torch.compile CUDA smoke test before training. "
+        f"torch_version={torch.__version__}, "
+        f"triton_module={triton_spec.origin if triton_spec else None}, "
+        f"triton_version={triton_version}, python_executable={sys.executable}"
+    )
+
+
+def _maybe_compile(module, cfg, device):
     if not cfg.get("compile", False):
         return module
     if not hasattr(torch, "compile"):
         raise RuntimeError("torch.compile was requested but is unavailable")
+    _validate_compile_runtime(device)
     return torch.compile(module, dynamic=True)
 
 
@@ -1117,9 +1152,9 @@ def train_jepa(
         if device.type == "cuda" and resume_state.get("cuda_rng_state") is not None:
             torch.cuda.set_rng_state_all(resume_state["cuda_rng_state"])
 
-    context_runner = _maybe_compile(context_encoder, cfg)
-    target_runner = _maybe_compile(target_encoder, cfg)
-    predictor_runner = _maybe_compile(predictor, cfg)
+    context_runner = _maybe_compile(context_encoder, cfg, device)
+    target_runner = _maybe_compile(target_encoder, cfg, device)
+    predictor_runner = _maybe_compile(predictor, cfg, device)
     accumulation_steps = int(cfg["accumulation_steps"])
     max_steps = int(cfg["steps"])
     if int(cfg["num_epochs"]) * updates_per_epoch < max_steps:

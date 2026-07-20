@@ -17,6 +17,7 @@ dependencies = [
     "torchvision==0.21.0 ; sys_platform != 'linux' or platform_machine != 'x86_64'",
     "torchvision==0.21.0+cu124 ; sys_platform == 'linux' and platform_machine == 'x86_64'",
     "tqdm>=4.68.4",
+    "triton==3.2.0 ; platform_machine == 'x86_64' and sys_platform == 'linux'",
 ]
 
 [tool.uv.sources]

@@ -24,7 +24,7 @@ from cody_jepa.single_stream_jepa import (
     validate_resume_state,
     video_from_batch,
 )
-from cody_jepa.single_stream_jepa import _prediction_metrics
+from cody_jepa.single_stream_jepa import _maybe_compile, _prediction_metrics
 
 
 def tiny_config(num_epochs=2):
@@ -126,6 +126,18 @@ class SingleStreamJEPATest(unittest.TestCase):
         self.assertIn("uv sync --frozen --reinstall-package torch", message)
         self.assertIn("PyTorch CUDA 12.8+ build", message)
         self.assertIn("python_executable=", message)
+
+    def test_cuda_compile_requires_working_triton_before_first_batch(self):
+        cfg = tiny_config()
+        cfg["compile"] = True
+        with (
+            patch("torch.utils._triton.has_triton", return_value=False),
+        ):
+            with self.assertRaisesRegex(RuntimeError, "TorchInductor cannot use Triton") as caught:
+                _maybe_compile(torch.nn.Identity(), cfg, torch.device("cuda"))
+        message = str(caught.exception)
+        self.assertIn("CONFIG['compile'] = False", message)
+        self.assertIn("--reinstall-package triton", message)
 
     def test_multiblock_masks_are_deterministic_disjoint_and_full_tubes(self):
         cfg = tiny_config()

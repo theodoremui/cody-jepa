@@ -141,6 +141,32 @@ RUN_FULL_TRAINING = True
 
 Keep `CONFIG["required_device"] = "cuda"`. This makes a missing GPU fail immediately instead of silently starting a multi-day CPU run. Keep `compile=False` for the first successful eager run; compilation is an optional later benchmark.
 
+If you later test `compile=True`, run it only after the eager CUDA run has
+completed a short checkpoint. `torch.compile` on CUDA uses TorchInductor and
+Triton; if Triton is missing or too old, PyTorch raises
+`BackendCompilerFailed: Cannot find a working triton installation`. Keep
+`compile=False` for production training until this smoke test passes:
+
+```bash
+uv run python - <<'PY'
+import torch
+from torch.utils._triton import has_triton
+
+print({"has_triton": has_triton(), "torch": torch.__version__})
+if not has_triton():
+    raise SystemExit("Triton is unavailable; keep CONFIG['compile'] = False")
+
+@torch.compile
+def add_one(x):
+    return x + 1
+
+x = torch.zeros(8, device="cuda")
+add_one(x)
+torch.cuda.synchronize()
+print("torch.compile CUDA smoke test: passed")
+PY
+```
+
 The flag is defined before dataset construction. Enabling it automatically changes the loader from sampled verification/fingerprinting to decoding and content-hashing every frame. The full job refuses to start unless both production integrity modes are active, so a corrupt nonsampled frame fails before optimization and exact resume is bound to every frame byte.
 
 If `outputs/single-stream-jepa/latest.pt` already exists, the notebook refuses to overwrite it unless you explicitly resume or choose a new output directory.
