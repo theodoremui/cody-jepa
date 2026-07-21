@@ -15,15 +15,6 @@ from .dataset import REQUIRED_MANIFEST_COLUMNS
 
 IMAGE_SUFFIXES = frozenset({".jpg", ".png"})
 MOTION_ARTIFACT_STEM = "healthgait_motion_diagnostics"
-PROBE_EXPORT_STEM = "healthgait_dummy_probe_exports"
-PROBE_METADATA_COLUMNS = [
-    "sequence_id",
-    "split",
-    "subject_id",
-    "gait_system",
-    "trial",
-    "window_start",
-]
 
 
 def _pyplot():
@@ -216,113 +207,6 @@ def _diagnostic_record(sample):
     return record, video, diff_map
 
 
-def _cycle_stats(stats, latent_dim):
-    return [float(stats[index % len(stats)]) for index in range(latent_dim)]
-
-
-def _probe_vectors(sample, latent_dim):
-    video = _to_numpy_video(sample["video"])
-    temporal_diff = np.abs(np.diff(video, axis=0))
-    frame_means = video.reshape(video.shape[0], -1).mean(axis=1)
-    frame_stds = video.reshape(video.shape[0], -1).std(axis=1)
-
-    attr_stats = [
-        video.mean(),
-        video.std(),
-        video.min(),
-        video.max(),
-        frame_means[0],
-        frame_means[video.shape[0] // 2],
-        frame_means[-1],
-        np.count_nonzero(video > 1e-6) / video.size,
-    ]
-    if temporal_diff.size:
-        diff_frame_means = temporal_diff.reshape(temporal_diff.shape[0], -1).mean(axis=1)
-        dyn_stats = [
-            temporal_diff.mean(),
-            temporal_diff.std(),
-            temporal_diff.max(),
-            diff_frame_means.mean(),
-            diff_frame_means.std(),
-            abs(float(frame_means[-1] - frame_means[0])),
-            np.count_nonzero(temporal_diff > 1e-6) / temporal_diff.size,
-            frame_stds.std(),
-        ]
-    else:
-        dyn_stats = [0.0] * 8
-
-    return _cycle_stats(attr_stats, latent_dim), _cycle_stats(dyn_stats, latent_dim)
-
-
-def _probe_fieldnames(latent_dim):
-    return [
-        *PROBE_METADATA_COLUMNS,
-        *(f"s_attr_{index}" for index in range(latent_dim)),
-        *(f"s_dyn_{index}" for index in range(latent_dim)),
-    ]
-
-
-def _probe_row(sample, latent_dim):
-    s_attr, s_dyn = _probe_vectors(sample, latent_dim)
-    row = {
-        "sequence_id": str(sample["sequence_id"]),
-        "split": str(sample["split"]),
-        "subject_id": str(sample["subject_id"]),
-        "gait_system": str(sample["gait_system"]),
-        "trial": str(sample["trial"]),
-        "window_start": int(sample["window_start"]),
-    }
-    for index, value in enumerate(s_attr):
-        row[f"s_attr_{index}"] = f"{value:.8f}"
-    for index, value in enumerate(s_dyn):
-        row[f"s_dyn_{index}"] = f"{value:.8f}"
-    return row
-
-
-def write_healthgait_dummy_probe_exports(
-    datasets,
-    output_dir,
-    stem=PROBE_EXPORT_STEM,
-    latent_dim=8,
-    samples_per_split=None,
-    seed=0,
-    epoch=0,
-):
-    """Write probe-ready placeholder stream exports from deterministic clip statistics."""
-    latent_dim = int(latent_dim)
-    if latent_dim <= 0:
-        raise ValueError(f"latent_dim must be positive; got {latent_dim}")
-
-    output_dir = Path(output_dir)
-    output_dir.mkdir(parents=True, exist_ok=True)
-    csv_path = output_dir / f"{stem}.csv"
-    fieldnames = _probe_fieldnames(latent_dim)
-    dataset_by_split = _dataset_map(datasets)
-    rows = []
-
-    for split, dataset in sorted(dataset_by_split.items()):
-        previous_epoch = getattr(dataset, "epoch", None)
-        if hasattr(dataset, "set_epoch"):
-            dataset.set_epoch(epoch)
-        try:
-            if samples_per_split is None:
-                indices = range(len(dataset))
-            else:
-                indices = _sample_indices(split, len(dataset), samples_per_split, seed, epoch)
-            for index in indices:
-                rows.append(_probe_row(dataset[index], latent_dim))
-        finally:
-            if previous_epoch is not None and hasattr(dataset, "set_epoch"):
-                dataset.set_epoch(previous_epoch)
-
-    with csv_path.open("w", newline="") as csv_file:
-        writer = csv.DictWriter(csv_file, fieldnames=fieldnames)
-        writer.writeheader()
-        writer.writerows(rows)
-
-    return {"csv": csv_path, "fieldnames": fieldnames, "row_count": len(rows)}
-
-
 def _save_contact_sheet(records, videos, output_path):
     plt = _pyplot()
     columns = 3
@@ -484,6 +368,5 @@ def run_healthgait_motion_diagnostics(
 __all__ = [
     "run_healthgait_motion_diagnostics",
     "summarize_healthgait_manifest",
-    "write_healthgait_dummy_probe_exports",
     "write_healthgait_metadata_summary",
 ]

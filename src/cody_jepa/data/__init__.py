@@ -12,16 +12,15 @@ from .healthgait import (
     VALID_WINDOW_POLICIES,
     audit_healthgait_clip_quality,
     build_healthgait_dataset_from_config,
-    build_healthgait_datasets,
     build_healthgait_datasets_from_config,
-    build_healthgait_loaders,
     build_healthgait_loaders_from_config,
     find_repo_root,
     healthgait_manifest_path,
     preview_manifest,
+)
+from .healthgait_diagnostics import (
     run_healthgait_motion_diagnostics,
     summarize_healthgait_manifest,
-    write_healthgait_dummy_probe_exports,
     write_healthgait_metadata_summary,
 )
 
@@ -40,15 +39,12 @@ __all__ = [
     "VALID_WINDOW_POLICIES",
     "audit_healthgait_clip_quality",
     "build_healthgait_dataset_from_config",
-    "build_healthgait_datasets",
     "build_healthgait_datasets_from_config",
-    "build_healthgait_loaders",
     "build_healthgait_loaders_from_config",
     "find_repo_root",
     "healthgait_manifest_path",
     "preview_manifest",
     "run_healthgait_motion_diagnostics",
     "summarize_healthgait_manifest",
-    "write_healthgait_dummy_probe_exports",
     "write_healthgait_metadata_summary",
 ]

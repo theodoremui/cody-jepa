@@ -16,7 +16,6 @@ if str(SRC_ROOT) not in sys.path:
 from cody_jepa.data import (
     run_healthgait_motion_diagnostics,
     summarize_healthgait_manifest,
-    write_healthgait_dummy_probe_exports,
     write_healthgait_metadata_summary,
 )
 
@@ -194,71 +193,6 @@ class HealthGaitMotionDiagnosticsTest(unittest.TestCase):
 
             compact_summary = json.loads(first["artifacts"]["json"].read_text())
             self.assertEqual(compact_summary["sample_count"], 5)
-
-
-class HealthGaitDummyProbeExportTest(unittest.TestCase):
-    @staticmethod
-    def _ramp_video():
-        frames = [torch.full((1, 2, 2), value) for value in (0.0, 0.25, 0.5, 0.75)]
-        return torch.stack(frames)
-
-    @staticmethod
-    def _steady_video():
-        return torch.full((4, 1, 2, 2), 0.5, dtype=torch.float32)
-
-    def test_probe_export_locks_schema_and_uses_deterministic_clip_stats(self):
-        train = SyntheticMotionDataset("train", [(self._ramp_video(), "ramp")])
-        val = SyntheticMotionDataset("val", [(self._steady_video(), "steady")])
-        train.set_epoch(11)
-        val.set_epoch(13)
-
-        with tempfile.TemporaryDirectory() as temporary_dir:
-            root = Path(temporary_dir)
-            first = write_healthgait_dummy_probe_exports(
-                [train, val], root / "first", latent_dim=4, epoch=2
-            )
-            second = write_healthgait_dummy_probe_exports(
-                [train, val], root / "second", latent_dim=4, epoch=2
-            )
-
-            expected_fieldnames = [
-                "sequence_id",
-                "split",
-                "subject_id",
-                "gait_system",
-                "trial",
-                "window_start",
-                "s_attr_0",
-                "s_attr_1",
-                "s_attr_2",
-                "s_attr_3",
-                "s_dyn_0",
-                "s_dyn_1",
-                "s_dyn_2",
-                "s_dyn_3",
-            ]
-            self.assertEqual(first["fieldnames"], expected_fieldnames)
-            self.assertEqual(first["row_count"], 2)
-            self.assertEqual(first["csv"].read_text(), second["csv"].read_text())
-            self.assertEqual(train.epoch, 11)
-            self.assertEqual(val.epoch, 13)
-
-            with first["csv"].open(newline="") as csv_file:
-                rows = list(csv.DictReader(csv_file))
-
-            self.assertEqual(rows[0]["sequence_id"], "train-ramp")
-            self.assertEqual(rows[0]["split"], "train")
-            self.assertEqual(rows[0]["window_start"], "2")
-            self.assertEqual(rows[0]["s_attr_0"], "0.37500000")
-            self.assertEqual(rows[0]["s_attr_1"], "0.27950850")
-            self.assertEqual(rows[0]["s_attr_2"], "0.00000000")
-            self.assertEqual(rows[0]["s_attr_3"], "0.75000000")
-            self.assertEqual(rows[0]["s_dyn_0"], "0.25000000")
-            self.assertEqual(rows[0]["s_dyn_1"], "0.00000000")
-            self.assertEqual(rows[0]["s_dyn_2"], "0.25000000")
-            self.assertEqual(rows[0]["s_dyn_3"], "0.25000000")
-            self.assertEqual(rows[1]["sequence_id"], "val-steady")
-            self.assertEqual(rows[1]["s_dyn_0"], "0.00000000")
 
 
 if __name__ == "__main__":

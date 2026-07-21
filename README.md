@@ -6,7 +6,7 @@ CoDy-JEPA (Counterfactual-Dynamical Joint-Embedding Predictive Architecture) is 
 
 The method is intended for people walking, hands gesturing, robot arms reaching, and other systems whose structure changes slowly while their state changes over time.
 
-> **Project status:** this repository contains the CoDy-JEPA research design, a strict Health&Gait silhouette data pipeline, and a tested single-stream masked-JEPA prototype. The prototype validates the training infrastructure and representation-learning signal; it is not yet the final dual-stream, counterfactual CoDy-JEPA model. The runnable pipeline prepares reproducible `[B, T, C, H, W]` batches, validates subject-disjoint data provenance, trains with resumable checkpoints, monitors collapse and context dependence, and exports a placeholder schema for later representation probes.
+> **Project status:** this repository contains the CoDy-JEPA research design, a strict Health&Gait silhouette data pipeline, and a tested single-stream masked-JEPA prototype. The prototype validates the training infrastructure and representation-learning signal; it is not yet the final dual-stream, counterfactual CoDy-JEPA model. The runnable pipeline prepares reproducible `[B, T, C, H, W]` batches, validates subject-disjoint data provenance, trains with resumable checkpoints, monitors collapse and context dependence, and evaluates frozen learned representations with linear probes.
 
 ## Why CoDy-JEPA?
 
@@ -114,6 +114,33 @@ Training loss alone cannot show that the streams learned the intended informatio
 | Camera, room, or dataset source | Measure and control | Low |
 
 The central measurement is the **leakage gap**: `S_dyn` should predict motion variables well and identity variables poorly. Transfer probes should be trained on one set of subjects, views, or robot embodiments and evaluated on held-out ones.
+
+### Single-stream frozen-feature probes
+
+The trained single-stream baseline has a two-stage probe runner. Feature export
+restores only the EMA target encoder, freezes it, switches it to evaluation mode,
+and runs under `torch.inference_mode()`. Each deterministic clip window becomes
+one row containing its manifest metadata and the mean-pooled, pre-final-LayerNorm
+target tokens:
+
+```bash
+uv run python scripts/export_single_stream_features.py \
+  --checkpoint outputs/single-stream-jepa/best_loss.pt \
+  --output outputs/single-stream-jepa/frozen_features.npz \
+  --device cuda
+
+uv run python scripts/eval_probes.py \
+  --features outputs/single-stream-jepa/frozen_features.npz \
+  --output-dir outputs/single-stream-jepa/probes
+```
+
+The evaluator reports three protocols in both JSON and CSV: a sequence-disjoint
+closed-set identity classifier over training subjects, nearest-centroid identity
+retrieval over separately enrolled validation subjects, and a `gait_system`
+linear classifier trained on training subjects and evaluated on subject-disjoint
+validation subjects. Balanced accuracy is the primary gait metric. The exporter
+accepts `.csv` or compressed `.npz`; both carry a JSON provenance sidecar with
+the checkpoint hash and exact feature formula.
 
 The proposed ablations are:
 
@@ -228,10 +255,9 @@ The notebook walks through:
 - `[B, T, C, H, W]` DataLoader batches;
 - deterministic temporal-window sampling;
 - clip contact sheets and frame-difference diagnostics;
-- motion-energy summaries; and
-- placeholder `S_attr` and `S_dyn` probe exports.
+- motion-energy summaries.
 
-The placeholder exports contain deterministic clip statistics, not learned CoDy-JEPA representations. They establish the table schema that later model checkpoints should produce.
+Learned representations are exported and evaluated with the frozen-feature probe workflow described above, after a checkpoint has been trained.
 
 ## Data-pipeline guarantees
 
@@ -254,7 +280,9 @@ cody-jepa/
 ├── notebooks/
 │   └── healthgait_manifest_loader.ipynb
 ├── scripts/
-│   └── build_healthgait_manifest.py
+│   ├── build_healthgait_manifest.py
+│   ├── export_single_stream_features.py
+│   └── eval_probes.py
 ├── src/cody_jepa/data/             # Dataset, loaders, and diagnostics
 ├── tests/                          # Fixture-based data-pipeline tests
 ├── pyproject.toml                  # Project metadata and dependencies

@@ -6,12 +6,6 @@ import torch
 from torch.utils.data import DataLoader
 
 from .dataset import HealthGaitManifestDataset, ManifestValidationError, VALID_SPLITS
-from .healthgait_diagnostics import (
-    run_healthgait_motion_diagnostics,
-    summarize_healthgait_manifest,
-    write_healthgait_dummy_probe_exports,
-    write_healthgait_metadata_summary,
-)
 
 
 DEFAULT_BATCH_SIZE = 16
@@ -202,39 +196,6 @@ def preview_manifest(manifest_csv, n=3):
         return [row for _, row in zip(range(n), reader)]
 
 
-def build_healthgait_datasets(
-    manifest_csv=None,
-    repo_root=None,
-    clip_length=DEFAULT_CLIP_LENGTH,
-    image_size=DEFAULT_IMAGE_SIZE,
-    base_seed=DEFAULT_BASE_SEED,
-):
-    """Build train and validation Health&Gait datasets from a manifest."""
-    root = find_repo_root() if repo_root is None else Path(repo_root)
-    manifest = healthgait_manifest_path(root) if manifest_csv is None else Path(manifest_csv)
-
-    train_ds = HealthGaitManifestDataset(
-        manifest,
-        split="train",
-        repo_root=root,
-        clip_length=clip_length,
-        image_size=image_size,
-        random_windows=True,
-        base_seed=base_seed,
-    )
-    val_ds = HealthGaitManifestDataset(
-        manifest,
-        split="val",
-        repo_root=root,
-        clip_length=clip_length,
-        image_size=image_size,
-        random_windows=False,
-        base_seed=base_seed,
-    )
-
-    return train_ds, val_ds
-
-
 def build_healthgait_dataset_from_config(
     config, *, _validated_samples=None, _manifest_sha256=None, _inventory_sha256=None
 ):
@@ -262,7 +223,9 @@ def build_healthgait_dataset_from_config(
         image_verify_mode=config.image_verify_mode,
         inventory_hash_mode=config.inventory_hash_mode,
         allowed_data_root=config.allowed_data_root,
-        deterministic_windows=(config.eval_windows if config.split == "val" else 1),
+        # Explicitly deterministic training datasets are also useful for frozen
+        # probes. Random training datasets must remain one-window-per-sequence.
+        deterministic_windows=(config.eval_windows if not config.uses_random_windows() else 1),
         _validated_samples=_validated_samples,
         _manifest_sha256=_manifest_sha256,
         _inventory_sha256=_inventory_sha256,
@@ -279,47 +242,6 @@ def build_healthgait_datasets_from_config(config):
         _inventory_sha256=train_ds._inventory_sha256,
     )
     return train_ds, val_ds
-
-
-def build_healthgait_loaders(
-    manifest_csv=None,
-    repo_root=None,
-    clip_length=DEFAULT_CLIP_LENGTH,
-    image_size=DEFAULT_IMAGE_SIZE,
-    batch_size=DEFAULT_BATCH_SIZE,
-    num_workers=0,
-    pin_memory=False,
-    base_seed=DEFAULT_BASE_SEED,
-):
-    """Build train and validation DataLoaders with notebook-safe defaults."""
-    train_ds, val_ds = build_healthgait_datasets(
-        manifest_csv=manifest_csv,
-        repo_root=repo_root,
-        clip_length=clip_length,
-        image_size=image_size,
-        base_seed=base_seed,
-    )
-
-    train_generator = torch.Generator()
-    train_generator.manual_seed(int(base_seed))
-
-    train_loader = DataLoader(
-        train_ds,
-        batch_size=batch_size,
-        shuffle=True,
-        num_workers=num_workers,
-        pin_memory=pin_memory,
-        generator=train_generator,
-    )
-    val_loader = DataLoader(
-        val_ds,
-        batch_size=batch_size,
-        shuffle=False,
-        num_workers=num_workers,
-        pin_memory=pin_memory,
-    )
-
-    return train_loader, val_loader
 
 
 def build_healthgait_loaders_from_config(config, datasets=None):
@@ -446,16 +368,10 @@ __all__ = [
     "HealthGaitLoaderConfig",
     "VALID_WINDOW_POLICIES",
     "build_healthgait_dataset_from_config",
-    "build_healthgait_datasets",
     "build_healthgait_datasets_from_config",
-    "build_healthgait_loaders",
     "build_healthgait_loaders_from_config",
     "audit_healthgait_clip_quality",
     "find_repo_root",
     "healthgait_manifest_path",
     "preview_manifest",
-    "run_healthgait_motion_diagnostics",
-    "summarize_healthgait_manifest",
-    "write_healthgait_dummy_probe_exports",
-    "write_healthgait_metadata_summary",
 ]

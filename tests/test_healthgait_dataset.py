@@ -341,6 +341,28 @@ class HealthGaitDatasetSeedTest(unittest.TestCase):
             self.assertEqual(tuple(val_batch["video"].shape), (1, 4, 1, 6, 6))
             self.assertIn("subject_id", train_batch)
 
+    def test_deterministic_train_config_honors_eval_windows_for_feature_export(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            manifest = self._write_fixture(root)
+            config = HealthGaitLoaderConfig(
+                manifest_csv=manifest,
+                repo_root=root,
+                split="train",
+                clip_length=4,
+                image_size=(6, 6),
+                window_policy="center",
+                eval_windows=3,
+            )
+
+            train_ds, val_ds = build_healthgait_datasets_from_config(config)
+
+            self.assertFalse(train_ds.random_windows)
+            self.assertEqual(train_ds.deterministic_windows, 3)
+            self.assertEqual(val_ds.deterministic_windows, 3)
+            self.assertEqual(len(train_ds), len(train_ds.samples) * 3)
+            self.assertEqual(len(val_ds), len(val_ds.samples) * 3)
+
     def test_loader_config_rejects_unsupported_loss_path_channels(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)

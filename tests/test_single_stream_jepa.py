@@ -23,7 +23,6 @@ from cody_jepa.single_stream_jepa import (
     optimizer_param_groups,
     representation_diagnostics,
     resolve_device,
-    subject_aware_context_sources,
     train_jepa,
     validate_resume_state,
     video_from_batch,
@@ -625,15 +624,6 @@ class SingleStreamJEPATest(unittest.TestCase):
             self.assertTrue((Path(tmp) / "latest.pt").is_file())
             self.assertTrue((Path(tmp) / "best_loss.pt").is_file())
             self.assertFalse(list(Path(tmp).glob("*.tmp")))
-
-    def test_subject_aware_context_sources_never_pair_the_same_subject(self):
-        subjects = ["A", "A", "A", "B", "B", "C"]
-        sources = subject_aware_context_sources(subjects)
-        self.assertIsNotNone(sources)
-        self.assertTrue(
-            all(subjects[index] != subjects[source] for index, source in enumerate(sources))
-        )
-        self.assertIsNone(subject_aware_context_sources(["A", "A"]))
 
     def test_aligned_completion_reports_max_steps(self):
         cfg = tiny_config(num_epochs=1)

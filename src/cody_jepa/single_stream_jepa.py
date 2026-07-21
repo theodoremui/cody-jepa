@@ -399,7 +399,8 @@ class Predictor(nn.Module):
         return self.out(hidden)
 
 
-def build_models(cfg, device, mask_groups=DEFAULT_MASK_GROUPS):
+def build_encoder(cfg, device):
+    """Build one encoder from a saved single-stream configuration."""
     encoder_args = (
         cfg["embed_dim"],
         cfg["hidden_dim"],
@@ -414,8 +415,12 @@ def build_models(cfg, device, mask_groups=DEFAULT_MASK_GROUPS):
         cfg.get("uniform_power", True),
         cfg.get("norm_eps", 1e-6),
     )
-    context_encoder = VisionTransformer(*encoder_args).to(device)
-    target_encoder = VisionTransformer(*encoder_args).to(device)
+    return VisionTransformer(*encoder_args).to(device)
+
+
+def build_models(cfg, device, mask_groups=DEFAULT_MASK_GROUPS):
+    context_encoder = build_encoder(cfg, device)
+    target_encoder = build_encoder(cfg, device)
     target_encoder.load_state_dict(context_encoder.state_dict())
     target_encoder.requires_grad_(False).eval()
     predictor = Predictor(
@@ -830,15 +835,6 @@ def balanced_wrong_subject_permutation(subject_ids, seed):
     if any(subjects[index] == subjects[source] for index, source in enumerate(sources)):
         raise RuntimeError("subject-aware context construction failed")
     return sources
-
-
-def subject_aware_context_sources(subject_ids):
-    """Legacy import alias using the corrected fail-closed pairing contract.
-
-    Unlike the pre-schema-3 helper, this returns ``None`` when a no-reuse
-    cross-subject permutation is mathematically impossible.
-    """
-    return balanced_wrong_subject_permutation(subject_ids, seed=0)
 
 
 def _dataset_subject_id(dataset, index):
@@ -1626,6 +1622,7 @@ __all__ = [
     "Predictor",
     "VisionTransformer",
     "balanced_wrong_subject_permutation",
+    "build_encoder",
     "build_models",
     "ema_tau_for_step",
     "ema_update",

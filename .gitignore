@@ -4,6 +4,7 @@
 .DS_Store
 .env
 .venv/
+*.egg-info/
 __pycache__/
 .ipynb_checkpoints/
 slurm-*.out
