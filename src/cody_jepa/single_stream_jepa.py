@@ -2,7 +2,10 @@
 
 This module intentionally implements a V-JEPA-style masked latent prediction
 baseline. It does not implement CoDy-JEPA's later counterfactual or explicit
-future-dynamics objective. Production defaults to BF16. FP16 is supported with
+future-dynamics objective. It does support CoDy-JEPA's VICReg-style variance
+and covariance anti-collapse safeguards (``var_coef``/``cov_coef``) and
+optional cross-batch target standardization, because EMA-only anti-collapse
+proved insufficient at this data and batch scale. Production defaults to BF16. FP16 is supported with
 gradient scaling, but non-finite unscaled gradients intentionally fail fast
 instead of silently skipping examples and changing the exact-resume trajectory.
 """
@@ -634,6 +637,15 @@ def validate_training_config(cfg, train_loader):
     loss_exp = float(cfg.get("loss_exp", 1.0))
     if not math.isfinite(loss_exp) or loss_exp < 1.0:
         raise ValueError("loss_exp must be finite and at least 1")
+    for key in ("var_coef", "cov_coef"):
+        value = float(cfg.get(key, 0.0))
+        if not math.isfinite(value) or value < 0:
+            raise ValueError(f"{key} must be finite and non-negative")
+    var_gamma = float(cfg.get("var_gamma", 1.0))
+    if not math.isfinite(var_gamma) or var_gamma <= 0:
+        raise ValueError("var_gamma must be finite and positive")
+    if not isinstance(cfg.get("target_batch_standardize", False), bool):
+        raise ValueError("target_batch_standardize must be a bool")
     input_mean = float(cfg.get("input_mean", 0.5))
     input_std = float(cfg.get("input_std", 0.5))
     if not math.isfinite(input_mean) or not math.isfinite(input_std) or input_std <= 0:
@@ -721,14 +733,60 @@ def _prediction_metrics(predicted, target, loss_exp):
     return per_example_loss, per_example_cosine
 
 
+def vicreg_regularization(features, gamma=1.0):
+    """Return VICReg-style (variance_loss, covariance_loss) for token features.
+
+    ``features`` is ``[N, D]`` or ``[B, K, D]``; token rows are treated as
+    samples. The variance term hinges each dimension's std toward ``gamma`` so
+    dimensions cannot die; the covariance term penalizes off-diagonal feature
+    correlation so information spreads across dimensions instead of collapsing
+    onto a few directions.
+    """
+    if features.ndim == 3:
+        features = features.reshape(-1, features.size(-1))
+    if features.ndim != 2:
+        raise ValueError("features must be [N, D] or [B, K, D]")
+    if features.size(0) < 2:
+        raise ValueError("variance/covariance penalties need at least 2 samples")
+    if not math.isfinite(gamma) or gamma <= 0:
+        raise ValueError("gamma must be finite and positive")
+    features = features.float()
+    centered = features - features.mean(dim=0, keepdim=True)
+    variance = centered.pow(2).mean(dim=0)
+    standard_deviation = torch.sqrt(variance + 1e-4)
+    variance_loss = F.relu(gamma - standard_deviation).mean()
+    covariance = centered.T @ centered / (features.size(0) - 1)
+    off_diagonal = covariance - torch.diag_embed(covariance.diagonal())
+    covariance_loss = off_diagonal.pow(2).sum() / features.size(1)
+    return variance_loss, covariance_loss
+
+
 @torch.no_grad()
-def encode_targets(target_encoder, video, return_pre_norm=False):
+def encode_targets(
+    target_encoder, video, return_pre_norm=False, batch_standardize=False
+):
+    """Encode EMA targets.
+
+    ``batch_standardize=True`` additionally standardizes every feature
+    dimension across all tokens in the batch (mean 0, std 1). This removes the
+    constant-target escape hatch: a prediction that ignores context cannot
+    match targets whose per-dimension batch statistics are forced to vary. It
+    intentionally couples targets to batch composition, which is deterministic
+    here because loaders use fixed batching and seeded ordering.
+    """
     encoded = target_encoder(video, return_pre_norm=return_pre_norm)
     if return_pre_norm:
         normalized, pre_norm = encoded
     else:
         normalized, pre_norm = encoded, None
     normalized = F.layer_norm(normalized, (normalized.size(-1),))
+    if batch_standardize:
+        flat = normalized.reshape(-1, normalized.size(-1)).float()
+        if flat.size(0) < 2:
+            raise ValueError("batch standardization needs at least 2 tokens")
+        mean = flat.mean(dim=0)
+        standard_deviation = flat.std(dim=0, unbiased=False).clamp_min(1e-4)
+        normalized = ((normalized - mean) / standard_deviation).to(normalized.dtype)
     return normalized, pre_norm
 
 
@@ -740,6 +798,7 @@ def group_forward(
     mask_group,
     mask_index,
     loss_exp,
+    return_context_tokens=False,
 ):
     context_indices = mask_group["ctx"]
     target_indices = mask_group["pred"]
@@ -752,6 +811,8 @@ def group_forward(
         context_tokens, context_indices, target_indices, mask_index=mask_index
     )
     loss, cosine = _prediction_metrics(predicted, target_tokens, loss_exp)
+    if return_context_tokens:
+        return loss, cosine, context_tokens
     return loss, cosine
 
 
@@ -1006,7 +1067,11 @@ def evaluate_jepa(
         with _autocast_context(cfg, device):
             online_tokens = context_encoder(video)
             pooled_features.append(online_tokens.float().mean(dim=1).cpu())
-            targets, _ = encode_targets(target_encoder, video)
+            targets, _ = encode_targets(
+                target_encoder,
+                video,
+                batch_standardize=bool(cfg.get("target_batch_standardize", False)),
+            )
             batch_loss = torch.zeros(video.size(0), device=device)
             batch_cosine = torch.zeros(video.size(0), device=device)
             for mask_index, mask_group in enumerate(masks):
@@ -1338,6 +1403,10 @@ def train_jepa(
     predictor_runner = _maybe_compile(predictor, cfg, device)
     accumulation_steps = int(cfg["accumulation_steps"])
     max_steps = int(cfg["steps"])
+    var_coef = float(cfg.get("var_coef", 0.0))
+    cov_coef = float(cfg.get("cov_coef", 0.0))
+    var_gamma = float(cfg.get("var_gamma", 1.0))
+    regularization_active = var_coef > 0.0 or cov_coef > 0.0
     if int(cfg["num_epochs"]) * updates_per_epoch < max_steps:
         print(
             f"warning: num_epochs can produce only "
@@ -1361,6 +1430,7 @@ def train_jepa(
         pending_examples = 0
         pending_microbatches = 0
         epoch_loss_sum = epoch_cosine_sum = 0.0
+        epoch_variance_sum = epoch_covariance_sum = 0.0
         epoch_examples = 0
         grad_norm_sum = 0.0
         grad_updates = 0
@@ -1380,11 +1450,17 @@ def train_jepa(
                 cfg, video.size(0), mask_rng, device=device, mask_groups=mask_groups
             )
             with _autocast_context(cfg, device):
-                targets, _ = encode_targets(target_runner, video)
+                targets, _ = encode_targets(
+                    target_runner,
+                    video,
+                    batch_standardize=bool(
+                        cfg.get("target_batch_standardize", False)
+                    ),
+                )
             batch_loss = batch_cosine = 0.0
             for mask_index, mask_group in enumerate(masks):
                 with _autocast_context(cfg, device):
-                    losses, cosines = group_forward(
+                    losses, cosines, context_tokens = group_forward(
                         context_runner,
                         predictor_runner,
                         video,
@@ -1392,11 +1468,30 @@ def train_jepa(
                         mask_group,
                         mask_index,
                         float(cfg.get("loss_exp", 1.0)),
+                        return_context_tokens=True,
                     )
                     group_loss = losses.mean()
-                if not torch.isfinite(group_loss):
+                total_group_loss = group_loss
+                if regularization_active:
+                    # Computed outside autocast in float32 for a stable
+                    # covariance estimate; gradients still flow to the encoder.
+                    variance_loss, covariance_loss = vicreg_regularization(
+                        context_tokens.float(), var_gamma
+                    )
+                    total_group_loss = (
+                        total_group_loss
+                        + var_coef * variance_loss
+                        + cov_coef * covariance_loss
+                    )
+                    epoch_variance_sum += (
+                        float(variance_loss.detach()) * video.size(0) / len(masks)
+                    )
+                    epoch_covariance_sum += (
+                        float(covariance_loss.detach()) * video.size(0) / len(masks)
+                    )
+                if not torch.isfinite(total_group_loss):
                     raise FloatingPointError("non-finite JEPA loss before backward")
-                weighted = group_loss * video.size(0)
+                weighted = total_group_loss * video.size(0)
                 scaler.scale(weighted).backward()
                 batch_loss += float(losses.detach().sum()) / len(masks)
                 batch_cosine += float(cosines.detach().sum()) / len(masks)
@@ -1477,6 +1572,16 @@ def train_jepa(
             "grad_norm": grad_norm_sum / max(1, grad_updates),
             "train_loss": epoch_loss_sum / epoch_examples,
             "train_cosine": epoch_cosine_sum / epoch_examples,
+            "train_variance_loss": (
+                epoch_variance_sum / epoch_examples
+                if regularization_active
+                else None
+            ),
+            "train_covariance_loss": (
+                epoch_covariance_sum / epoch_examples
+                if regularization_active
+                else None
+            ),
             "train_examples": epoch_examples,
             "epoch_seconds": epoch_seconds,
             "examples_per_second": epoch_examples / max(epoch_seconds, 1e-12),
@@ -1636,5 +1741,6 @@ __all__ = [
     "resolve_device",
     "train_jepa",
     "validate_resume_state",
+    "vicreg_regularization",
     "video_from_batch",
 ]

@@ -8,6 +8,22 @@ The method is intended for people walking, hands gesturing, robot arms reaching,
 
 > **Project status:** this repository contains the CoDy-JEPA research design, a strict Health&Gait silhouette data pipeline, and a tested single-stream masked-JEPA prototype. The prototype validates the training infrastructure and representation-learning signal; it is not yet the final dual-stream, counterfactual CoDy-JEPA model. The runnable pipeline prepares reproducible `[B, T, C, H, W]` batches, validates subject-disjoint data provenance, trains with resumable checkpoints, monitors collapse and context dependence, and evaluates frozen learned representations with linear probes.
 
+## Navigate this repository
+
+Use this table as the shortest path to the part of the project you need:
+
+| Goal | Start here |
+| --- | --- |
+| Understand the research question and proposed dual-stream method | [Why CoDy-JEPA?](#why-cody-jepa), [Method](#method), and [Evaluation](#evaluation) |
+| Install the locked environment and run tests | [Quick start](#quick-start) |
+| Download Health&Gait and create the subject-disjoint manifest | [Prepare Health&Gait](#prepare-healthgait) and [`scripts/build_healthgait_manifest.py`](scripts/build_healthgait_manifest.py) |
+| Inspect batches, sampling, and motion diagnostics | [Explore the data pipeline](#explore-the-data-pipeline) and [`notebooks/healthgait_manifest_loader.ipynb`](notebooks/healthgait_manifest_loader.ipynb) |
+| Run the safe single-stream smoke test or configure training | [Run the single-stream prototype](#run-the-single-stream-prototype) and [`notebooks/single-stream-jepa.ipynb`](notebooks/single-stream-jepa.ipynb) |
+| Train on Stanford HAIC with an H100 | [`tutorials/train-cody-jepa-on-haic.md`](tutorials/train-cody-jepa-on-haic.md) and [`slurm/train-single-stream-jepa.sbatch`](slurm/train-single-stream-jepa.sbatch) |
+| Export a checkpoint and measure learned information | [Single-stream frozen-feature probes](#single-stream-frozen-feature-probes) |
+| Find a model, loader, script, test, or result | [Code and repository guide](#code-and-repository-guide) |
+| Review the existing split-leakage evidence | [`haic-results/split-sanity-check.md`](haic-results/split-sanity-check.md) |
+
 ## Why CoDy-JEPA?
 
 Video models can solve the wrong problem for the right score. If one person always appears in one room and walks at one speed, a model may associate the room or identity with speed instead of learning gait phase and cadence. This is **shortcut learning**: the model exploits a correlation that works on a familiar split but fails when the person, camera, or environment changes [6].
@@ -259,6 +275,30 @@ The notebook walks through:
 
 Learned representations are exported and evaluated with the frozen-feature probe workflow described above, after a checkpoint has been trained.
 
+### Run the single-stream prototype
+
+[`notebooks/single-stream-jepa.ipynb`](notebooks/single-stream-jepa.ipynb) is the experiment controller. The reusable model, masking, evaluation, and checkpoint code lives in [`src/cody_jepa/single_stream_jepa.py`](src/cody_jepa/single_stream_jepa.py); the notebook configures that code rather than duplicating it.
+
+Open the notebook through the locked environment:
+
+```bash
+uv run jupyter lab notebooks/single-stream-jepa.ipynb
+```
+
+With no environment flags, `Run All` validates the configured Health&Gait data and executes a one-step synthetic CPU smoke test. A real training run requires a CUDA worker and is deliberately opt-in. These are the notebook's runtime controls:
+
+| Environment variable | Default | Purpose |
+| --- | --- | --- |
+| `CODY_JEPA_RUN_FULL_TRAINING` | `0` | Set to `1` to run the full CUDA training path after the real-batch CUDA preflight. |
+| `CODY_JEPA_RUN_DATA_AUDIT` | `1` for preflight, `0` for full training | Runs the all-sequence clip-quality audit separately from expensive GPU training. |
+| `CODY_JEPA_RUN_EXHAUSTIVE_DATA_AUDIT` | `0` | Verifies and hashes every frame. Use as a separate CPU/I/O certification job. |
+| `CODY_JEPA_OUTPUT_DIR` | `outputs/single-stream-jepa` | Selects the checkpoint directory. A new run refuses to overwrite an existing `latest.pt`. |
+| `CODY_JEPA_RESUME_CHECKPOINT` | unset | Resumes from an explicit epoch-boundary checkpoint after validating its model and data contract. |
+
+The baseline uses multiblock tube masking, an online context encoder, an exponential-moving-average target encoder, and a predictor. Its training path supports BF16, gradient accumulation, optional `torch.compile`, target batch standardization, and VICReg-style variance/covariance safeguards. Validation reports prediction metrics, feature variance and effective rank, plus a seeded wrong-subject context-shuffle gap. It writes `latest.pt`, `best_loss.pt`, and, only when the representation-health checks pass, `best_healthy.pt`.
+
+For the production H100 settings, submission commands, monitoring, resume procedure, output inspection, and troubleshooting, follow the [HAIC training guide](tutorials/train-cody-jepa-on-haic.md). The checked-in [Slurm script](slurm/train-single-stream-jepa.sbatch) is the source of truth for scheduler resources and environment flags.
+
 ## Data-pipeline guarantees
 
 `HealthGaitManifestDataset` validates the full manifest before yielding samples. It rejects:
@@ -272,24 +312,103 @@ Learned representations are exported and evaluated with the frozen-feature probe
 
 Each sample is a normalized grayscale tensor shaped `[T, C, H, W]` plus its source metadata. Frames are loaded only when requested, so the full dataset is not held in memory.
 
-## Repository layout
+## Code and repository guide
+
+### End-to-end code flow
+
+```text
+Health&Gait frames
+    │
+    ├─ scripts/build_healthgait_manifest.py
+    │      └─ subject-disjoint CSV + metadata summaries
+    │
+    ├─ cody_jepa.data
+    │      └─ validated datasets → deterministic DataLoaders → diagnostics
+    │
+    ├─ notebooks/single-stream-jepa.ipynb
+    │      └─ cody_jepa.single_stream_jepa → training → checkpoints
+    │
+    ├─ scripts/export_single_stream_features.py
+    │      └─ frozen EMA-target features + provenance sidecar
+    │
+    └─ scripts/eval_probes.py
+           └─ identity and gait-system metrics in JSON + CSV
+```
+
+The notebooks are entry points for exploration and experiment orchestration. The reusable and tested implementation is under `src/cody_jepa/`; command-line workflows live under `scripts/`.
+
+### Tracked repository layout
 
 ```text
 cody-jepa/
-├── images/                         # Method and evaluation diagrams
+├── .gitignore
+├── .python-version                  # Local Python version hint
+├── README.md                        # Research overview and repository entry point
+├── pyproject.toml                   # Package metadata and locked dependency policy
+├── uv.lock                          # Exact cross-platform dependency resolution
+├── images/                          # Seven research, method, objective, and evaluation SVGs
 ├── notebooks/
-│   └── healthgait_manifest_loader.ipynb
+│   ├── healthgait_manifest_loader.ipynb  # Data-contract and diagnostics walkthrough
+│   └── single-stream-jepa.ipynb          # Safe smoke test and full-training controller
 ├── scripts/
-│   ├── build_healthgait_manifest.py
-│   ├── export_single_stream_features.py
-│   └── eval_probes.py
-├── src/cody_jepa/data/             # Dataset, loaders, and diagnostics
-├── tests/                          # Fixture-based data-pipeline tests
-├── pyproject.toml                  # Project metadata and dependencies
-└── README.md
+│   ├── build_healthgait_manifest.py      # Scan frames and write the subject split
+│   ├── export_single_stream_features.py  # Checkpoint → deterministic feature table
+│   └── eval_probes.py                    # Feature table → linear-probe reports
+├── slurm/
+│   └── train-single-stream-jepa.sbatch   # HAIC H100 batch job
+├── src/cody_jepa/
+│   ├── __init__.py
+│   ├── single_stream_jepa.py             # Masking, ViT, predictor, training, eval, resume
+│   ├── probes.py                         # Feature I/O, provenance, and probe protocols
+│   └── data/
+│       ├── __init__.py                   # Public data-pipeline exports
+│       ├── dataset.py                    # Strict manifest dataset and frame loading
+│       ├── healthgait.py                 # Loader config, builders, and quality audit
+│       └── healthgait_diagnostics.py     # Summaries, plots, and motion diagnostics
+├── tests/
+│   ├── test_healthgait_dataset.py        # Sampling, manifests, provenance, augmentation
+│   ├── test_healthgait_diagnostics.py    # Summary and motion-diagnostic artifacts
+│   ├── test_probes.py                    # Frozen export, formats, and probe protocols
+│   ├── test_single_stream_jepa.py        # Model, masks, training, health, checkpoints
+│   ├── test_single_stream_notebook.py    # Notebook safety and orchestration invariants
+│   └── test_uv_policy.py                 # Locked-environment policy checks
+├── tutorials/
+│   └── train-cody-jepa-on-haic.md        # Full H100 operator runbook
+└── haic-results/
+    ├── single-stream-jepa-90881.executed.ipynb  # Archived executed experiment
+    ├── split-sanity-check.md                    # Split leakage investigation
+    └── split_nearest_pairs_top12.png            # Nearest-pair evidence image
 ```
 
-Large datasets, model outputs, and checkpoints are intentionally excluded from version control.
+### Source modules and change map
+
+| Area | Read or modify | Verify with |
+| --- | --- | --- |
+| Manifest rules, frame discovery, temporal windows, augmentation, or sample metadata | `src/cody_jepa/data/dataset.py` and `src/cody_jepa/data/healthgait.py` | `tests/test_healthgait_dataset.py` |
+| Dataset summaries, contact sheets, difference maps, or motion-energy checks | `src/cody_jepa/data/healthgait_diagnostics.py` | `tests/test_healthgait_diagnostics.py` |
+| Mask generation, video transformer, predictor, schedules, training, validation, or checkpoint resume | `src/cody_jepa/single_stream_jepa.py` | `tests/test_single_stream_jepa.py` |
+| Frozen feature schema, checkpoint restoration, identity protocols, or gait-system probe | `src/cody_jepa/probes.py` | `tests/test_probes.py` |
+| Experiment configuration and the boundary between CPU audit and CUDA training | `notebooks/single-stream-jepa.ipynb` | `tests/test_single_stream_notebook.py` |
+| Dependency or environment policy | `pyproject.toml`, `uv.lock`, and notebook shell commands | `tests/test_uv_policy.py` |
+| HAIC resource requests and job lifecycle | `slurm/train-single-stream-jepa.sbatch` | `bash -n slurm/train-single-stream-jepa.sbatch` and the HAIC tutorial |
+
+### Data, outputs, and archived evidence
+
+The tracked repository is intentionally small. A fresh clone does not contain Health&Gait frames or trained checkpoints.
+
+| Path | Lifecycle |
+| --- | --- |
+| `data/healthgait/raw/` | Local dataset extracted from Zenodo; ignored by Git. |
+| `data/healthgait/manifests/` and `data/healthgait/diagnostics/` | Reproducible local products of the manifest and diagnostic workflows; the whole `data/` tree is ignored. |
+| `outputs/`, `checkpoints/`, `runs/`, `*.pt`, `*.pth`, `*.ckpt` | Local training and evaluation products; ignored by Git. |
+| `logs/` and `notebook-runs/` | Created by the Slurm workflow for scheduler/GPU logs and executed notebooks. Treat them as run artifacts and review them before committing. |
+| `haic-results/` | Curated, tracked evidence from completed HAIC experiments. It is for inspection, not imported by training code or tests. |
+
+When adding behavior, keep reusable logic in `src/cody_jepa/`, keep notebooks thin, add the corresponding focused test, and run the full suite before submitting changes:
+
+```bash
+MPLCONFIGDIR=/tmp/mpl uv run python -m unittest discover -s tests -v
+```
 
 ## References
 

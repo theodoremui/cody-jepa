@@ -16,6 +16,7 @@ from cody_jepa.single_stream_jepa import (
     balanced_wrong_subject_permutation,
     build_models,
     ema_tau_for_step,
+    encode_targets,
     evaluate_jepa,
     healthy_checkpoint_path,
     learning_rate_for_step,
@@ -25,6 +26,7 @@ from cody_jepa.single_stream_jepa import (
     resolve_device,
     train_jepa,
     validate_resume_state,
+    vicreg_regularization,
     video_from_batch,
 )
 from cody_jepa.single_stream_jepa import (
@@ -684,6 +686,113 @@ class SingleStreamJEPATest(unittest.TestCase):
         initial_loss = result["history"][0]["val"]["loss"]
         final_loss = result["history"][-1]["val"]["loss"]
         self.assertLess(final_loss, initial_loss - 0.02)
+
+
+class AntiCollapseSafeguardTest(unittest.TestCase):
+    def test_vicreg_flags_collapsed_and_redundant_features(self):
+        collapsed = torch.ones(64, 8)
+        variance_loss, covariance_loss = vicreg_regularization(collapsed)
+        self.assertGreater(float(variance_loss), 0.9)
+        self.assertAlmostEqual(float(covariance_loss), 0.0, places=6)
+
+        generator = torch.Generator().manual_seed(0)
+        base = torch.randn(4096, 1, generator=generator)
+        base = (base - base.mean()) / base.std(unbiased=False)
+        redundant = torch.cat([base, base], dim=1)
+        variance_loss, covariance_loss = vicreg_regularization(redundant)
+        self.assertLess(float(variance_loss), 0.01)
+        self.assertGreater(float(covariance_loss), 0.9)
+
+    def test_vicreg_is_small_for_healthy_features(self):
+        generator = torch.Generator().manual_seed(1)
+        healthy = torch.randn(8192, 6, generator=generator)
+        healthy = (healthy - healthy.mean(dim=0)) / healthy.std(
+            dim=0, unbiased=False
+        )
+        variance_loss, covariance_loss = vicreg_regularization(healthy)
+        self.assertLess(float(variance_loss), 0.01)
+        self.assertLess(float(covariance_loss), 0.01)
+
+    def test_vicreg_flattens_token_features_and_validates_inputs(self):
+        generator = torch.Generator().manual_seed(2)
+        tokens = torch.randn(4, 8, 6, generator=generator)
+        from_tokens = vicreg_regularization(tokens)
+        from_flat = vicreg_regularization(tokens.reshape(-1, 6))
+        self.assertAlmostEqual(
+            float(from_tokens[0]), float(from_flat[0]), places=6
+        )
+        self.assertAlmostEqual(
+            float(from_tokens[1]), float(from_flat[1]), places=6
+        )
+        with self.assertRaisesRegex(ValueError, "at least 2 samples"):
+            vicreg_regularization(torch.zeros(1, 4))
+        with self.assertRaisesRegex(ValueError, "must be \\[N, D\\]"):
+            vicreg_regularization(torch.zeros(4))
+        with self.assertRaisesRegex(ValueError, "gamma"):
+            vicreg_regularization(torch.zeros(4, 4), gamma=0.0)
+
+    def test_vicreg_gradients_reach_features(self):
+        features = torch.randn(32, 4, requires_grad=True)
+        variance_loss, covariance_loss = vicreg_regularization(features)
+        (variance_loss + covariance_loss).backward()
+        self.assertIsNotNone(features.grad)
+        self.assertTrue(torch.isfinite(features.grad).all())
+
+    def test_encode_targets_batch_standardization(self):
+        cfg = tiny_config()
+        _, target_encoder, _ = build_models(cfg, torch.device("cpu"))
+        video = torch.rand(4, 4, 1, 16, 16)
+        video = (video - 0.5) / 0.5
+        default_targets, _ = encode_targets(target_encoder, video)
+        standardized, _ = encode_targets(
+            target_encoder, video, batch_standardize=True
+        )
+        self.assertEqual(default_targets.shape, standardized.shape)
+        flat = standardized.reshape(-1, standardized.size(-1))
+        self.assertTrue(torch.allclose(flat.mean(dim=0), torch.zeros(flat.size(1)), atol=1e-4))
+        self.assertTrue(
+            torch.allclose(
+                flat.std(dim=0, unbiased=False), torch.ones(flat.size(1)), atol=1e-3
+            )
+        )
+        self.assertFalse(torch.allclose(default_targets, standardized))
+
+    def test_invalid_safeguard_config_fails_before_training(self):
+        for key, value, message in (
+            ("var_coef", -0.1, "var_coef"),
+            ("cov_coef", float("nan"), "cov_coef"),
+            ("var_gamma", 0.0, "var_gamma"),
+            ("target_batch_standardize", "yes", "target_batch_standardize"),
+        ):
+            cfg = tiny_config()
+            cfg[key] = value
+            train, val = tiny_loaders()
+            with self.assertRaisesRegex(ValueError, message):
+                train_jepa(cfg, train, val, {"dataset": "a"}, device="cpu")
+
+    def test_training_with_safeguards_runs_and_logs_regularization(self):
+        cfg = tiny_config(num_epochs=2)
+        cfg.update({
+            "var_coef": 1.0,
+            "cov_coef": 0.04,
+            "var_gamma": 1.0,
+            "target_batch_standardize": True,
+        })
+        train, val = tiny_loaders()
+        result = train_jepa(cfg, train, val, {"dataset": "safeguards"}, device="cpu")
+        for epoch_metrics in result["history"]:
+            self.assertTrue(math.isfinite(epoch_metrics["train_variance_loss"]))
+            self.assertTrue(math.isfinite(epoch_metrics["train_covariance_loss"]))
+            self.assertGreaterEqual(epoch_metrics["train_variance_loss"], 0.0)
+            self.assertGreaterEqual(epoch_metrics["train_covariance_loss"], 0.0)
+            self.assertTrue(math.isfinite(epoch_metrics["train_loss"]))
+
+    def test_training_without_safeguards_keeps_metrics_disabled(self):
+        cfg = tiny_config(num_epochs=1)
+        train, val = tiny_loaders()
+        result = train_jepa(cfg, train, val, {"dataset": "baseline"}, device="cpu")
+        self.assertIsNone(result["history"][0]["train_variance_loss"])
+        self.assertIsNone(result["history"][0]["train_covariance_loss"])
 
 
 if __name__ == "__main__":
