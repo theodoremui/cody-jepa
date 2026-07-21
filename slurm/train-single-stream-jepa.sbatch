@@ -16,7 +16,7 @@ cd "/hai/scratch/$USER/cody-jepa"
 export CODY_JEPA_RUN_FULL_TRAINING=1
 export CODY_JEPA_RUN_DATA_AUDIT=0
 export CODY_JEPA_RUN_EXHAUSTIVE_DATA_AUDIT=0
-export CODY_JEPA_OUTPUT_DIR=outputs/single-stream-jepa-h100-v2
+export CODY_JEPA_OUTPUT_DIR=outputs/single-stream-jepa-h100-v3
 unset CODY_JEPA_RESUME_CHECKPOINT
 export MPLCONFIGDIR=/tmp/mpl
 

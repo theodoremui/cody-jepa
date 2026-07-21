@@ -26,10 +26,11 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from torch import optim
+from torch.utils.data import DataLoader, SequentialSampler
 
 
 MODEL_ARCHITECTURE = "cody-jepa-single-stream-masked-v3"
-CHECKPOINT_SCHEMA = 2
+CHECKPOINT_SCHEMA = 3
 
 
 @dataclass(frozen=True)
@@ -784,25 +785,151 @@ def representation_diagnostics(clip_features):
     }
 
 
-def subject_aware_context_sources(subject_ids):
-    """Return deterministic wrong-subject source rows, or None for one-subject batches."""
+def _subject_balanced_mean(values_by_subject):
+    if not values_by_subject:
+        return float("nan")
+    return sum(
+        sum(values) / len(values) for values in values_by_subject.values()
+    ) / len(values_by_subject)
+
+
+def balanced_wrong_subject_permutation(subject_ids, seed):
+    """Return a seeded one-to-one cross-subject source permutation.
+
+    Every row is used exactly once as a target and once as a source. A perfect
+    cross-subject permutation exists exactly when no subject owns more than half
+    of the rows. Returning ``None`` makes an infeasible diagnostic explicit
+    instead of silently reusing a small number of source clips.
+    """
     subjects = [str(subject).casefold() for subject in subject_ids]
     if len(set(subjects)) < 2:
         return None
-    sources = []
+    rows_by_subject = defaultdict(list)
     for index, subject in enumerate(subjects):
-        source = None
-        for offset in range(1, len(subjects) + 1):
-            candidate = (index + offset) % len(subjects)
-            if subjects[candidate] != subject:
-                source = candidate
-                break
-        if source is None:
-            return None
-        sources.append(source)
+        rows_by_subject[subject].append(index)
+    maximum_subject_rows = max(len(rows) for rows in rows_by_subject.values())
+    if maximum_subject_rows > len(subjects) - maximum_subject_rows:
+        return None
+
+    rng = random.Random(seed)
+    groups = list(rows_by_subject.values())
+    rng.shuffle(groups)
+    for rows in groups:
+        rng.shuffle(rows)
+    ordered_targets = [index for rows in groups for index in rows]
+    ordered_sources = (
+        ordered_targets[maximum_subject_rows:]
+        + ordered_targets[:maximum_subject_rows]
+    )
+    sources = [None] * len(subjects)
+    for target, source in zip(ordered_targets, ordered_sources):
+        sources[target] = source
+
+    if sorted(sources) != list(range(len(subjects))):
+        raise RuntimeError("wrong-subject pairing is not a permutation")
     if any(subjects[index] == subjects[source] for index, source in enumerate(sources)):
         raise RuntimeError("subject-aware context construction failed")
     return sources
+
+
+def subject_aware_context_sources(subject_ids):
+    """Legacy import alias using the corrected fail-closed pairing contract.
+
+    Unlike the pre-schema-3 helper, this returns ``None`` when a no-reuse
+    cross-subject permutation is mathematically impossible.
+    """
+    return balanced_wrong_subject_permutation(subject_ids, seed=0)
+
+
+def _dataset_subject_id(dataset, index):
+    subject_id_at = getattr(dataset, "subject_id_at", None)
+    if callable(subject_id_at):
+        return str(subject_id_at(index))
+    sample = dataset[index]
+    if not isinstance(sample, Mapping) or "subject_id" not in sample:
+        raise TypeError(
+            "context-shuffle evaluation requires dataset rows with subject_id metadata"
+        )
+    return str(sample["subject_id"])
+
+
+def _context_shuffle_plan(loader, seed):
+    """Plan a full-loader cross-subject permutation without loading video tensors."""
+    if not isinstance(loader, DataLoader):
+        return {
+            "status": "unavailable_non_dataloader",
+            "source_index_batches": [],
+            "source_positions": [],
+            "subjects": [],
+        }
+    if loader.drop_last:
+        raise ValueError("context-shuffle evaluation requires drop_last=False")
+    if not isinstance(loader.sampler, SequentialSampler):
+        raise ValueError(
+            "context-shuffle evaluation requires a deterministic sequential loader"
+        )
+    if getattr(loader, "in_order", True) is False:
+        raise ValueError("context-shuffle evaluation requires in_order=True")
+    if loader.batch_size is None:
+        raise ValueError("context-shuffle evaluation requires a fixed batch_size")
+
+    target_index_batches = []
+    for batch in loader.batch_sampler:
+        indices = [int(index) for index in batch]
+        target_index_batches.append(indices)
+    target_indices = [index for batch in target_index_batches for index in batch]
+    if target_indices != list(range(len(loader.dataset))):
+        raise ValueError(
+            "context-shuffle evaluation requires every dataset row exactly once in order"
+        )
+
+    subjects = [_dataset_subject_id(loader.dataset, index) for index in target_indices]
+    source_positions = balanced_wrong_subject_permutation(subjects, seed)
+    if source_positions is None:
+        return {
+            "status": "infeasible_subject_distribution",
+            "source_index_batches": [],
+            "source_positions": [],
+            "subjects": subjects,
+        }
+    source_indices = [target_indices[position] for position in source_positions]
+    source_index_batches = []
+    offset = 0
+    for target_batch in target_index_batches:
+        next_offset = offset + len(target_batch)
+        source_index_batches.append(source_indices[offset:next_offset])
+        offset = next_offset
+    return {
+        "status": "complete",
+        "source_index_batches": source_index_batches,
+        "source_positions": source_positions,
+        "subjects": subjects,
+    }
+
+
+def _context_source_loader(loader, shuffle_plan, seed):
+    """Clone validation-loading behavior for the planned source-index batches."""
+    if shuffle_plan["status"] != "complete":
+        return None
+    generator = torch.Generator().manual_seed(int(seed))
+    options = {
+        "dataset": loader.dataset,
+        "batch_sampler": shuffle_plan["source_index_batches"],
+        "num_workers": loader.num_workers,
+        "collate_fn": loader.collate_fn,
+        "pin_memory": loader.pin_memory,
+        "timeout": loader.timeout,
+        "worker_init_fn": loader.worker_init_fn,
+        "multiprocessing_context": loader.multiprocessing_context,
+        "generator": generator,
+        "persistent_workers": loader.persistent_workers,
+    }
+    if loader.num_workers > 0:
+        options["prefetch_factor"] = loader.prefetch_factor
+    pin_memory_device = getattr(loader, "pin_memory_device", "")
+    if pin_memory_device:
+        options["pin_memory_device"] = pin_memory_device
+    return DataLoader(**options)
 
 
 def representation_health(metrics, cfg):
@@ -817,10 +944,17 @@ def representation_health(metrics, cfg):
         cfg.get("min_effective_rank_ratio", 0.05)
     ):
         issues.append("effective_rank_below_threshold")
-    if (
+    context_gap = metrics.get(
+        "subject_balanced_context_shuffle_loss_gap",
+        metrics.get("context_shuffle_loss_gap", float("nan")),
+    )
+    context_status = metrics.get("context_shuffle_status")
+    if context_status not in {None, "complete"}:
+        issues.append("context_shuffle_unavailable")
+    elif (
         metrics.get("context_shuffle_pairs", 0) <= 0
-        or not math.isfinite(metrics["context_shuffle_loss_gap"])
-        or metrics["context_shuffle_loss_gap"]
+        or not math.isfinite(context_gap)
+        or context_gap
         < float(cfg.get("min_context_shuffle_loss_gap", 0.0))
     ):
         issues.append("context_shuffle_gap_below_threshold")
@@ -842,7 +976,8 @@ def evaluate_jepa(
     expected_split,
     mask_seed,
     mask_groups=DEFAULT_MASK_GROUPS,
-    shortcut_batches=1,
+    context_shuffle=True,
+    context_seed=None,
 ):
     context_encoder.eval()
     target_encoder.eval()
@@ -855,16 +990,27 @@ def evaluate_jepa(
     pooled_features = []
     shuffle_gap_sum = 0.0
     shuffle_gap_examples = 0
-    shortcut_batches_done = 0
+    subject_shuffle_gaps = defaultdict(list)
+    shuffle_plan = None
+    if context_shuffle:
+        if context_seed is None:
+            raise ValueError("context_seed is required when context_shuffle=True")
+        shuffle_plan = _context_shuffle_plan(loader, context_seed)
+    source_loader = (
+        _context_source_loader(loader, shuffle_plan, context_seed)
+        if shuffle_plan is not None and shuffle_plan["status"] == "complete"
+        else None
+    )
+    source_iterator = iter(source_loader) if source_loader is not None else None
     for batch_index, batch in enumerate(loader):
         video = video_from_batch(batch, device, cfg, expected_split)
         masks = multiblock_mask(
             cfg, video.size(0), mask_rng, device=device, mask_groups=mask_groups
         )
         with _autocast_context(cfg, device):
-            targets, pre_norm = encode_targets(
-                target_encoder, video, return_pre_norm=True
-            )
+            online_tokens = context_encoder(video)
+            pooled_features.append(online_tokens.float().mean(dim=1).cpu())
+            targets, _ = encode_targets(target_encoder, video)
             batch_loss = torch.zeros(video.size(0), device=device)
             batch_cosine = torch.zeros(video.size(0), device=device)
             for mask_index, mask_group in enumerate(masks):
@@ -879,15 +1025,25 @@ def evaluate_jepa(
                 )
                 batch_loss += loss / len(masks)
                 batch_cosine += cosine / len(masks)
-            context_sources = (
-                subject_aware_context_sources(batch["subject_id"])
-                if shortcut_batches_done < shortcut_batches
-                else None
-            )
-            if context_sources is not None:
-                shuffled_video = video[
-                    torch.tensor(context_sources, device=device, dtype=torch.long)
+            if shuffle_plan is not None and shuffle_plan["status"] == "complete":
+                try:
+                    source_batch = next(source_iterator)
+                except StopIteration as error:
+                    raise RuntimeError(
+                        "context source loader ended before the target loader"
+                    ) from error
+                shuffled_video = video_from_batch(
+                    source_batch, device, cfg, expected_split
+                )
+                target_subjects = [str(value).casefold() for value in batch["subject_id"]]
+                source_subjects = [
+                    str(value).casefold() for value in source_batch["subject_id"]
                 ]
+                if any(
+                    target == source
+                    for target, source in zip(target_subjects, source_subjects)
+                ):
+                    raise RuntimeError("context-shuffle plan paired the same subject")
                 shuffled_loss = torch.zeros(video.size(0), device=device)
                 for mask_index, mask_group in enumerate(masks):
                     loss, _ = group_forward(
@@ -900,43 +1056,72 @@ def evaluate_jepa(
                         float(cfg.get("loss_exp", 1.0)),
                     )
                     shuffled_loss += loss / len(masks)
-                shuffle_gap_sum += float((shuffled_loss - batch_loss).sum())
+                gaps = (shuffled_loss - batch_loss).float().cpu()
+                shuffle_gap_sum += float(gaps.sum())
                 shuffle_gap_examples += video.size(0)
-                shortcut_batches_done += 1
+                for subject, gap in zip(batch["subject_id"], gaps):
+                    subject_shuffle_gaps[str(subject).casefold()].append(float(gap))
         batch_count = video.size(0)
         total_loss += float(batch_loss.sum())
         total_cosine += float(batch_cosine.sum())
         examples += batch_count
-        pooled_features.append(pre_norm.float().mean(dim=1).cpu())
         for index, subject in enumerate(batch["subject_id"]):
             subject_loss[str(subject)].append(float(batch_loss[index]))
             subject_cosine[str(subject)].append(float(batch_cosine[index]))
+    if source_iterator is not None:
+        try:
+            next(source_iterator)
+        except StopIteration:
+            pass
+        else:
+            raise RuntimeError("context source loader outlasted the target loader")
     if examples == 0:
         raise RuntimeError("evaluation loader produced no batches")
     diagnostics = representation_diagnostics(torch.cat(pooled_features, dim=0))
     diagnostics.update({
         "loss": total_loss / examples,
         "cosine": total_cosine / examples,
-        "subject_balanced_loss": sum(
-            sum(values) / len(values) for values in subject_loss.values()
-        ) / len(subject_loss),
-        "subject_balanced_cosine": sum(
-            sum(values) / len(values) for values in subject_cosine.values()
-        ) / len(subject_cosine),
+        "subject_balanced_loss": _subject_balanced_mean(subject_loss),
+        "subject_balanced_cosine": _subject_balanced_mean(subject_cosine),
         "context_shuffle_loss_gap": (
             shuffle_gap_sum / shuffle_gap_examples
             if shuffle_gap_examples
             else float("nan")
         ),
+        "subject_balanced_context_shuffle_loss_gap": _subject_balanced_mean(
+            subject_shuffle_gaps
+        ),
         "context_shuffle_pairs": shuffle_gap_examples,
-        "context_shuffle_batches": shortcut_batches_done,
+        "context_shuffle_batches": (
+            len(shuffle_plan["source_index_batches"])
+            if shuffle_plan is not None and shuffle_plan["status"] == "complete"
+            else 0
+        ),
+        "context_shuffle_subjects": len(subject_shuffle_gaps),
+        "context_shuffle_unique_sources": (
+            len(set(shuffle_plan["source_positions"]))
+            if shuffle_plan is not None and shuffle_plan["status"] == "complete"
+            else 0
+        ),
     })
     if not all(
         math.isfinite(value)
         for key, value in diagnostics.items()
-        if key not in {"context_shuffle_loss_gap"}
+        if key not in {
+            "context_shuffle_loss_gap",
+            "subject_balanced_context_shuffle_loss_gap",
+        }
     ):
         raise FloatingPointError(f"non-finite evaluation diagnostics: {diagnostics}")
+    diagnostics.update({
+        "representation_source": "context_encoder_final_norm_full_view_mean_pool",
+        "context_shuffle_pairing": "global_seeded_cross_subject_permutation_v1",
+        "context_shuffle_status": (
+            shuffle_plan["status"]
+            if shuffle_plan is not None
+            else "disabled"
+        ),
+    })
     diagnostics.update(representation_health(diagnostics, cfg))
     return diagnostics
 
@@ -1267,7 +1452,8 @@ def train_jepa(
                 "val",
                 mask_seed=seed + 1,
                 mask_groups=mask_groups,
-                shortcut_batches=int(cfg.get("shortcut_diagnostic_batches", 1)),
+                context_shuffle=True,
+                context_seed=seed + 2,
             )
         train_eval_metrics = None
         train_eval_every = int(cfg.get("train_eval_every_epochs", 0))
@@ -1284,7 +1470,7 @@ def train_jepa(
                 "train",
                 mask_seed=seed + 2,
                 mask_groups=mask_groups,
-                shortcut_batches=0,
+                context_shuffle=False,
             )
         epoch_seconds = time.perf_counter() - epoch_started
         metrics = {
@@ -1355,7 +1541,8 @@ def train_jepa(
         val_text = (
             f" | val_loss={val_metrics['loss']:.4f}, "
             f"effective_rank={val_metrics['effective_rank']:.1f}, "
-            f"context_shuffle_loss_gap={val_metrics['context_shuffle_loss_gap']:.4f}"
+            f"subject_balanced_context_shuffle_loss_gap="
+            f"{val_metrics['subject_balanced_context_shuffle_loss_gap']:.4f}"
             if val_metrics is not None
             else ""
         )
@@ -1418,6 +1605,18 @@ def load_checkpoint(path):
     return torch.load(Path(path), map_location="cpu", weights_only=False)
 
 
+def healthy_checkpoint_path(checkpoint_dir, best_healthy_epoch):
+    """Return the written healthy checkpoint path, or ``None`` when unselected."""
+    if best_healthy_epoch is None:
+        return None
+    path = Path(checkpoint_dir) / "best_healthy.pt"
+    if not path.is_file():
+        raise FileNotFoundError(
+            f"healthy epoch {best_healthy_epoch} was selected but {path} was not written"
+        )
+    return path
+
+
 __all__ = [
     "CHECKPOINT_SCHEMA",
     "DEFAULT_MASK_GROUPS",
@@ -1426,10 +1625,12 @@ __all__ = [
     "MaskGroupConfig",
     "Predictor",
     "VisionTransformer",
+    "balanced_wrong_subject_permutation",
     "build_models",
     "ema_tau_for_step",
     "ema_update",
     "evaluate_jepa",
+    "healthy_checkpoint_path",
     "learning_rate_for_step",
     "load_checkpoint",
     "multiblock_mask",

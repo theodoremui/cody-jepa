@@ -139,8 +139,14 @@ Clone the repository and install the locked dependencies:
 ```bash
 git clone https://github.com/theodoremui/cody-jepa.git
 cd cody-jepa
-uv sync
+uv sync --frozen
 ```
+
+This repository uses `uv` exclusively for Python environments and dependencies.
+Run project tools through `uv run`; change dependencies with `uv add` or
+`uv remove`, regenerate the lock with `uv lock`, and verify existing environments
+with `uv sync --frozen`. Do not add pip, Conda, Poetry, or ad-hoc system-Python
+installation steps to project documentation or notebooks.
 
 Run the test suite:
 

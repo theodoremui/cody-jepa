@@ -10,10 +10,14 @@ import torch
 from torch.utils.data import DataLoader, Dataset
 
 from cody_jepa.single_stream_jepa import (
+    CHECKPOINT_SCHEMA,
     DEFAULT_MASK_GROUPS,
     VisionTransformer,
+    balanced_wrong_subject_permutation,
     build_models,
     ema_tau_for_step,
+    evaluate_jepa,
+    healthy_checkpoint_path,
     learning_rate_for_step,
     multiblock_mask,
     optimizer_param_groups,
@@ -24,7 +28,13 @@ from cody_jepa.single_stream_jepa import (
     validate_resume_state,
     video_from_batch,
 )
-from cody_jepa.single_stream_jepa import _maybe_compile, _prediction_metrics
+from cody_jepa.single_stream_jepa import (
+    _context_shuffle_plan,
+    _context_source_loader,
+    _maybe_compile,
+    _prediction_metrics,
+    _subject_balanced_mean,
+)
 
 
 def tiny_config(num_epochs=2):
@@ -68,15 +78,21 @@ def tiny_config(num_epochs=2):
         "eval_every_epochs": 1,
         "train_eval_every_epochs": 0,
         "checkpoint_every_epochs": 1,
-        "shortcut_diagnostic_batches": 1,
     }
 
 
 class TinyVideoDataset(Dataset):
-    def __init__(self, split, count, seed):
+    def __init__(self, split, count, seed, subjects=None):
         generator = torch.Generator().manual_seed(seed)
         self.videos = torch.rand(count, 4, 1, 16, 16, generator=generator)
         self.split = split
+        self.subjects = (
+            list(subjects)
+            if subjects is not None
+            else [f"subject-{index}" for index in range(count)]
+        )
+        if len(self.subjects) != count:
+            raise ValueError("subjects must match count")
 
     def __len__(self):
         return len(self.videos)
@@ -86,8 +102,11 @@ class TinyVideoDataset(Dataset):
             "video": self.videos[index],
             "split": self.split,
             "sequence_id": f"{self.split}-{index}",
-            "subject_id": f"subject-{index}",
+            "subject_id": self.subjects[index],
         }
+
+    def subject_id_at(self, index):
+        return self.subjects[index]
 
 
 def tiny_loaders(seed=7):
@@ -233,6 +252,265 @@ class SingleStreamJEPATest(unittest.TestCase):
         self.assertGreater(varied["effective_rank"], 1.0)
         self.assertLess(varied["near_zero_variance_fraction"], 1.0)
 
+    def test_evaluation_diagnostics_use_normalized_full_view_context_features(self):
+        cfg = tiny_config(num_epochs=1)
+        context, target, predictor = build_models(cfg, torch.device("cpu"))
+        with torch.no_grad():
+            for parameter in target.parameters():
+                parameter.zero_()
+        _, val = tiny_loaders()
+        metrics = evaluate_jepa(
+            context,
+            target,
+            predictor,
+            val,
+            cfg,
+            torch.device("cpu"),
+            "val",
+            mask_seed=17,
+            context_shuffle=False,
+        )
+
+        pooled = []
+        for batch in val:
+            video = video_from_batch(batch, torch.device("cpu"), cfg, "val")
+            with torch.no_grad():
+                pooled.append(context(video).mean(dim=1))
+        expected = representation_diagnostics(torch.cat(pooled, dim=0))
+        for key in (
+            "feature_std",
+            "near_zero_variance_fraction",
+            "effective_rank",
+            "effective_rank_ratio",
+        ):
+            self.assertAlmostEqual(metrics[key], expected[key], places=6)
+        self.assertEqual(
+            metrics["representation_source"],
+            "context_encoder_final_norm_full_view_mean_pool",
+        )
+
+    def test_global_wrong_subject_permutation_is_seeded_balanced_and_complete(self):
+        subjects = ["A"] * 4 + ["b"] * 3 + ["C"] * 2
+        first = balanced_wrong_subject_permutation(subjects, seed=19)
+        repeated = balanced_wrong_subject_permutation(subjects, seed=19)
+        self.assertEqual(first, repeated)
+        self.assertGreater(len({
+            tuple(balanced_wrong_subject_permutation(subjects, seed=seed))
+            for seed in range(10)
+        }), 1)
+        self.assertEqual(sorted(first), list(range(len(subjects))))
+        self.assertTrue(all(
+            subjects[target].casefold() != subjects[source].casefold()
+            for target, source in enumerate(first)
+        ))
+        self.assertIsNone(
+            balanced_wrong_subject_permutation(["A"] * 5 + ["B"] * 3, seed=1)
+        )
+        boundary = ["A", "a", "B", "b"]
+        boundary_sources = balanced_wrong_subject_permutation(boundary, seed=3)
+        self.assertEqual(sorted(boundary_sources), list(range(len(boundary))))
+        self.assertTrue(all(
+            boundary[target].casefold() != boundary[source].casefold()
+            for target, source in enumerate(boundary_sources)
+        ))
+
+    def test_subject_balanced_mean_weights_subjects_equally(self):
+        values = {"frequent": [1.0, 3.0, 5.0], "rare": [9.0]}
+        self.assertEqual(_subject_balanced_mean(values), 6.0)
+        self.assertNotEqual(_subject_balanced_mean(values), 4.5)
+
+    def test_context_shuffle_diagnostic_covers_the_full_ordered_validation_set(self):
+        cfg = tiny_config(num_epochs=1)
+        subjects = ["A"] * 4 + ["B"] * 3 + ["C"] * 2
+        dataset = TinyVideoDataset("val", len(subjects), cfg["seed"], subjects)
+        loader = DataLoader(dataset, batch_size=2, shuffle=False)
+        context, target, predictor = build_models(cfg, torch.device("cpu"))
+        metrics = evaluate_jepa(
+            context,
+            target,
+            predictor,
+            loader,
+            cfg,
+            torch.device("cpu"),
+            "val",
+            mask_seed=23,
+            context_shuffle=True,
+            context_seed=29,
+        )
+        self.assertEqual(metrics["context_shuffle_pairs"], len(dataset))
+        self.assertEqual(metrics["context_shuffle_unique_sources"], len(dataset))
+        self.assertEqual(metrics["context_shuffle_batches"], len(loader))
+        self.assertEqual(metrics["context_shuffle_subjects"], 3)
+        self.assertTrue(math.isfinite(metrics["context_shuffle_loss_gap"]))
+        self.assertTrue(math.isfinite(
+            metrics["subject_balanced_context_shuffle_loss_gap"]
+        ))
+
+    def test_context_shuffle_uses_planned_sources_and_subject_balanced_gap(self):
+        cfg = tiny_config(num_epochs=1)
+        subjects = ["A"] * 3 + ["B"] * 2 + ["C"]
+        values = [0.05, 0.15, 0.25, 0.55, 0.70, 0.95]
+        dataset = TinyVideoDataset("val", len(subjects), cfg["seed"], subjects)
+        for video, value in zip(dataset.videos, values):
+            video.fill_(value)
+        loader = DataLoader(dataset, batch_size=2, shuffle=False)
+
+        class ScalarContext(torch.nn.Module):
+            def forward(self, video, token_indices=None):
+                scalar = video.mean(dim=(1, 2, 3, 4), keepdim=True)
+                count = cfg["num_tokens"] if token_indices is None else token_indices.size(1)
+                return scalar.reshape(video.size(0), 1, 1).expand(
+                    -1, count, cfg["embed_dim"]
+                )
+
+        class ZeroTarget(torch.nn.Module):
+            def forward(self, video, return_pre_norm=False):
+                output = torch.zeros(
+                    video.size(0), cfg["num_tokens"], cfg["embed_dim"]
+                )
+                return (output, output) if return_pre_norm else output
+
+        class ContextValuePredictor(torch.nn.Module):
+            def forward(
+                self, context_tokens, context_indices, target_indices, mask_index
+            ):
+                value = context_tokens[:, :1, :]
+                return value.expand(-1, target_indices.size(1), -1)
+
+        context_seed = 53
+        metrics = evaluate_jepa(
+            ScalarContext(),
+            ZeroTarget(),
+            ContextValuePredictor(),
+            loader,
+            cfg,
+            torch.device("cpu"),
+            "val",
+            mask_seed=47,
+            context_shuffle=True,
+            context_seed=context_seed,
+        )
+        sources = balanced_wrong_subject_permutation(subjects, context_seed)
+        normalized = [abs((value - cfg["input_mean"]) / cfg["input_std"]) for value in values]
+        gaps_by_subject = {}
+        all_gaps = []
+        for target, source in enumerate(sources):
+            gap = normalized[source] - normalized[target]
+            all_gaps.append(gap)
+            gaps_by_subject.setdefault(subjects[target], []).append(gap)
+        expected_example = sum(all_gaps) / len(all_gaps)
+        expected_subject = _subject_balanced_mean(gaps_by_subject)
+        self.assertAlmostEqual(metrics["context_shuffle_loss_gap"], expected_example, places=6)
+        self.assertAlmostEqual(
+            metrics["subject_balanced_context_shuffle_loss_gap"],
+            expected_subject,
+            places=6,
+        )
+        self.assertNotAlmostEqual(expected_example, expected_subject, places=6)
+
+    def test_context_shuffle_fails_closed_for_infeasible_subject_distribution(self):
+        cfg = tiny_config(num_epochs=1)
+        subjects = ["A"] * 5 + ["B"] * 3
+        dataset = TinyVideoDataset("val", len(subjects), cfg["seed"], subjects)
+        loader = DataLoader(dataset, batch_size=2, shuffle=False)
+        context, target, predictor = build_models(cfg, torch.device("cpu"))
+        metrics = evaluate_jepa(
+            context,
+            target,
+            predictor,
+            loader,
+            cfg,
+            torch.device("cpu"),
+            "val",
+            mask_seed=31,
+            context_shuffle=True,
+            context_seed=37,
+        )
+        self.assertEqual(metrics["context_shuffle_status"], "infeasible_subject_distribution")
+        self.assertEqual(metrics["context_shuffle_pairs"], 0)
+        self.assertEqual(metrics["context_shuffle_batches"], 0)
+        self.assertEqual(metrics["context_shuffle_unique_sources"], 0)
+        self.assertTrue(math.isnan(metrics["context_shuffle_loss_gap"]))
+        self.assertTrue(math.isnan(
+            metrics["subject_balanced_context_shuffle_loss_gap"]
+        ))
+        self.assertFalse(metrics["representations_healthy"])
+        self.assertIn("context_shuffle_unavailable", metrics["health_issues"])
+
+    def test_context_shuffle_rejects_nonsequential_or_incomplete_loaders(self):
+        cfg = tiny_config(num_epochs=1)
+        dataset = TinyVideoDataset("val", 4, cfg["seed"])
+        context, target, predictor = build_models(cfg, torch.device("cpu"))
+        for loader, message in (
+            (DataLoader(dataset, batch_size=2, shuffle=True), "sequential"),
+            (DataLoader(dataset, batch_size=3, shuffle=False, drop_last=True), "drop_last"),
+        ):
+            with self.assertRaisesRegex(ValueError, message):
+                evaluate_jepa(
+                    context,
+                    target,
+                    predictor,
+                    loader,
+                    cfg,
+                    torch.device("cpu"),
+                    "val",
+                    mask_seed=41,
+                    context_shuffle=True,
+                    context_seed=43,
+                )
+        loader = DataLoader(dataset, batch_size=2, shuffle=False)
+        with self.assertRaisesRegex(ValueError, "context_seed"):
+            evaluate_jepa(
+                context,
+                target,
+                predictor,
+                loader,
+                cfg,
+                torch.device("cpu"),
+                "val",
+                mask_seed=41,
+                context_shuffle=True,
+            )
+        out_of_order = DataLoader(
+            dataset, batch_size=2, shuffle=False, num_workers=1, in_order=False
+        )
+        with self.assertRaisesRegex(ValueError, "in_order"):
+            evaluate_jepa(
+                context,
+                target,
+                predictor,
+                out_of_order,
+                cfg,
+                torch.device("cpu"),
+                "val",
+                mask_seed=41,
+                context_shuffle=True,
+                context_seed=43,
+            )
+
+    def test_context_source_loader_preserves_worker_loading_contract(self):
+        dataset = TinyVideoDataset("val", 6, 7)
+        target_generator = torch.Generator().manual_seed(11)
+        loader = DataLoader(
+            dataset, batch_size=2, shuffle=False, num_workers=1,
+            prefetch_factor=3, pin_memory=True, persistent_workers=False,
+            generator=target_generator,
+        )
+        plan = _context_shuffle_plan(loader, seed=61)
+        source_loader = _context_source_loader(loader, plan, seed=67)
+
+        self.assertEqual(plan["status"], "complete")
+        self.assertIs(source_loader.dataset, loader.dataset)
+        self.assertIs(source_loader.collate_fn, loader.collate_fn)
+        self.assertEqual(source_loader.num_workers, 1)
+        self.assertEqual(source_loader.prefetch_factor, 3)
+        self.assertTrue(source_loader.pin_memory)
+        self.assertFalse(source_loader.persistent_workers)
+        self.assertIsNot(source_loader.generator, loader.generator)
+        self.assertEqual(
+            list(source_loader.batch_sampler), plan["source_index_batches"]
+        )
+
     def test_batch_boundary_rejects_wrong_split_and_nonfinite_input(self):
         cfg = tiny_config()
         batch = next(iter(tiny_loaders()[0]))
@@ -315,10 +593,29 @@ class SingleStreamJEPATest(unittest.TestCase):
         cfg = tiny_config(num_epochs=1)
         train, val = tiny_loaders()
         result = train_jepa(cfg, train, val, {"dataset": "a"}, device="cpu")
+        self.assertEqual(CHECKPOINT_SCHEMA, 3)
+        self.assertEqual(result["checkpoint_state"]["schema"], CHECKPOINT_SCHEMA)
         with self.assertRaisesRegex(ValueError, "dataset/loader"):
             validate_resume_state(
                 result["checkpoint_state"], cfg, DEFAULT_MASK_GROUPS, {"dataset": "b"}
             )
+        legacy = copy.deepcopy(result["checkpoint_state"])
+        legacy["schema"] = 2
+        with self.assertRaisesRegex(ValueError, "schema"):
+            validate_resume_state(
+                legacy, cfg, DEFAULT_MASK_GROUPS, {"dataset": "a"}
+            )
+
+    def test_healthy_checkpoint_path_is_truthful_about_selection_and_files(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "best_healthy.pt"
+            path.write_bytes(b"stale")
+            self.assertIsNone(healthy_checkpoint_path(tmp, None))
+            path.unlink()
+            with self.assertRaisesRegex(FileNotFoundError, "healthy epoch 7"):
+                healthy_checkpoint_path(tmp, 7)
+            path.write_bytes(b"checkpoint")
+            self.assertEqual(healthy_checkpoint_path(tmp, 7), path)
 
     def test_atomic_latest_and_best_checkpoints_are_written(self):
         cfg = tiny_config(num_epochs=1)

@@ -52,6 +52,31 @@ class SingleStreamNotebookTest(unittest.TestCase):
         self.assertIn("CODY_JEPA_RESUME_CHECKPOINT", source)
         self.assertIn("CODY_JEPA_OUTPUT_DIR", source)
 
+    def test_healthy_checkpoint_is_reported_only_when_it_was_selected_and_written(self):
+        source = "\n".join(code_cells())
+
+        self.assertIn(
+            "best_healthy_path = healthy_checkpoint_path(",
+            source,
+        )
+        self.assertIn(
+            "str(best_healthy_path) if best_healthy_path else None",
+            source,
+        )
+        self.assertIn("OUTPUT_DIR, result['best_healthy_epoch']", source)
+        self.assertNotIn(
+            "'best_healthy': str(OUTPUT_DIR / 'best_healthy.pt')",
+            source,
+        )
+
+    def test_plots_name_corrected_online_and_subject_balanced_diagnostics(self):
+        source = "\n".join(code_cells())
+
+        self.assertIn("subject_balanced_context_shuffle_loss_gap", source)
+        self.assertIn("Online full-view effective rank", source)
+        self.assertIn("Subject-balanced wrong-context loss gap", source)
+        self.assertNotIn("shortcut_diagnostic_batches", source)
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -14,3 +14,5 @@ src/cody_jepa/data/healthgait_diagnostics.py
 tests/test_healthgait_dataset.py
 tests/test_healthgait_diagnostics.py
 tests/test_single_stream_jepa.py
+tests/test_single_stream_notebook.py
+tests/test_uv_policy.py

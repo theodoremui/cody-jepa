@@ -590,6 +590,17 @@ class HealthGaitManifestDataset(Dataset):
     def __len__(self):
         return len(self.samples) * self.deterministic_windows
 
+    def subject_id_at(self, idx):
+        """Return sample-level subject metadata without decoding any frames."""
+        if not isinstance(idx, int) or isinstance(idx, bool):
+            raise TypeError("dataset index must be an integer")
+        if idx < 0:
+            idx += len(self)
+        if not 0 <= idx < len(self):
+            raise IndexError(idx)
+        sample_index, _ = divmod(idx, self.deterministic_windows)
+        return self.samples[sample_index]["subject_id"]
+
     def __getitem__(self, idx):
         sample_index, window_index = divmod(idx, self.deterministic_windows)
         sample = self.samples[sample_index]

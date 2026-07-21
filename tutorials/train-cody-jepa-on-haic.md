@@ -15,12 +15,12 @@ Keeping these phases separate prevents slow dataset checks from consuming H100 t
 A falling loss is not enough. A model can produce a smooth loss curve while learning collapsed or position-only features. Treat the run as successful only when all of the following conditions hold:
 
 - Validation loss improves.
-- Validation features retain nontrivial variance and effective rank.
-- Shuffling the video context increases prediction loss.
+- The normalized, full-view online/context encoder features retain nontrivial variance and effective rank.
+- A seeded one-to-one wrong-subject permutation over the full validation set increases prediction loss on a subject-balanced basis.
 - Training and validation subjects remain disjoint.
 - `latest.pt` resumes from an exact epoch boundary when the dataset is unchanged.
 - `best_loss.pt` records the lowest subject-balanced validation loss.
-- `best_healthy.pt` records the best checkpoint that also passes the representation-health checks.
+- `best_healthy.pt`, when written, records the best checkpoint that also passes every representation-health check.
 
 ## Training configuration
 
@@ -66,6 +66,8 @@ uv sync --frozen
 ```
 
 Always launch Python and Jupyter through `uv run`. This ensures that the notebook uses the project environment instead of a system or Conda installation.
+Manage dependencies only with `uv add`, `uv remove`, `uv lock`, and `uv sync`;
+do not use pip, Conda, Poetry, or system-Python installation commands in this workflow.
 
 ### Confirm that the dataset exists
 
@@ -246,7 +248,7 @@ For a new run, confirm that the script contains these environment settings:
 export CODY_JEPA_RUN_FULL_TRAINING=1
 export CODY_JEPA_RUN_DATA_AUDIT=0
 export CODY_JEPA_RUN_EXHAUSTIVE_DATA_AUDIT=0
-export CODY_JEPA_OUTPUT_DIR=outputs/single-stream-jepa-h100-v2
+export CODY_JEPA_OUTPUT_DIR=outputs/single-stream-jepa-h100-v3
 unset CODY_JEPA_RESUME_CHECKPOINT
 export MPLCONFIGDIR=/tmp/mpl
 ```
@@ -267,14 +269,14 @@ These variables have distinct jobs:
 The provided script uses:
 
 ```text
-outputs/single-stream-jepa-h100-v2
+outputs/single-stream-jepa-h100-v3
 ```
 
 Check whether that directory already contains a checkpoint:
 
 ```bash
 cd /hai/scratch/$USER/cody-jepa
-ls -la outputs/single-stream-jepa-h100-v2 2>/dev/null || true
+ls -la outputs/single-stream-jepa-h100-v3 2>/dev/null || true
 ```
 
 If `latest.pt` exists, do not delete it. Either resume that run as described in Section 8 or choose a new directory, such as:
@@ -355,7 +357,7 @@ The notebook performs one real, production-sized forward and backward step befor
 `nbconvert` captures cell output inside the executed notebook. It does not stream every epoch metric to the Slurm log. During training, use the GPU CSV and checkpoint timestamps as the primary progress signals:
 
 ```bash
-ls -lh "outputs/single-stream-jepa-h100-v2"
+ls -lh "outputs/single-stream-jepa-h100-v3"
 ```
 
 `latest.pt` appears after the first complete epoch and is replaced atomically after each later epoch.
@@ -379,8 +381,8 @@ A completed run should produce:
 
 ```text
 notebook-runs/single-stream-jepa-<JOB_ID>.executed.ipynb
-outputs/single-stream-jepa-h100-v2/latest.pt
-outputs/single-stream-jepa-h100-v2/best_loss.pt
+outputs/single-stream-jepa-h100-v3/latest.pt
+outputs/single-stream-jepa-h100-v3/best_loss.pt
 logs/single-stream-jepa-<JOB_ID>.out
 logs/gpu-<JOB_ID>.csv
 ```
@@ -388,7 +390,7 @@ logs/gpu-<JOB_ID>.csv
 `best_healthy.pt` appears only after a validation checkpoint passes every representation-health criterion:
 
 ```text
-outputs/single-stream-jepa-h100-v2/best_healthy.pt
+outputs/single-stream-jepa-h100-v3/best_healthy.pt
 ```
 
 Inspect checkpoint metadata without loading model tensors onto the GPU:
@@ -400,7 +402,7 @@ from pathlib import Path
 
 from cody_jepa.single_stream_jepa import load_checkpoint
 
-output_dir = Path("outputs/single-stream-jepa-h100-v2")
+output_dir = Path("outputs/single-stream-jepa-h100-v3")
 metadata = {}
 
 for name in ("latest.pt", "best_loss.pt", "best_healthy.pt"):
@@ -430,9 +432,19 @@ Use the checkpoints as follows:
 - `best_loss.pt` is useful for diagnosis and loss-based comparisons.
 - `best_healthy.pt` is the preferred checkpoint for representation probes.
 
+If `best_healthy.pt` was not written, the run did not pass the health contract.
+Do not silently substitute `best_loss.pt`; report the failed health metrics and
+start a corrected run instead.
+
 ## 8. Resume an interrupted run
 
 Resume only from a checkpoint written by the same training configuration and data contract. Keep the original output directory so the run continues in place.
+
+The corrected diagnostics use checkpoint schema 3. Schema-2 checkpoints from
+the legacy pre-normalization/one-batch diagnostics cannot be resumed because
+their `best_healthy_*` state is not comparable. Keep them for historical analysis
+or manually load model weights for a separate probe; start a new training output
+directory for corrected health-based checkpoint selection.
 
 In `slurm/train-single-stream-jepa.sbatch`, replace:
 
@@ -443,7 +455,7 @@ unset CODY_JEPA_RESUME_CHECKPOINT
 with:
 
 ```bash
-export CODY_JEPA_RESUME_CHECKPOINT=outputs/single-stream-jepa-h100-v2/latest.pt
+export CODY_JEPA_RESUME_CHECKPOINT=outputs/single-stream-jepa-h100-v3/latest.pt
 ```
 
 The new-run script intentionally exits when `latest.pt` already exists. For a resume job, replace that guard with:
@@ -461,7 +473,7 @@ Keep these values unchanged:
 export CODY_JEPA_RUN_FULL_TRAINING=1
 export CODY_JEPA_RUN_DATA_AUDIT=0
 export CODY_JEPA_RUN_EXHAUSTIVE_DATA_AUDIT=0
-export CODY_JEPA_OUTPUT_DIR=outputs/single-stream-jepa-h100-v2
+export CODY_JEPA_OUTPUT_DIR=outputs/single-stream-jepa-h100-v3
 ```
 
 Validate and submit the edited script:

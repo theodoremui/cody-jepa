@@ -611,6 +611,13 @@ class HealthGaitDatasetSeedTest(unittest.TestCase):
             starts = [dataset[index]["window_start"] for index in range(3)]
             max_start = dataset.samples[0]["num_frames"] - 4
             self.assertEqual(starts, [0, round(max_start / 2), max_start])
+            self.assertEqual(
+                [dataset.subject_id_at(index) for index in range(3)],
+                [dataset.samples[0]["subject_id"]] * 3,
+            )
+            self.assertEqual(dataset.subject_id_at(-1), dataset.samples[-1]["subject_id"])
+            with self.assertRaises(IndexError):
+                dataset.subject_id_at(len(dataset))
 
     def test_dataset_signature_changes_with_transform_contract(self):
         with tempfile.TemporaryDirectory() as tmp:
