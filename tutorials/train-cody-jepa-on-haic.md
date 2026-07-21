@@ -1,40 +1,54 @@
 # Train the single-stream JEPA prototype on HAIC
 
-This guide runs [`notebooks/single-stream-jepa.ipynb`](../notebooks/single-stream-jepa.ipynb) on a Stanford HAI Compute Cluster GPU. The notebook is a Health&Gait feasibility baseline: it predicts masked latent video features with one stream. It is not the final dual-stream CoDy-JEPA experiment.
+This guide runs [`notebooks/single-stream-jepa.ipynb`](../notebooks/single-stream-jepa.ipynb) on one NVIDIA H100 GPU in the Stanford HAI Compute Cluster. The notebook is a Health&Gait feasibility experiment that learns masked video representations from a single stream. It is not the final dual-stream CoDy-JEPA model.
 
-## What the notebook validates
+The workflow has three separate phases:
 
-The run is successful only if all of these hold:
+1. Verify the Python environment and CUDA runtime in a short interactive H100 session.
+2. Validate the dataset in a CPU-only Slurm session.
+3. Submit the full training notebook as a batch job.
 
-- JEPA validation loss improves.
-- Validation feature variance and effective rank remain nontrivial.
-- Shuffling video context increases prediction loss.
-- Train and validation subjects remain disjoint.
-- `latest.pt` can resume exactly at an epoch boundary.
-- `best_loss.pt` preserves the lowest subject-balanced validation loss.
-- `best_healthy.pt` preserves the best checkpoint that also passes rank, variance, norm, and wrong-subject-context checks.
+Keeping these phases separate prevents slow dataset checks from consuming H100 time. It also makes failures easier to locate.
 
-Loss alone is insufficient because a collapsed or position-only model can still produce a deceptively smooth curve.
+## What a successful run must show
 
-## Current run shape
+A falling loss is not enough. A model can produce a smooth loss curve while learning collapsed or position-only features. Treat the run as successful only when all of the following conditions hold:
 
-| Setting | Default | Meaning |
+- Validation loss improves.
+- Validation features retain nontrivial variance and effective rank.
+- Shuffling the video context increases prediction loss.
+- Training and validation subjects remain disjoint.
+- `latest.pt` resumes from an exact epoch boundary when the dataset is unchanged.
+- `best_loss.pt` records the lowest subject-balanced validation loss.
+- `best_healthy.pt` records the best checkpoint that also passes the representation-health checks.
+
+## Training configuration
+
+The notebook currently uses these production settings:
+
+| Setting | Value | Meaning |
 | --- | ---: | --- |
-| Physical batch | `16` | Clips resident for one microbatch. |
-| Accumulation | `4` | Effective batch is 64 clips. |
-| Frames | `16` | Frames per clip. |
-| Resolution | `112x112` | Grayscale silhouette input. |
-| Tubelet / patch | `2 / 8` | Produces 1,568 video tokens. |
-| Epochs | `100` | 39 equal-sized optimizer updates per epoch. |
-| Optimizer steps | `3,900` | Exact epoch-boundary stopping point. |
-| Validation cadence | every 5 epochs | Three deterministic windows per validation sequence. |
-| Checkpoints | every epoch | Atomic `latest.pt`, `best_loss.pt`, and health-gated `best_healthy.pt`. |
+| Physical batch size | `16` | Clips processed in one GPU microbatch. |
+| Gradient accumulation | `4` | Four microbatches produce an effective batch of 64 clips. |
+| Frames per clip | `16` | Number of grayscale silhouette frames in each input clip. |
+| Image resolution | `112 x 112` | Spatial size after preprocessing. |
+| Tubelet size | `2` | Number of adjacent frames in each temporal token. |
+| Patch size | `8 x 8` | Spatial area represented by each token. |
+| Tokens per clip | `1,568` | Token count produced by the configured video geometry. |
+| Epochs | `100` | Complete passes through the training split. |
+| Optimizer steps | `3,900` | Exactly 39 optimizer updates per epoch. |
+| Validation cadence | Every 5 epochs | Validation uses three deterministic windows per sequence. |
+| Checkpoint cadence | Every epoch | `latest.pt` is written after each complete epoch. |
+| Numeric precision | BF16 | Reduced precision supported efficiently by H100 GPUs. |
+| Compilation | Disabled | The first production run uses eager PyTorch execution. |
 
-The physical batch is intentionally much smaller than the old notebook default. Gradient accumulation preserves an effective batch of 64 without retaining a batch-256 predictor graph. Training drops only the final incomplete physical batch each epoch so every optimizer/EMA update has the same 64-example weight.
+The physical batch size is intentionally smaller than the original notebook setting. Gradient accumulation preserves an effective batch of 64 without keeping a batch-256 predictor graph in GPU memory.
 
-## Prepare the cluster workspace
+## 1. Prepare the HAIC workspace
 
-From the HAIC head node:
+Run setup commands from the HAIC head node. Do not run training, Jupyter, or other compute-heavy processes on the head node.
+
+For a new checkout:
 
 ```bash
 cd /hai/scratch/$USER
@@ -43,22 +57,42 @@ cd cody-jepa
 uv sync --frozen
 ```
 
-The prepared dataset and manifest must exist beneath:
+For an existing checkout:
+
+```bash
+cd /hai/scratch/$USER/cody-jepa
+git pull --ff-only
+uv sync --frozen
+```
+
+Always launch Python and Jupyter through `uv run`. This ensures that the notebook uses the project environment instead of a system or Conda installation.
+
+### Confirm that the dataset exists
+
+The notebook expects these paths:
 
 ```text
 data/healthgait/raw/Health_Gait/silhouette/
 data/healthgait/manifests/silhouette_subject_split_seed0.csv
 ```
 
-Follow [`health-and-gait.md`](health-and-gait.md) if they are missing.
+Check them before requesting compute resources:
 
-## Run the safety checks first
+```bash
+test -d data/healthgait/raw/Health_Gait/silhouette
+test -f data/healthgait/manifests/silhouette_subject_split_seed0.csv
+wc -l data/healthgait/manifests/silhouette_subject_split_seed0.csv
+```
 
-Request a short interactive GPU allocation using the account and partition assigned to you:
+The current manifest should contain 3,131 lines: one header and 3,130 sequence rows. If the data is missing, follow [`health-and-gait.md`](health-and-gait.md) before continuing.
+
+## 2. Verify the H100 and Python environment
+
+Request a short interactive H100 allocation:
 
 ```bash
 srun \
-  --account=<ACCOUNT> \
+  --account=mind \
   --partition=hai-interactive \
   --gres=gpu:h100:1 \
   --cpus-per-task=8 \
@@ -67,23 +101,42 @@ srun \
   --pty bash
 ```
 
-Then run:
+After the interactive shell opens, return to the project directory:
+
+```bash
+cd /hai/scratch/$USER/cody-jepa
+```
+
+### Check the allocated GPU
 
 ```bash
 nvidia-smi
+```
+
+The device name should contain `H100`. Do not continue with this locked environment if Slurm assigns a B200 or another GPU family.
+
+### Check the PyTorch CUDA runtime
+
+Run a real CUDA operation and print the active Python and PyTorch configuration:
+
+```bash
 uv run python - <<'PY'
 import json
 import sys
 import torch
 
-capability = torch.cuda.get_device_capability()
+device = torch.device("cuda")
+capability = torch.cuda.get_device_capability(device)
 required_arch = f"sm_{capability[0]}{capability[1]}"
 torch_cuda_arch_list = torch.cuda.get_arch_list()
-torch.zeros(1, device="cuda").add_(1)
-torch.cuda.synchronize()
+
+probe = torch.zeros(1, device=device)
+probe.add_(1)
+torch.cuda.synchronize(device)
+
 print(json.dumps({
     "cuda_compute_capability": capability,
-    "cuda_device_name": torch.cuda.get_device_name(),
+    "cuda_device_name": torch.cuda.get_device_name(device),
     "cuda_preflight": "passed",
     "python_executable": sys.executable,
     "required_cuda_arch": required_arch,
@@ -93,49 +146,66 @@ print(json.dumps({
     "torch_version": torch.__version__,
 }, indent=2, sort_keys=True))
 PY
+```
+
+For an H100, expect the device name to contain `H100`, the compute capability to be `(9, 0)`, and the required architecture to be `sm_90`.
+
+### Run the test suite
+
+```bash
+MPLCONFIGDIR=/tmp/mpl \
 uv run python -m unittest discover -s tests -v
 ```
 
-If the CUDA probe reports `no kernel image is available for execution on the
-device`, compare `cuda_compute_capability` with `torch_cuda_arch_list`:
+Do not submit the training job until the CUDA probe and all tests pass.
 
-- If HAIC allocated an H100/Hopper GPU and the required architecture is missing,
-  the notebook is loading an incompatible or stale PyTorch build. Repair the
-  locked environment and rerun the same probe before decoding the dataset:
+### Repair an incompatible PyTorch installation
+
+If the probe reports `no kernel image is available for execution on the device`, compare `required_cuda_arch` with `torch_cuda_arch_list`.
+
+If the allocated GPU is an H100 but `sm_90` is missing, reinstall the locked PyTorch packages:
 
 ```bash
-uv sync --frozen --reinstall-package torch --reinstall-package torchvision
+uv sync --frozen \
+  --reinstall-package torch \
+  --reinstall-package torchvision
 ```
 
-- If HAIC allocated a newer Blackwell GPU, the current locked PyTorch 2.6.0
-  CUDA 12.4 environment is the wrong binary family for that node. Request a
-  Hopper/H100 node for this locked run, or update the project pins to a PyTorch
-  CUDA 12.8+ build and regenerate `uv.lock` before training.
+Then rerun the CUDA probe. Do not continue until it passes.
 
-Do not launch a separate system or Conda Jupyter process for this run. Use the
-project environment through `uv run`, and check `python_executable` in the probe
-if an interactive notebook still selects the wrong kernel.
-
-After the CUDA probe and tests pass, leave the GPU shell. Execute the notebook
-once in a CPU-only Slurm allocation, without `--gres` and without the training
-flag. This validates the real manifest, sampled image integrity, subject
-isolation, and model geometry. It also decodes one deterministic clip from
-every train and validation sequence to reject blank or static sources, then
-runs a tiny CPU training loop without occupying an allocated GPU:
+When the GPU and test checks are complete, leave the interactive GPU shell:
 
 ```bash
 exit
+```
+
+## 3. Run the dataset preflight without a GPU
+
+The dataset preflight validates every manifest row and decodes one deterministic clip from every training and validation sequence. It detects subject leakage, invalid paths, duplicate sources, corrupt sampled images, blank sequences, static sequences, and missing-frame gaps.
+
+This work is CPU and storage intensive, so run it without requesting a GPU:
+
+```bash
 srun \
-  --account=<ACCOUNT> \
+  --account=mind \
   --partition=hai-interactive \
   --cpus-per-task=8 \
   --mem=64G \
   --time=01:00:00 \
   --pty bash
+```
+
+Inside the CPU-only shell, execute the notebook with explicit preflight settings:
+
+```bash
 cd /hai/scratch/$USER/cody-jepa
 mkdir -p notebook-runs
+
+CODY_JEPA_RUN_FULL_TRAINING=0 \
+CODY_JEPA_RUN_DATA_AUDIT=1 \
+CODY_JEPA_RUN_EXHAUSTIVE_DATA_AUDIT=0 \
 MPLCONFIGDIR=/tmp/mpl \
-uv run jupyter nbconvert \
+uv run --no-sync jupyter nbconvert \
   --to notebook \
   --execute notebooks/single-stream-jepa.ipynb \
   --output-dir notebook-runs \
@@ -143,27 +213,293 @@ uv run jupyter nbconvert \
   --ExecutePreprocessor.timeout=1800
 ```
 
-Do not continue if preflight raises an error. In particular, the loader refuses blank identities, split leakage, frame paths outside `data/healthgait`, duplicate frame sources, corrupt sampled images, blank/static sequence probes, and clips that would cross missing-frame gaps.
+The preflight can take about 10 minutes on HAIC storage. A successful run writes:
 
-## Enable the full run
+```text
+notebook-runs/single-stream-jepa-preflight.ipynb
+```
 
-Set `CODY_JEPA_RUN_FULL_TRAINING=1` in the job environment. Do not edit the
-notebook. Full training defaults `CODY_JEPA_RUN_DATA_AUDIT` to `0`, because the
-all-sequence audit was already completed above. The training path still checks
-the full manifest, every frame name and size, sampled frame bytes, subject
-isolation, and a real batch. It then runs one production-size BF16
-forward/backward step on the allocated GPU before starting epoch 1.
+Open or inspect that executed notebook and confirm that it reports:
 
-Keep `CONFIG["required_device"] = "cuda"`. This makes a missing GPU fail
-immediately instead of silently starting a multi-day CPU run. Keep
-`compile=False` for the first successful eager run; compilation is an optional
-later benchmark.
+- 2,506 training sequences.
+- 624 validation sequences.
+- 318 training subjects.
+- 80 validation subjects.
+- No subject overlap.
+- A completed CPU smoke-training step.
 
-If you later test `compile=True`, run it only after the eager CUDA run has
-completed a short checkpoint. `torch.compile` on CUDA uses TorchInductor and
-Triton; if Triton is missing or too old, PyTorch raises
-`BackendCompilerFailed: Cannot find a working triton installation`. Keep
-`compile=False` for production training until this smoke test passes:
+Do not submit the GPU job if the preflight raises an exception.
+
+When the preflight passes, leave the CPU-only shell:
+
+```bash
+exit
+```
+
+## 4. Configure a new training run
+
+The checked-in batch script is [`slurm/train-single-stream-jepa.sbatch`](../slurm/train-single-stream-jepa.sbatch). Treat this file as the source of truth for the HAIC job. The tutorial does not duplicate the full script because duplicated copies can drift apart.
+
+For a new run, confirm that the script contains these environment settings:
+
+```bash
+export CODY_JEPA_RUN_FULL_TRAINING=1
+export CODY_JEPA_RUN_DATA_AUDIT=0
+export CODY_JEPA_RUN_EXHAUSTIVE_DATA_AUDIT=0
+export CODY_JEPA_OUTPUT_DIR=outputs/single-stream-jepa-h100-v2
+unset CODY_JEPA_RESUME_CHECKPOINT
+export MPLCONFIGDIR=/tmp/mpl
+```
+
+These variables have distinct jobs:
+
+| Variable | New-run value | Purpose |
+| --- | --- | --- |
+| `CODY_JEPA_RUN_FULL_TRAINING` | `1` | Enables the full CUDA training path. |
+| `CODY_JEPA_RUN_DATA_AUDIT` | `0` | Skips the all-sequence audit that already passed in Section 3. |
+| `CODY_JEPA_RUN_EXHAUSTIVE_DATA_AUDIT` | `0` | Avoids reading and hashing every frame before GPU work begins. |
+| `CODY_JEPA_OUTPUT_DIR` | A new directory | Keeps checkpoints from separate runs isolated. |
+| `CODY_JEPA_RESUME_CHECKPOINT` | Unset | Tells the notebook to initialize a new model. |
+| `MPLCONFIGDIR` | `/tmp/mpl` | Gives Matplotlib a writable cache directory. |
+
+### Choose a fresh output directory
+
+The provided script uses:
+
+```text
+outputs/single-stream-jepa-h100-v2
+```
+
+Check whether that directory already contains a checkpoint:
+
+```bash
+cd /hai/scratch/$USER/cody-jepa
+ls -la outputs/single-stream-jepa-h100-v2 2>/dev/null || true
+```
+
+If `latest.pt` exists, do not delete it. Either resume that run as described in Section 8 or choose a new directory, such as:
+
+```bash
+export CODY_JEPA_OUTPUT_DIR=outputs/single-stream-jepa-h100-v3
+```
+
+Update the value inside the batch script. Variables exported only in your login shell do not override values that the script exports itself.
+
+### Validate the batch script
+
+```bash
+bash -n slurm/train-single-stream-jepa.sbatch
+```
+
+No output means that the shell syntax is valid.
+
+## 5. Submit the training job
+
+Slurm opens the `#SBATCH --output` file before the script starts. Create the log directory before calling `sbatch`:
+
+```bash
+cd /hai/scratch/$USER/cody-jepa
+mkdir -p logs notebook-runs
+```
+
+Submit the job and save its numeric ID:
+
+```bash
+JOB_ID=$(sbatch --parsable slurm/train-single-stream-jepa.sbatch)
+echo "Submitted job $JOB_ID"
+```
+
+Check its state:
+
+```bash
+squeue -j "$JOB_ID" -o "%.18i %.2t %.10M %R"
+```
+
+Common states are:
+
+| State | Meaning |
+| --- | --- |
+| `PD` | The job is pending and waiting for resources or quota. |
+| `R` | Slurm has started the batch script on a compute node. |
+| `CG` | The process has exited and Slurm is completing cleanup. |
+| `CD` | The job completed successfully. |
+| `F` | The job failed. Inspect the Slurm log for the cause. |
+
+Queue time is not predictable. It depends on H100 availability, the `mind` account quota, and other jobs in the `hai` partition.
+
+## 6. Monitor startup and training
+
+The batch script creates two logs:
+
+```text
+logs/single-stream-jepa-<JOB_ID>.out
+logs/gpu-<JOB_ID>.csv
+```
+
+Watch the Slurm log in one terminal:
+
+```bash
+tail -F "logs/single-stream-jepa-${JOB_ID}.out"
+```
+
+Watch GPU utilization in another terminal:
+
+```bash
+tail -F "logs/gpu-${JOB_ID}.csv"
+```
+
+The GPU log records utilization and memory once per minute. Low utilization during initial dataset construction is normal. With the full data audit disabled, expect the production BF16 CUDA preflight to begin within about 5 to 10 minutes after the job enters state `R`. Investigate if the job remains in state `R` for more than 15 minutes without any increase in GPU memory or utilization.
+
+The notebook performs one real, production-sized forward and backward step before epoch 1. This step verifies CUDA compatibility, BF16 execution, data transfer, finite loss, finite gradients, and peak GPU memory.
+
+`nbconvert` captures cell output inside the executed notebook. It does not stream every epoch metric to the Slurm log. During training, use the GPU CSV and checkpoint timestamps as the primary progress signals:
+
+```bash
+ls -lh "outputs/single-stream-jepa-h100-v2"
+```
+
+`latest.pt` appears after the first complete epoch and is replaced atomically after each later epoch.
+
+For scheduler details, run:
+
+```bash
+scontrol show job "$JOB_ID"
+sacct -j "$JOB_ID" --format=JobID,State,Elapsed,ExitCode,MaxRSS
+```
+
+To cancel the job:
+
+```bash
+scancel "$JOB_ID"
+```
+
+## 7. Inspect completed outputs
+
+A completed run should produce:
+
+```text
+notebook-runs/single-stream-jepa-<JOB_ID>.executed.ipynb
+outputs/single-stream-jepa-h100-v2/latest.pt
+outputs/single-stream-jepa-h100-v2/best_loss.pt
+logs/single-stream-jepa-<JOB_ID>.out
+logs/gpu-<JOB_ID>.csv
+```
+
+`best_healthy.pt` appears only after a validation checkpoint passes every representation-health criterion:
+
+```text
+outputs/single-stream-jepa-h100-v2/best_healthy.pt
+```
+
+Inspect checkpoint metadata without loading model tensors onto the GPU:
+
+```bash
+uv run python - <<'PY'
+import json
+from pathlib import Path
+
+from cody_jepa.single_stream_jepa import load_checkpoint
+
+output_dir = Path("outputs/single-stream-jepa-h100-v2")
+metadata = {}
+
+for name in ("latest.pt", "best_loss.pt", "best_healthy.pt"):
+    path = output_dir / name
+    if not path.exists():
+        metadata[name] = {"status": "not_written"}
+        continue
+
+    checkpoint = load_checkpoint(path)
+    metadata[name] = {
+        "best_epoch": checkpoint["best_epoch"],
+        "best_healthy_epoch": checkpoint["best_healthy_epoch"],
+        "best_val_loss": checkpoint["best_val_loss"],
+        "completed_epochs": checkpoint["completed_epochs"],
+        "dataset_sha256": checkpoint["data_contract"]["train_dataset"]["dataset_sha256"],
+        "global_step": checkpoint["global_step"],
+        "status": "written",
+    }
+
+print(json.dumps(metadata, indent=2, sort_keys=True))
+PY
+```
+
+Use the checkpoints as follows:
+
+- `latest.pt` is for resuming an interrupted run.
+- `best_loss.pt` is useful for diagnosis and loss-based comparisons.
+- `best_healthy.pt` is the preferred checkpoint for representation probes.
+
+## 8. Resume an interrupted run
+
+Resume only from a checkpoint written by the same training configuration and data contract. Keep the original output directory so the run continues in place.
+
+In `slurm/train-single-stream-jepa.sbatch`, replace:
+
+```bash
+unset CODY_JEPA_RESUME_CHECKPOINT
+```
+
+with:
+
+```bash
+export CODY_JEPA_RESUME_CHECKPOINT=outputs/single-stream-jepa-h100-v2/latest.pt
+```
+
+The new-run script intentionally exits when `latest.pt` already exists. For a resume job, replace that guard with:
+
+```bash
+if [[ ! -f "$CODY_JEPA_RESUME_CHECKPOINT" ]]; then
+  echo "Resume checkpoint does not exist: $CODY_JEPA_RESUME_CHECKPOINT" >&2
+  exit 2
+fi
+```
+
+Keep these values unchanged:
+
+```bash
+export CODY_JEPA_RUN_FULL_TRAINING=1
+export CODY_JEPA_RUN_DATA_AUDIT=0
+export CODY_JEPA_RUN_EXHAUSTIVE_DATA_AUDIT=0
+export CODY_JEPA_OUTPUT_DIR=outputs/single-stream-jepa-h100-v2
+```
+
+Validate and submit the edited script:
+
+```bash
+bash -n slurm/train-single-stream-jepa.sbatch
+JOB_ID=$(sbatch --parsable slurm/train-single-stream-jepa.sbatch)
+echo "Submitted resume job $JOB_ID"
+```
+
+Before loading weights, the notebook compares the checkpoint with the current architecture, masks, optimizer behavior, loader configuration, manifest hash, and frame-inventory fingerprint. A mismatch stops the resume rather than mixing two experiments.
+
+## 9. Run exhaustive data certification when needed
+
+Normal training checks the full manifest, every frame name and size, and sampled frame contents. Checkpoints also preserve the random states needed for an exact epoch-boundary resume. Exact continuation assumes that the underlying dataset has not changed.
+
+For byte-level dataset certification, run a separate CPU-only notebook job with:
+
+```bash
+CODY_JEPA_RUN_FULL_TRAINING=0 \
+CODY_JEPA_RUN_DATA_AUDIT=1 \
+CODY_JEPA_RUN_EXHAUSTIVE_DATA_AUDIT=1 \
+MPLCONFIGDIR=/tmp/mpl \
+uv run --no-sync jupyter nbconvert \
+  --to notebook \
+  --execute notebooks/single-stream-jepa.ipynb \
+  --output-dir notebook-runs \
+  --output single-stream-jepa-exhaustive-audit.ipynb \
+  --ExecutePreprocessor.timeout=-1
+```
+
+The current dataset contains 321,247 frames. Exhaustive mode opens every image and reads every frame byte, so it can take much longer than the standard preflight. Do not combine exhaustive certification with an H100 training allocation.
+
+## 10. Test `torch.compile` only after eager training works
+
+Keep `CONFIG["compile"] = False` for the first successful run. CUDA compilation adds TorchInductor and Triton as possible failure points without being required for correctness.
+
+If you later want to benchmark compilation, test the runtime first in an interactive H100 session:
 
 ```bash
 uv run python - <<'PY'
@@ -181,144 +517,37 @@ def add_one(x):
 x = torch.zeros(8, device="cuda")
 add_one(x)
 torch.cuda.synchronize()
-print("torch.compile CUDA smoke test: passed")
+print("torch.compile CUDA smoke test passed")
 PY
 ```
 
-Exhaustive certification of all 321,247 frames is intentionally separate from
-GPU training. To run it as a one-time I/O job, set
-`CODY_JEPA_RUN_EXHAUSTIVE_DATA_AUDIT=1` and leave
-`CODY_JEPA_RUN_FULL_TRAINING=0`. Do not combine those flags in an H100 job: the
-exhaustive mode opens every image and reads every frame byte before model work.
+Do not enable compilation for the production notebook until this test passes and the eager run has produced a valid checkpoint.
 
-If `outputs/single-stream-jepa/latest.pt` already exists, the notebook refuses to overwrite it unless you explicitly resume or choose a new output directory.
+## Troubleshooting
 
-## Submit a batch job
+| Symptom | What to check |
+| --- | --- |
+| Job remains in `PD` | Run `squeue -j "$JOB_ID" -o "%.18i %.2t %.10M %R"`. The final column explains whether the job is waiting for resources, priority, or quota. |
+| Job enters `R` but no Slurm log appears | Confirm that `logs/` existed before submission and inspect `scontrol show job "$JOB_ID"`. |
+| GPU utilization stays near zero for more than 15 minutes | Inspect the Slurm log, confirm all three run-mode variables, and check whether dataset construction is blocked on HAIC storage. |
+| Job receives a non-H100 GPU | Keep `--gres=gpu:h100:1`. The batch script intentionally exits when the device name does not contain `H100`. |
+| CUDA reports no compatible kernel image | Reinstall the locked PyTorch packages and confirm that `sm_90` appears in `torch.cuda.get_arch_list()`. |
+| Notebook refuses to overwrite `latest.pt` | Choose a new `CODY_JEPA_OUTPUT_DIR` for a new run, or configure an explicit resume. Do not delete an existing checkpoint unless you have intentionally discarded that experiment. |
+| GPU runs out of memory during the BF16 preflight | Reduce the physical `batch_size` and increase `accumulation_steps` by the same factor to preserve the effective batch size. Recheck that the number of microbatches remains divisible by the accumulation count. |
+| Executed notebook is missing while the job is running | This is expected. `nbconvert` writes the final executed notebook after execution ends. Use the GPU CSV and checkpoints to monitor an active run. |
+| Job stops before `latest.pt` appears | No complete epoch was saved. Start a new run in the same empty directory or choose another fresh output directory. |
 
-Create `slurm/train-single-stream-jepa.sbatch`:
+## Scientific stop conditions
 
-```bash
-#!/bin/bash
-#SBATCH --job-name=single-stream-jepa
-#SBATCH --account=<ACCOUNT>
-#SBATCH --partition=hai
-#SBATCH --gres=gpu:h100:1
-#SBATCH --cpus-per-task=8
-#SBATCH --mem=64G
-#SBATCH --time=72:00:00
-#SBATCH --output=logs/single-stream-jepa-%j.out
+Stop the run and investigate if any of these conditions occur:
 
-set -euo pipefail
-cd /hai/scratch/$USER/cody-jepa
-mkdir -p logs notebook-runs outputs/single-stream-jepa
+- Loss, gradients, or inputs become non-finite.
+- Effective rank trends toward 1.
+- Per-feature variance approaches zero.
+- The shuffled-context loss gap remains near zero after the initial learning period.
+- Validation improves only the clip-weighted metric and not the subject-balanced metric.
+- GPU memory usage approaches the H100 capacity.
 
-nvidia-smi
-gpu_name=$(nvidia-smi --query-gpu=name --format=csv,noheader | head -1)
-case "$gpu_name" in
-  *H100*) ;;
-  *) echo "Expected an H100, got: $gpu_name" >&2; exit 2 ;;
-esac
-nvidia-smi \
-  --query-gpu=timestamp,name,utilization.gpu,memory.used,memory.total \
-  --format=csv --loop=60 > "logs/gpu-${SLURM_JOB_ID}.csv" &
-gpu_monitor_pid=$!
-trap 'kill "$gpu_monitor_pid" 2>/dev/null || true' EXIT
+The training loop raises on non-finite values before updating the online or target encoder with corrupted gradients.
 
-CODY_JEPA_RUN_FULL_TRAINING=1 \
-CODY_JEPA_RUN_DATA_AUDIT=0 \
-CODY_JEPA_RUN_EXHAUSTIVE_DATA_AUDIT=0 \
-MPLCONFIGDIR=/tmp/mpl \
-uv run --no-sync jupyter nbconvert \
-  --to notebook \
-  --execute notebooks/single-stream-jepa.ipynb \
-  --output-dir notebook-runs \
-  --output "single-stream-jepa-${SLURM_JOB_ID}.executed.ipynb" \
-  --ExecutePreprocessor.timeout=-1
-```
-
-Submit and monitor it:
-
-```bash
-mkdir -p logs notebook-runs
-sbatch slurm/train-single-stream-jepa.sbatch
-squeue -u "$USER"
-tail -f logs/single-stream-jepa-<JOBID>.out
-tail -f logs/gpu-<JOBID>.csv
-```
-
-## Resume an interrupted run
-
-The notebook writes `latest.pt` only after a complete epoch, so the saved
-DataLoader, mask, Torch, optimizer, scaler, and EMA states share one exact
-boundary. Resume without editing the notebook:
-
-```bash
-CODY_JEPA_RUN_FULL_TRAINING=1 \
-CODY_JEPA_RESUME_CHECKPOINT=outputs/single-stream-jepa/latest.pt \
-MPLCONFIGDIR=/tmp/mpl \
-uv run --no-sync jupyter nbconvert \
-  --to notebook \
-  --execute notebooks/single-stream-jepa.ipynb \
-  --output-dir notebook-runs \
-  --output "single-stream-jepa-${SLURM_JOB_ID}.resumed.ipynb" \
-  --ExecutePreprocessor.timeout=-1
-```
-
-Resume validation rejects a changed architecture, mask policy, optimizer
-behavior, loader contract, manifest hash, or frame-inventory fingerprint. The
-fingerprint covers every frame name and size plus sampled frame contents. Use
-the separate exhaustive audit when a byte-for-byte certification is required.
-
-## Inspect results
-
-Expected artifacts:
-
-```text
-notebook-runs/single-stream-jepa-<JOBID>.executed.ipynb
-outputs/single-stream-jepa/latest.pt
-outputs/single-stream-jepa/best_loss.pt
-outputs/single-stream-jepa/best_healthy.pt
-logs/single-stream-jepa-<JOBID>.out
-logs/gpu-<JOBID>.csv
-```
-
-Inspect checkpoint metadata without loading it onto the GPU:
-
-```bash
-uv run python - <<'PY'
-import json
-from pathlib import Path
-from cody_jepa.single_stream_jepa import load_checkpoint
-
-metadata = {}
-for name in ("latest.pt", "best_loss.pt", "best_healthy.pt"):
-    path = Path("outputs/single-stream-jepa") / name
-    if not path.exists():
-        metadata[name] = {"status": "not_written_yet"}
-        continue
-    checkpoint = load_checkpoint(path)
-    metadata[name] = {
-        "best_epoch": checkpoint["best_epoch"],
-        "best_val_loss": checkpoint["best_val_loss"],
-        "dataset_sha256": checkpoint["data_contract"]["train_dataset"]["dataset_sha256"],
-        "epoch": checkpoint["completed_epochs"],
-        "step": checkpoint["global_step"],
-        "status": "written",
-    }
-print(json.dumps(metadata, indent=2, sort_keys=True))
-PY
-```
-
-Use `best_healthy.pt` for representation probes. `best_loss.pt` is retained for diagnosis because its lower loss may still coincide with collapse or a position-only shortcut. `latest.pt` exists for continuation.
-
-## Stop conditions
-
-Stop and investigate if any of these occur:
-
-- Loss, gradients, or inputs become non-finite. The loop raises before corrupting online or EMA weights.
-- Effective rank trends toward 1 or per-feature variance approaches zero.
-- Shuffled-context loss gap remains near zero after the initial learning period.
-- Validation improves only clip-weighted metrics but not subject-balanced metrics.
-- GPU memory is close to capacity. Reduce physical `batch_size` and increase `accumulation_steps` to preserve effective batch size.
-
-Do not use this prototype’s prediction loss as evidence for CoDy-JEPA’s final disentanglement claim. That requires the later stream-specific probes, counterfactual intervention, and transfer evaluation.
+Finally, do not treat this prototype's prediction loss as evidence for the final CoDy-JEPA disentanglement claim. That claim requires stream-specific probes, counterfactual intervention, and transfer evaluation.
