@@ -1,45 +1,45 @@
 # CoDy-JEPA
 
-## Learning motion without memorizing who moves
+**Learning how things move without memorizing who moves.**
 
-CoDy-JEPA (Counterfactual-Dynamical Joint-Embedding Predictive Architecture) is a research project for learning motion representations from unlabeled video. Its goal is to represent **how an articulated system moves** while limiting how much identity, appearance, or environment information leaks into that motion representation.
+CoDy-JEPA (Counterfactual-Dynamical Joint-Embedding Predictive Architecture) learns motion representations from unlabeled video of articulated systems: people walking, hands gesturing, robot arms reaching. It separates what stays the same within a clip (body shape, viewpoint, background) from what changes (pose, gait phase, speed), so the motion representation transfers to new people, cameras, and settings instead of memorizing incidental correlations.
 
-The method is intended for people walking, hands gesturing, robot arms reaching, and other systems whose structure changes slowly while their state changes over time.
+The name describes the core trick. The model is *dynamical* because it splits its representation into a stable stream and a dynamics stream, and *counterfactual* because it trains on deliberately mismatched inputs that pair one clip's appearance with another clip's motion. A predictor that sees person A's body but person B's stride can only succeed by reading the motion itself.
 
-> **Project status:** this repository contains the CoDy-JEPA research design, a strict Health&Gait silhouette data pipeline, and a tested single-stream masked-JEPA prototype. The prototype validates the training infrastructure and representation-learning signal; it is not yet the final dual-stream, counterfactual CoDy-JEPA model. The runnable pipeline prepares reproducible `[B, T, C, H, W]` batches, validates subject-disjoint data provenance, trains with resumable checkpoints, monitors collapse and context dependence, and evaluates frozen learned representations with linear probes.
+## Where to Go
 
-## Navigate this repository
-
-Use this table as the shortest path to the part of the project you need:
-
-| Goal | Start here |
+| If you want to | Read |
 | --- | --- |
-| Understand the research question and proposed dual-stream method | [Why CoDy-JEPA?](#why-cody-jepa), [Method](#method), and [Evaluation](#evaluation) |
-| Install the locked environment and run tests | [Quick start](#quick-start) |
-| Download Health&Gait and create the subject-disjoint manifest | [Prepare Health&Gait](#prepare-healthgait) and [`scripts/build_healthgait_manifest.py`](scripts/build_healthgait_manifest.py) |
-| Inspect batches, sampling, and motion diagnostics | [Explore the data pipeline](#explore-the-data-pipeline) and [`notebooks/healthgait_manifest_loader.ipynb`](notebooks/healthgait_manifest_loader.ipynb) |
-| Run the safe single-stream smoke test or configure training | [Run the single-stream prototype](#run-the-single-stream-prototype) and [`notebooks/single-stream-jepa.ipynb`](notebooks/single-stream-jepa.ipynb) |
-| Train on Stanford HAIC with an H100 | [`tutorials/train-cody-jepa-on-haic.md`](tutorials/train-cody-jepa-on-haic.md) and [`slurm/train-single-stream-jepa.sbatch`](slurm/train-single-stream-jepa.sbatch) |
-| Export a checkpoint and measure learned information | [Single-stream frozen-feature probes](#single-stream-frozen-feature-probes) |
-| Find a model, loader, script, test, or result | [Code and repository guide](#code-and-repository-guide) |
-| Review the retained HAIC run evidence | [`haic-results/job_91108.ipynb`](haic-results/job_91108.ipynb) |
+| Understand the research idea | [The Idea](#the-idea), [Method](#method), [Evaluation](#evaluation) |
+| Install the environment and run tests | [Getting Started](#getting-started) |
+| Download the dataset and build the manifest | [Data: Health&Gait](#data-healthgait) |
+| Train the single-stream prototype | [Training](#training) |
+| Evaluate a trained checkpoint | [Evaluating a Checkpoint](#evaluating-a-checkpoint) |
+| Find a model, script, or test | [Repository Map](#repository-map) |
 
-## Why CoDy-JEPA?
+## The Idea
 
-Video models can solve the wrong problem for the right score. If one person always appears in one room and walks at one speed, a model may associate the room or identity with speed instead of learning gait phase and cadence. This is **shortcut learning**: the model exploits a correlation that works on a familiar split but fails when the person, camera, or environment changes [6].
+Video models can solve the wrong problem for the right score. If one person always appears in one room and walks at one speed, a model may associate the room or the identity with the speed instead of learning gait phase and cadence. This is shortcut learning: the model exploits a correlation that works on a familiar split but fails when the person, camera, or environment changes [6].
 
-CoDy-JEPA addresses this failure mode with two latent summaries:
+CoDy-JEPA addresses this failure mode with two latent streams:
 
 - `S_attr`, the **attribute stream**, represents comparatively stable information such as body proportions, clothing, viewpoint, background, robot morphology, or tool shape.
 - `S_dyn`, the **dynamics stream**, represents changing state such as pose transitions, gait phase, cadence, velocity, contact state, or gesture phase.
 
-This split is an inductive bias, not a claim that structure and motion are naturally independent. Body shape can constrain gait, for example. Unsupervised data alone cannot guarantee a uniquely disentangled representation [10], so the separation must be tested with leakage probes and transfer experiments. The counterfactual intervention is motivated by the broader goal of learning representations organized around causal factors rather than incidental correlations [11].
+This split is an inductive bias, not a claim that structure and motion are naturally independent; body shape can constrain gait, for example. Unsupervised data alone cannot guarantee a uniquely disentangled representation [10], so the separation must be tested with leakage probes and transfer experiments. The counterfactual intervention is motivated by the broader goal of organizing representations around causal factors rather than incidental correlations [11].
 
 ![Stable and dynamic factorization](images/05-v3-factorization.svg)
 
 ## Method
 
-CoDy-JEPA combines temporal token routing, counterfactual token swapping, latent future prediction, and redundancy reduction.
+CoDy-JEPA combines four mechanisms, each answering one question:
+
+| Step | Mechanism | Question it answers |
+| --- | --- | --- |
+| 1 | Temporal token routing | Which tokens describe structure, and which describe motion? |
+| 2 | CI-TSI counterfactual swapping | How do we stop identity from predicting motion? |
+| 3 | Latent future prediction | What is the training signal? |
+| 4 | HSIC plus variance and covariance terms | How do the streams stay distinct without collapsing? |
 
 ### 1. Encode and route video tokens
 
@@ -56,18 +56,18 @@ $$
 v_p=\frac{1}{T}\sum_{t=1}^{T}\lVert z_{t,p}-\bar z_p\rVert_2^2.
 $$
 
-Low-variation tokens are routed toward the attribute encoder $g_a$. High-variation tokens are routed toward the dynamics encoder $g_d$:
+Low-variation tokens are routed toward the attribute encoder $g_a$, and high-variation tokens toward the dynamics encoder $g_d$, using thresholds $\tau_a$ and $\tau_d$:
 
 $$
 S_{\text{attr}} = g_a(\left\lbrace z_{t,p}: v_p \le \tau_a \right\rbrace), \qquad
 S_{\text{dyn}}(1:t) = g_d(\left\lbrace z_{s,p}: s \le t,\ v_p \ge \tau_d \right\rbrace).
 $$
 
-In a gait clip, torso shape may enter the stable stream while alternating foot and knee positions enter the dynamic stream. Temporal variation is only an initial routing signal: a static room can still be a nuisance, and slow movement can still be dynamics. The probes described below determine whether the learned split is useful.
+In a gait clip, torso shape may enter the stable stream while alternating foot and knee positions enter the dynamic stream. Temporal variation is only an initial routing signal: a static room can still be a nuisance, and slow movement can still be dynamics. The probes described under [Evaluation](#evaluation) determine whether the learned split is useful.
 
 ### 2. Break identity-motion shortcuts
 
-The core intervention is **Cross-Instance Token-Swapping Intervention (CI-TSI)**. Given clips A and B from the same broad domain, CoDy-JEPA combines A's stable context with B's motion history:
+Routing gives each stream its inputs, but as long as both streams come from the same clip, the body and its motion still belong to the same person, and identity can still stand in for motion. The core intervention breaks that link: the **Cross-Instance Token-Swapping Intervention (CI-TSI)**. Given clips A and B from the same broad domain, CoDy-JEPA combines A's stable context with B's motion history:
 
 $$
 C_{A\leftarrow B}=[S_{\mathrm{attr}}(A),S_{\mathrm{dyn}}(B,1{:}t)].
@@ -79,13 +79,13 @@ $$
 \hat S_{\mathrm{dyn}}(B,t+k)=q_\psi(C_{A\leftarrow B},k).
 $$
 
-If A supplies the body and B supplies the stride rhythm, the association “Person A usually walks slowly” no longer solves the task. The predictor must retain motion from B and use A only as context.
+If A supplies the body and B supplies the stride rhythm, the association "Person A usually walks slowly" no longer solves the task. The predictor must retain motion from B and use A only as context.
 
 ![Counterfactual prediction objective](images/06-v3-objective.svg)
 
 ### 3. Predict representations, not pixels
 
-As in JEPA-style learning [1, 2], the target is produced by a slowly updated target encoder. The predictor matches a normalized latent future rather than reconstructing RGB frames:
+The counterfactual context needs a prediction target, and the choice of target determines what the model is forced to learn. As in JEPA-style learning [1, 2], the target is produced by a slowly updated target encoder. The predictor matches a normalized latent future rather than reconstructing RGB frames:
 
 $$
 \mathcal{L}_{\text{pred}} =
@@ -93,11 +93,11 @@ $$
 \mathrm{sg}\left(\mathrm{norm}(\bar{S}_{\text{dyn}}(B,t+k))\right)\right\rVert_2^2 .
 $$
 
-Here, `sg` means stop-gradient. Latent prediction lets the objective focus on predictable semantic and physical structure instead of every pixel. This differs from MAE and VideoMAE, whose training targets are reconstructed image or video content [4, 5].
+Here `sg` means stop-gradient. Latent prediction lets the objective focus on predictable semantic and physical structure instead of every pixel, which distinguishes it from MAE and VideoMAE, whose targets are reconstructed image or video content [4, 5].
 
 ### 4. Separate the streams without collapse
 
-Prediction alone does not prevent both streams from storing the same information. CoDy-JEPA therefore penalizes their statistical dependence with the Hilbert-Schmidt Independence Criterion (HSIC) [7]. For a batch of $n$ clips, let $K$ and $L$ be kernel Gram matrices for `S_attr` and `S_dyn`, and let $H=I_n-\frac{1}{n}\mathbf1\mathbf1^\top$:
+The first three mechanisms define what to predict and from what context, but nothing yet stops the two streams from quietly storing the same information, or from collapsing to constants that make prediction trivially easy. CoDy-JEPA therefore penalizes their statistical dependence with the Hilbert-Schmidt Independence Criterion (HSIC) [7]. For a batch of $n$ clips, let $K$ and $L$ be kernel Gram matrices for `S_attr` and `S_dyn`, and let $H=I_n-\frac{1}{n}\mathbf1\mathbf1^\top$:
 
 $$
 \mathrm{HSIC}(S_{\text{attr}},S_{\text{dyn}})=
@@ -119,7 +119,7 @@ Each term has a distinct job: predict future motion, reduce cross-stream overlap
 
 ## Evaluation
 
-Training loss alone cannot show that the streams learned the intended information. After pretraining, freeze both encoders and fit linear or shallow probes:
+Training loss alone cannot show that the streams learned the intended information. After pretraining, both encoders are frozen and linear or shallow probes are fit:
 
 | Probe target | Desired `S_attr` result | Desired `S_dyn` result |
 | --- | --- | --- |
@@ -129,75 +129,43 @@ Training loss alone cannot show that the streams learned the intended informatio
 | Action or contact state | Low | High |
 | Camera, room, or dataset source | Measure and control | Low |
 
-The central measurement is the **leakage gap**: `S_dyn` should predict motion variables well and identity variables poorly. Transfer probes should be trained on one set of subjects, views, or robot embodiments and evaluated on held-out ones.
+The central measurement is the **leakage gap**: `S_dyn` should predict motion variables well and identity variables poorly. Transfer probes are trained on one set of subjects, views, or embodiments and evaluated on held-out ones.
 
-### Single-stream frozen-feature probes
+The key comparisons remove one mechanism at a time:
 
-The trained single-stream baseline has a two-stage probe runner. Feature export
-restores only the EMA target encoder, freezes it, switches it to evaluation mode,
-and runs under `torch.inference_mode()`. Each deterministic clip window becomes
-one row containing its manifest metadata and the mean-pooled, pre-final-LayerNorm
-target tokens:
+| Variant | What it tests |
+| --- | --- |
+| Single-stream JEPA predictor | Whether the dual-stream design matters at all (see also MC-JEPA's motion-content separation [3]) |
+| Dual stream without CI-TSI | Whether counterfactual swapping, not just the architecture, reduces leakage |
+| CoDy-JEPA without HSIC | Whether explicit independence pressure adds anything beyond swapping |
+| CoDy-JEPA without variance and covariance safeguards | Whether independence pressure alone drives the streams toward collapse |
 
-The retained working single-stream experiment uses the same directory name in
-HAIC and in the local copied results:
-
-| Experiment | HAIC directory | Local directory | Retained executed notebook |
-| --- | --- | --- | --- |
-| Stabilized VICReg baseline (job 91108) | `outputs/jepa-v4` | `outputs/jepa-v4` | `haic-results/job_91108.ipynb` |
-
-The failed job 90881 and 91023 notebooks and the local `outputs/jepa-v3/` copy
-were intentionally removed. They are not supported comparison inputs. The
-commands below operate on the retained local `jepa-v4` checkpoint:
-
-```bash
-uv run python scripts/export_single_stream_features.py \
-  --checkpoint outputs/jepa-v4/best_loss.pt \
-  --output outputs/jepa-v4/frozen_features.npz \
-  --device auto
-
-uv run python scripts/eval_probes.py \
-  --features outputs/jepa-v4/frozen_features.npz \
-  --output-dir outputs/jepa-v4
-```
-
-The evaluator reports three protocols in both JSON and CSV: a sequence-disjoint
-closed-set identity classifier over training subjects, nearest-centroid identity
-retrieval over separately enrolled validation subjects, and a `gait_system`
-linear classifier trained on training subjects and evaluated on subject-disjoint
-validation subjects. Balanced accuracy is the primary gait metric. The exporter
-accepts `.csv` or compressed `.npz`; both carry a JSON provenance sidecar with
-the checkpoint hash and exact feature formula.
-
-Do not compare an executed notebook directly with job 91108 when the other run
-ended with errors, used a legacy diagnostics schema, or wrote no
-`best_healthy.pt`. If a compatible checkpoint survives elsewhere, export its
-features and rerun both probes under the current code. If no compatible
-checkpoint survives, report the run only as a failed historical attempt and
-exclude it from quantitative comparisons. The retained notebook is provenance;
-its inline plots and historical HAIC path strings are not a portable results
-interface.
-
-The proposed ablations are:
-
-1. A single-stream V-JEPA-style predictor and the motion-content separation studied by MC-JEPA [3].
-2. A dual-stream model without CI-TSI.
-3. CoDy-JEPA without HSIC.
-4. CoDy-JEPA without variance and covariance safeguards.
-
-A strong result combines competitive future-dynamics prediction, less wrong-stream leakage, and better low-label transfer. A result in which swapping reduces identity leakage but harms motion prediction is also informative because it exposes the separation-performance tradeoff directly.
+A strong result combines competitive future-dynamics prediction, less wrong-stream leakage, and better low-label transfer. A result in which swapping reduces identity leakage but harms motion prediction is also informative, because it exposes the separation-performance tradeoff directly.
 
 ![Evaluation matrix](images/07-v3-evaluation.svg)
 
-## Quick start
+## Typical Workflow
+
+Everything below this point is practical. The sections form one pipeline, run in this order:
+
+| Step | Command or entry point | Details in |
+| --- | --- | --- |
+| 1. Install the locked environment | `uv sync --frozen` | [Getting Started](#getting-started) |
+| 2. Run the tests (no dataset needed) | `uv run python -m unittest discover -s tests -v` | [Getting Started](#getting-started) |
+| 3. Download Health&Gait and build the manifest | `uv run python scripts/build_healthgait_manifest.py` | [Data: Health&Gait](#data-healthgait) |
+| 4. Smoke-test, then train | `notebooks/single-stream-jepa.ipynb` | [Training](#training) |
+| 5. Export frozen features from a checkpoint | `scripts/export_single_stream_features.py` | [Evaluating a Checkpoint](#evaluating-a-checkpoint) |
+| 6. Run linear probes on the features | `scripts/eval_probes.py` | [Evaluating a Checkpoint](#evaluating-a-checkpoint) |
+
+## Getting Started
 
 ### Requirements
 
 - Git
 - [uv](https://docs.astral.sh/uv/)
-- Python 3.10 or newer; `uv` will create and manage the project environment
+- Python 3.10 or newer; `uv` creates and manages the project environment
 
-Clone the repository and install the locked dependencies:
+### Install
 
 ```bash
 git clone https://github.com/theodoremui/cody-jepa.git
@@ -205,13 +173,9 @@ cd cody-jepa
 uv sync --frozen
 ```
 
-This repository uses `uv` exclusively for Python environments and dependencies.
-Run project tools through `uv run`; change dependencies with `uv add` or
-`uv remove`, regenerate the lock with `uv lock`, and verify existing environments
-with `uv sync --frozen`. Do not add pip, Conda, Poetry, or ad-hoc system-Python
-installation steps to project documentation or notebooks.
+The project uses `uv` exclusively. Run tools through `uv run`, change dependencies with `uv add` or `uv remove`, and regenerate the lock with `uv lock`. Do not use pip, Conda, or Poetry here.
 
-Run the test suite:
+### Run the tests
 
 ```bash
 uv run python -m unittest discover -s tests -v
@@ -219,7 +183,9 @@ uv run python -m unittest discover -s tests -v
 
 The tests use generated fixtures, so they do not require the Health&Gait dataset.
 
-### Prepare Health&Gait
+## Data: Health&Gait
+
+### Download and extract
 
 The dataset is not distributed with this repository. Download the [Health&Gait v1.0 dataset from Zenodo](https://doi.org/10.5281/zenodo.14039922). The full dataset is a 26.8 GB multipart archive: `Health_Gait.z01` through `Health_Gait.z25` plus `Health_Gait.zip`. Keep every part in the same directory and extract from `Health_Gait.zip` into `data/healthgait/raw/`.
 
@@ -237,7 +203,11 @@ data/healthgait/raw/Health_Gait/
             └── ...
 ```
 
-`FGS` and `UGS` denote fast and usual gait speed. Once the frames are in place, build a deterministic, subject-disjoint train/validation manifest:
+`FGS` and `UGS` denote fast and usual gait speed.
+
+### Build the manifest
+
+Once the frames are in place, build a deterministic, subject-disjoint train/validation manifest:
 
 ```bash
 uv run python scripts/build_healthgait_manifest.py
@@ -248,7 +218,20 @@ The script writes:
 - `data/healthgait/manifests/silhouette_subject_split_seed0.csv`
 - metadata summaries under `data/healthgait/diagnostics/`
 
-The manifest records one trial per row. It contains the subject, modality, gait system, trial, frame directory, frame count, and split. Keeping the split in a manifest makes the experiment auditable and prevents the same subject from appearing in both training and validation.
+The manifest records one trial per row: subject, modality, gait system, trial, frame directory, frame count, and split. Keeping the split in a manifest makes the experiment auditable and prevents the same subject from appearing in both training and validation.
+
+### What the pipeline guarantees
+
+`HealthGaitManifestDataset` validates the full manifest before yielding samples. It rejects:
+
+- missing required columns or unsupported split names;
+- missing frame directories;
+- differences between declared and actual frame counts;
+- trials shorter than the requested clip length;
+- empty training or validation splits; and
+- subjects shared between training and validation.
+
+Each sample is a normalized grayscale tensor shaped `[T, C, H, W]` plus its source metadata. Frames are loaded lazily, so the full dataset is never held in memory.
 
 ### Load a batch
 
@@ -276,36 +259,23 @@ print(batch["video"].min().item(), batch["video"].max().item())  # 0.0 to 1.0
 
 The default policy selects deterministic pseudo-random windows for training and center windows for validation. A training loop should call `train_loader.dataset.set_epoch(epoch)` at the start of each epoch to change training windows reproducibly. Subject and trial metadata are provided for diagnostics; they are not labels for the self-supervised objective.
 
-### Explore the data pipeline
-
-Launch the notebook:
+### Explore the pipeline in a notebook
 
 ```bash
 uv run jupyter lab notebooks/healthgait_manifest_loader.ipynb
 ```
 
-The notebook walks through:
+The notebook walks through manifest validation, train and validation datasets, `[B, T, C, H, W]` batches, deterministic temporal-window sampling, clip contact sheets, frame-difference diagnostics, and motion-energy summaries.
 
-- manifest validation and metadata summaries;
-- train and validation datasets;
-- `[B, T, C, H, W]` DataLoader batches;
-- deterministic temporal-window sampling;
-- clip contact sheets and frame-difference diagnostics;
-- motion-energy summaries.
+## Training
 
-Learned representations are exported and evaluated with the frozen-feature probe workflow described above, after a checkpoint has been trained.
-
-### Run the single-stream prototype
-
-[`notebooks/single-stream-jepa.ipynb`](notebooks/single-stream-jepa.ipynb) is the experiment controller. The reusable model, masking, evaluation, and checkpoint code lives in [`src/cody_jepa/single_stream_jepa.py`](src/cody_jepa/single_stream_jepa.py); the notebook configures that code rather than duplicating it.
-
-Open the notebook through the locked environment:
+The runnable trainer in this repository is the single-stream JEPA baseline: the shared masked-prediction infrastructure that the dual-stream mechanisms in the [Method](#method) section build on. [`notebooks/single-stream-jepa.ipynb`](notebooks/single-stream-jepa.ipynb) is its experiment controller. The reusable model, masking, evaluation, and checkpoint code lives in [`src/cody_jepa/single_stream_jepa.py`](src/cody_jepa/single_stream_jepa.py); the notebook configures that code rather than duplicating it.
 
 ```bash
 uv run jupyter lab notebooks/single-stream-jepa.ipynb
 ```
 
-With no environment flags, `Run All` validates the configured Health&Gait data and executes a one-step synthetic CPU smoke test. A real training run requires a CUDA worker and is deliberately opt-in. These are the notebook's runtime controls:
+The notebook is safe by default. With no environment flags, `Run All` validates the configured Health&Gait data and executes a one-step synthetic CPU smoke test. A real training run requires a CUDA worker and is deliberately opt-in through these controls:
 
 | Environment variable | Default | Purpose |
 | --- | --- | --- |
@@ -315,24 +285,30 @@ With no environment flags, `Run All` validates the configured Health&Gait data a
 | `CODY_JEPA_OUTPUT_DIR` | `outputs/single-stream-jepa` | Selects the checkpoint directory. A new run refuses to overwrite an existing `latest.pt`. |
 | `CODY_JEPA_RESUME_CHECKPOINT` | unset | Resumes from an explicit epoch-boundary checkpoint after validating its model and data contract. |
 
-The baseline uses multiblock tube masking, an online context encoder, an exponential-moving-average target encoder, and a predictor. Its training path supports BF16, gradient accumulation, optional `torch.compile`, target batch standardization, and VICReg-style variance/covariance safeguards. Validation reports prediction metrics, feature variance and effective rank, plus a seeded wrong-subject context-shuffle gap. It writes `latest.pt`, `best_loss.pt`, and, only when the representation-health checks pass, `best_healthy.pt`.
+The trainer uses multiblock tube masking, an online context encoder, an exponential-moving-average target encoder, and a predictor. It supports BF16, gradient accumulation, optional `torch.compile`, target batch standardization, and VICReg-style variance and covariance safeguards. Validation reports prediction metrics, feature variance and effective rank, and a seeded wrong-subject context-shuffle gap. Every run writes `latest.pt` and `best_loss.pt`; `best_healthy.pt` is written only when the representation-health checks pass.
 
-For the production H100 settings, submission commands, monitoring, resume procedure, output inspection, and troubleshooting, follow the [HAIC training guide](tutorials/train-cody-jepa-on-haic.md). The checked-in [Slurm script](slurm/train-single-stream-jepa.sbatch) is the source of truth for scheduler resources and environment flags.
+For production H100 settings, submission commands, monitoring, the resume procedure, and troubleshooting, follow the [HAIC training guide](tutorials/haic-guide.md). The checked-in [Slurm script](slurm/train-single-stream-jepa.sbatch) is the source of truth for scheduler resources and environment flags.
 
-## Data-pipeline guarantees
+## Evaluating a Checkpoint
 
-`HealthGaitManifestDataset` validates the full manifest before yielding samples. It rejects:
+Evaluation is a two-stage workflow: export frozen features from a trained checkpoint, then fit linear probes on them. It requires a completed training run; replace `<run>` below with your checkpoint directory.
 
-- missing required columns or unsupported split names;
-- missing frame directories;
-- differences between declared and actual frame counts;
-- trials shorter than the requested clip length;
-- empty training or validation splits; and
-- subjects shared between training and validation.
+```bash
+uv run python scripts/export_single_stream_features.py \
+  --checkpoint outputs/<run>/best_loss.pt \
+  --output outputs/<run>/frozen_features.npz \
+  --device auto
 
-Each sample is a normalized grayscale tensor shaped `[T, C, H, W]` plus its source metadata. Frames are loaded only when requested, so the full dataset is not held in memory.
+uv run python scripts/eval_probes.py \
+  --features outputs/<run>/frozen_features.npz \
+  --output-dir outputs/<run>
+```
 
-## Code and repository guide
+The exporter restores only the EMA target encoder, freezes it, switches it to evaluation mode, and runs under `torch.inference_mode()`. Each deterministic clip window becomes one row containing its manifest metadata and the mean-pooled, pre-final-LayerNorm target tokens. It accepts `.csv` or compressed `.npz` output; both carry a JSON provenance sidecar with the checkpoint hash and the exact feature formula.
+
+The probe evaluator reports three protocols in both JSON and CSV: a sequence-disjoint closed-set identity classifier over training subjects, nearest-centroid identity retrieval over separately enrolled validation subjects, and a `gait_system` linear classifier trained on training subjects and evaluated on subject-disjoint validation subjects. Balanced accuracy is the primary gait metric.
+
+## Repository Map
 
 ### End-to-end code flow
 
@@ -355,47 +331,21 @@ Health&Gait frames
            └─ identity and gait-system metrics in JSON + CSV
 ```
 
-The notebooks are entry points for exploration and experiment orchestration. The reusable and tested implementation is under `src/cody_jepa/`; command-line workflows live under `scripts/`.
+### Directories
 
-### Tracked repository layout
+| Path | Contents |
+| --- | --- |
+| `src/cody_jepa/` | Tested library code: model, masking, training, probes, and the data pipeline |
+| `scripts/` | Command-line workflows: manifest building, feature export, probe evaluation |
+| `notebooks/` | Data-pipeline walkthrough and the training controller |
+| `slurm/` | HAIC H100 batch job definition |
+| `tutorials/` | Operator runbooks and research plans |
+| `tests/` | Unit tests; run without the dataset |
+| `images/` | Method and evaluation figures |
+| `data/` (untracked) | Health&Gait frames, manifests, and diagnostics |
+| `outputs/` (untracked) | Checkpoints, exported features, and probe reports |
 
-```text
-cody-jepa/
-├── .gitignore
-├── .python-version                  # Local Python version hint
-├── README.md                        # Research overview and repository entry point
-├── pyproject.toml                   # Package metadata and locked dependency policy
-├── uv.lock                          # Exact cross-platform dependency resolution
-├── images/                          # Seven research, method, objective, and evaluation SVGs
-├── notebooks/
-│   ├── healthgait_manifest_loader.ipynb  # Data-contract and diagnostics walkthrough
-│   └── single-stream-jepa.ipynb          # Safe smoke test and full-training controller
-├── scripts/
-│   ├── build_healthgait_manifest.py      # Scan frames and write the subject split
-│   ├── export_single_stream_features.py  # Checkpoint → deterministic feature table
-│   └── eval_probes.py                    # Feature table → linear-probe reports
-├── slurm/
-│   └── train-single-stream-jepa.sbatch   # HAIC H100 batch job
-├── src/cody_jepa/
-│   ├── __init__.py
-│   ├── single_stream_jepa.py             # Masking, ViT, predictor, training, eval, resume
-│   ├── probes.py                         # Feature I/O, provenance, and probe protocols
-│   └── data/
-│       ├── __init__.py                   # Public data-pipeline exports
-│       ├── dataset.py                    # Strict manifest dataset and frame loading
-│       ├── healthgait.py                 # Loader config, builders, and quality audit
-│       └── healthgait_diagnostics.py     # Summaries, plots, and motion diagnostics
-├── tests/
-│   ├── test_healthgait_dataset.py        # Sampling, manifests, provenance, augmentation
-│   ├── test_healthgait_diagnostics.py    # Summary and motion-diagnostic artifacts
-│   ├── test_probes.py                    # Frozen export, formats, and probe protocols
-│   ├── test_single_stream_jepa.py        # Model, masks, training, health, checkpoints
-│   ├── test_single_stream_notebook.py    # Notebook safety and orchestration invariants
-│   └── test_uv_policy.py                 # Locked-environment policy checks
-├── tutorials/
-│   └── train-cody-jepa-on-haic.md        # Full H100 operator runbook
-└── haic-results/
-    └── job_91108.ipynb                    # Retained stabilized HAIC execution
+The notebooks are entry points for exploration and orchestration; the reusable, tested implementation lives under `src/cody_jepa/`, and command-line workflows live under `scripts/`.
 
 ## References
 
