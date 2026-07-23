@@ -10,6 +10,22 @@ The workflow has three separate phases:
 
 Keeping these phases separate prevents slow dataset checks from consuming H100 time. It also makes failures easier to locate.
 
+## Retained results and new-run names
+
+The retained working result uses the same directory name in HAIC and locally:
+
+| Experiment | HAIC directory | Local directory | Retained notebook |
+| --- | --- | --- | --- |
+| Stabilized VICReg baseline (job 91108) | `outputs/jepa-v4` | `outputs/jepa-v4` | `haic-results/job_91108.ipynb` |
+
+The job 90881 and 91023 notebooks and the local `outputs/jepa-v3/` copy were
+deleted because they are failed historical attempts, not research comparison
+artifacts. Run IDs 90881 and 91023 may still appear in diagnostic comments or
+the job 91108 writeup to explain the earlier collapse, but they no longer name
+files that should exist. Use a fresh versioned directory, beginning with
+`outputs/jepa-v5`, for any new run so the retained `jepa-v4` result is never
+overwritten.
+
 ## What a successful run must show
 
 A falling loss is not enough. A model can produce a smooth loss curve while learning collapsed or position-only features. Treat the run as successful only when all of the following conditions hold:
@@ -248,7 +264,7 @@ For a new run, confirm that the script contains these environment settings:
 export CODY_JEPA_RUN_FULL_TRAINING=1
 export CODY_JEPA_RUN_DATA_AUDIT=0
 export CODY_JEPA_RUN_EXHAUSTIVE_DATA_AUDIT=0
-export CODY_JEPA_OUTPUT_DIR=outputs/single-stream-jepa-h100-v3
+export CODY_JEPA_OUTPUT_DIR=outputs/jepa-v5
 unset CODY_JEPA_RESUME_CHECKPOINT
 export MPLCONFIGDIR=/tmp/mpl
 ```
@@ -269,20 +285,20 @@ These variables have distinct jobs:
 The provided script uses:
 
 ```text
-outputs/single-stream-jepa-h100-v3
+outputs/jepa-v5
 ```
 
 Check whether that directory already contains a checkpoint:
 
 ```bash
 cd /hai/scratch/$USER/cody-jepa
-ls -la outputs/single-stream-jepa-h100-v3 2>/dev/null || true
+ls -la outputs/jepa-v5 2>/dev/null || true
 ```
 
 If `latest.pt` exists, do not delete it. Either resume that run as described in Section 8 or choose a new directory, such as:
 
 ```bash
-export CODY_JEPA_OUTPUT_DIR=outputs/single-stream-jepa-h100-v3
+export CODY_JEPA_OUTPUT_DIR=outputs/jepa-v6
 ```
 
 Update the value inside the batch script. Variables exported only in your login shell do not override values that the script exports itself.
@@ -357,7 +373,7 @@ The notebook performs one real, production-sized forward and backward step befor
 `nbconvert` captures cell output inside the executed notebook. It does not stream every epoch metric to the Slurm log. During training, use the GPU CSV and checkpoint timestamps as the primary progress signals:
 
 ```bash
-ls -lh "outputs/single-stream-jepa-h100-v3"
+ls -lh "outputs/jepa-v5"
 ```
 
 `latest.pt` appears after the first complete epoch and is replaced atomically after each later epoch.
@@ -381,8 +397,8 @@ A completed run should produce:
 
 ```text
 notebook-runs/single-stream-jepa-<JOB_ID>.executed.ipynb
-outputs/single-stream-jepa-h100-v3/latest.pt
-outputs/single-stream-jepa-h100-v3/best_loss.pt
+outputs/jepa-v5/latest.pt
+outputs/jepa-v5/best_loss.pt
 logs/single-stream-jepa-<JOB_ID>.out
 logs/gpu-<JOB_ID>.csv
 ```
@@ -390,7 +406,7 @@ logs/gpu-<JOB_ID>.csv
 `best_healthy.pt` appears only after a validation checkpoint passes every representation-health criterion:
 
 ```text
-outputs/single-stream-jepa-h100-v3/best_healthy.pt
+outputs/jepa-v5/best_healthy.pt
 ```
 
 Inspect checkpoint metadata without loading model tensors onto the GPU:
@@ -402,7 +418,7 @@ from pathlib import Path
 
 from cody_jepa.single_stream_jepa import load_checkpoint
 
-output_dir = Path("outputs/single-stream-jepa-h100-v3")
+output_dir = Path("outputs/jepa-v5")
 metadata = {}
 
 for name in ("latest.pt", "best_loss.pt", "best_healthy.pt"):
@@ -436,15 +452,35 @@ If `best_healthy.pt` was not written, the run did not pass the health contract.
 Do not silently substitute `best_loss.pt`; report the failed health metrics and
 start a corrected run instead.
 
+Archive a completed result only after inspecting it. For job 91108, the curated
+copy is `haic-results/job_91108.ipynb`; strings inside it still record the HAIC
+paths used when it executed and should not be rewritten after the fact.
+
+When a notebook run contains errors or is unsafe to compare directly:
+
+1. Check whether it completed an epoch and wrote a checkpoint. A partially
+   executed notebook without a checkpoint is diagnostic evidence only.
+2. Inspect checkpoint schema and `best_healthy_epoch`. A null healthy epoch
+   means the run failed the representation-health contract; do not silently use
+   `best_loss.pt` as an equivalent result.
+3. If a compatible checkpoint survives, re-export frozen features and rerun
+   `scripts/eval_probes.py` under the current code for every candidate run.
+4. If the schema is incompatible or no checkpoint survives, record the failure
+   reason and exclude the run from metric tables and direct plot comparisons.
+5. Keep only a concise failure summary or external job log when the full failed
+   notebook adds no reproducibility value. Do not restore the deleted 90881 or
+   91023 notebooks merely to make an unsafe comparison.
+
 ## 8. Resume an interrupted run
 
 Resume only from a checkpoint written by the same training configuration and data contract. Keep the original output directory so the run continues in place.
 
 The corrected diagnostics use checkpoint schema 3. Schema-2 checkpoints from
 the legacy pre-normalization/one-batch diagnostics cannot be resumed because
-their `best_healthy_*` state is not comparable. Keep them for historical analysis
-or manually load model weights for a separate probe; start a new training output
-directory for corrected health-based checkpoint selection.
+their `best_healthy_*` state is not comparable. If one exists outside the
+curated repository, use it only for an explicitly labeled weights-only probe or
+failure analysis. Start a new training directory for corrected health-based
+checkpoint selection.
 
 In `slurm/train-single-stream-jepa.sbatch`, replace:
 
@@ -455,7 +491,7 @@ unset CODY_JEPA_RESUME_CHECKPOINT
 with:
 
 ```bash
-export CODY_JEPA_RESUME_CHECKPOINT=outputs/single-stream-jepa-h100-v3/latest.pt
+export CODY_JEPA_RESUME_CHECKPOINT=outputs/jepa-v5/latest.pt
 ```
 
 The new-run script intentionally exits when `latest.pt` already exists. For a resume job, replace that guard with:
@@ -473,7 +509,7 @@ Keep these values unchanged:
 export CODY_JEPA_RUN_FULL_TRAINING=1
 export CODY_JEPA_RUN_DATA_AUDIT=0
 export CODY_JEPA_RUN_EXHAUSTIVE_DATA_AUDIT=0
-export CODY_JEPA_OUTPUT_DIR=outputs/single-stream-jepa-h100-v3
+export CODY_JEPA_OUTPUT_DIR=outputs/jepa-v5
 ```
 
 Validate and submit the edited script:

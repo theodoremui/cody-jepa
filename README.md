@@ -22,7 +22,7 @@ Use this table as the shortest path to the part of the project you need:
 | Train on Stanford HAIC with an H100 | [`tutorials/train-cody-jepa-on-haic.md`](tutorials/train-cody-jepa-on-haic.md) and [`slurm/train-single-stream-jepa.sbatch`](slurm/train-single-stream-jepa.sbatch) |
 | Export a checkpoint and measure learned information | [Single-stream frozen-feature probes](#single-stream-frozen-feature-probes) |
 | Find a model, loader, script, test, or result | [Code and repository guide](#code-and-repository-guide) |
-| Review the existing split-leakage evidence | [`haic-results/split-sanity-check.md`](haic-results/split-sanity-check.md) |
+| Review the retained HAIC run evidence | [`haic-results/job_91108.ipynb`](haic-results/job_91108.ipynb) |
 
 ## Why CoDy-JEPA?
 
@@ -139,15 +139,26 @@ and runs under `torch.inference_mode()`. Each deterministic clip window becomes
 one row containing its manifest metadata and the mean-pooled, pre-final-LayerNorm
 target tokens:
 
+The retained working single-stream experiment uses the same directory name in
+HAIC and in the local copied results:
+
+| Experiment | HAIC directory | Local directory | Retained executed notebook |
+| --- | --- | --- | --- |
+| Stabilized VICReg baseline (job 91108) | `outputs/jepa-v4` | `outputs/jepa-v4` | `haic-results/job_91108.ipynb` |
+
+The failed job 90881 and 91023 notebooks and the local `outputs/jepa-v3/` copy
+were intentionally removed. They are not supported comparison inputs. The
+commands below operate on the retained local `jepa-v4` checkpoint:
+
 ```bash
 uv run python scripts/export_single_stream_features.py \
-  --checkpoint outputs/single-stream-jepa/best_loss.pt \
-  --output outputs/single-stream-jepa/frozen_features.npz \
-  --device cuda
+  --checkpoint outputs/jepa-v4/best_loss.pt \
+  --output outputs/jepa-v4/frozen_features.npz \
+  --device auto
 
 uv run python scripts/eval_probes.py \
-  --features outputs/single-stream-jepa/frozen_features.npz \
-  --output-dir outputs/single-stream-jepa/probes
+  --features outputs/jepa-v4/frozen_features.npz \
+  --output-dir outputs/jepa-v4
 ```
 
 The evaluator reports three protocols in both JSON and CSV: a sequence-disjoint
@@ -157,6 +168,15 @@ linear classifier trained on training subjects and evaluated on subject-disjoint
 validation subjects. Balanced accuracy is the primary gait metric. The exporter
 accepts `.csv` or compressed `.npz`; both carry a JSON provenance sidecar with
 the checkpoint hash and exact feature formula.
+
+Do not compare an executed notebook directly with job 91108 when the other run
+ended with errors, used a legacy diagnostics schema, or wrote no
+`best_healthy.pt`. If a compatible checkpoint survives elsewhere, export its
+features and rerun both probes under the current code. If no compatible
+checkpoint survives, report the run only as a failed historical attempt and
+exclude it from quantitative comparisons. The retained notebook is provenance;
+its inline plots and historical HAIC path strings are not a portable results
+interface.
 
 The proposed ablations are:
 
@@ -375,9 +395,7 @@ cody-jepa/
 ├── tutorials/
 │   └── train-cody-jepa-on-haic.md        # Full H100 operator runbook
 └── haic-results/
-    ├── single-stream-jepa-90881.executed.ipynb  # Archived executed experiment
-    ├── split-sanity-check.md                    # Split leakage investigation
-    └── split_nearest_pairs_top12.png            # Nearest-pair evidence image
+    └── job_91108.ipynb                    # Retained stabilized HAIC execution
 ```
 
 ### Source modules and change map
@@ -400,9 +418,10 @@ The tracked repository is intentionally small. A fresh clone does not contain He
 | --- | --- |
 | `data/healthgait/raw/` | Local dataset extracted from Zenodo; ignored by Git. |
 | `data/healthgait/manifests/` and `data/healthgait/diagnostics/` | Reproducible local products of the manifest and diagnostic workflows; the whole `data/` tree is ignored. |
-| `outputs/`, `checkpoints/`, `runs/`, `*.pt`, `*.pth`, `*.ckpt` | Local training and evaluation products; ignored by Git. |
+| `outputs/jepa-v4/` | Local copy of the retained HAIC job 91108 results; ignored by Git. |
+| Other `outputs/`, `checkpoints/`, `runs/`, `*.pt`, `*.pth`, `*.ckpt` paths | Local training and evaluation products; ignored by Git. |
 | `logs/` and `notebook-runs/` | Created by the Slurm workflow for scheduler/GPU logs and executed notebooks. Treat them as run artifacts and review them before committing. |
-| `haic-results/` | Curated, tracked evidence from completed HAIC experiments. It is for inspection, not imported by training code or tests. |
+| `haic-results/` | Curated, tracked evidence from retained HAIC experiments. It is for inspection, not imported by training code or tests. |
 
 When adding behavior, keep reusable logic in `src/cody_jepa/`, keep notebooks thin, add the corresponding focused test, and run the full suite before submitting changes:
 

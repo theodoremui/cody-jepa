@@ -1,0 +1,89 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="470" viewBox="0 0 1200 470" role="img" aria-labelledby="t1 d1">
+  <title id="t1">How the single-stream masked JEPA learns</title>
+  <desc id="d1">A silhouette clip is masked into visible and hidden tokens. A context encoder plus predictor guess the features of the hidden tokens; an EMA target encoder produces the true features; the two are compared, and anti-collapse safeguards keep features from degenerating.</desc>
+  <defs>
+    <marker id="arw" markerWidth="12" markerHeight="12" refX="9" refY="6" orient="auto"><path d="M2,2 L10,6 L2,10 Z" fill="#334155"/></marker>
+    <marker id="arwG" markerWidth="12" markerHeight="12" refX="9" refY="6" orient="auto"><path d="M2,2 L10,6 L2,10 Z" fill="#059669"/></marker>
+    <filter id="sh" x="-8%" y="-8%" width="116%" height="126%"><feDropShadow dx="0" dy="3" stdDeviation="3" flood-color="#111827" flood-opacity="0.15"/></filter>
+  </defs>
+  <rect width="1200" height="470" fill="#f8fafc"/>
+  <text x="40" y="46" font-family="Inter, Arial, sans-serif" font-size="25" font-weight="700" fill="#111827">How it learns: predict hidden motion in feature space</text>
+  <text x="40" y="74" font-family="Inter, Arial, sans-serif" font-size="15" fill="#4b5563">No labels are used. The model teaches itself by hiding part of each walking clip and predicting what it hid — as abstract features, not pixels.</text>
+
+  <!-- Clip -->
+  <g filter="url(#sh)">
+    <rect x="40" y="150" width="180" height="150" rx="14" fill="#ffffff" stroke="#cbd5e1"/>
+    <text x="60" y="182" font-family="Inter, Arial, sans-serif" font-size="15" font-weight="700" fill="#111827">Silhouette clip</text>
+    <text x="60" y="202" font-family="Inter, Arial, sans-serif" font-size="12" fill="#6b7280">16 frames · 112×112</text>
+    <rect x="60" y="216" width="42" height="60" rx="6" fill="#e5e7eb" stroke="#9ca3af"/>
+    <rect x="112" y="216" width="42" height="60" rx="6" fill="#e5e7eb" stroke="#9ca3af"/>
+    <rect x="164" y="216" width="42" height="60" rx="6" fill="#e5e7eb" stroke="#9ca3af"/>
+    <circle cx="81" cy="234" r="7" fill="#9ca3af"/><circle cx="133" cy="238" r="7" fill="#9ca3af"/><circle cx="185" cy="234" r="7" fill="#9ca3af"/>
+  </g>
+
+  <!-- Mask -->
+  <g filter="url(#sh)">
+    <rect x="270" y="150" width="150" height="150" rx="14" fill="#ffffff" stroke="#cbd5e1"/>
+    <text x="345" y="182" font-family="Inter, Arial, sans-serif" font-size="15" font-weight="700" fill="#111827" text-anchor="middle">Mask</text>
+    <text x="345" y="202" font-family="Inter, Arial, sans-serif" font-size="12" fill="#6b7280" text-anchor="middle">split 1,568 tokens</text>
+    <rect x="292" y="218" width="24" height="24" rx="4" fill="#dbeafe" stroke="#60a5fa"/>
+    <rect x="320" y="218" width="24" height="24" rx="4" fill="#ffedd5" stroke="#fb923c"/>
+    <rect x="348" y="218" width="24" height="24" rx="4" fill="#dbeafe" stroke="#60a5fa"/>
+    <rect x="376" y="218" width="24" height="24" rx="4" fill="#ffedd5" stroke="#fb923c"/>
+    <rect x="292" y="246" width="24" height="24" rx="4" fill="#ffedd5" stroke="#fb923c"/>
+    <rect x="320" y="246" width="24" height="24" rx="4" fill="#dbeafe" stroke="#60a5fa"/>
+    <rect x="348" y="246" width="24" height="24" rx="4" fill="#ffedd5" stroke="#fb923c"/>
+    <rect x="376" y="246" width="24" height="24" rx="4" fill="#dbeafe" stroke="#60a5fa"/>
+    <text x="345" y="292" font-family="Inter, Arial, sans-serif" font-size="11" fill="#6b7280" text-anchor="middle">visible + hidden</text>
+  </g>
+
+  <!-- Context encoder -->
+  <g filter="url(#sh)">
+    <rect x="470" y="110" width="185" height="96" rx="14" fill="#eff6ff" stroke="#60a5fa"/>
+    <text x="562" y="150" font-family="Inter, Arial, sans-serif" font-size="15" font-weight="700" fill="#1e3a8a" text-anchor="middle">Context encoder</text>
+    <text x="562" y="172" font-family="Inter, Arial, sans-serif" font-size="12" fill="#3b82f6" text-anchor="middle">sees visible tokens</text>
+    <text x="562" y="190" font-family="Inter, Arial, sans-serif" font-size="11" fill="#6b7280" text-anchor="middle">ViT · ~10.7M params</text>
+  </g>
+  <!-- Predictor -->
+  <g filter="url(#sh)">
+    <rect x="705" y="110" width="160" height="96" rx="14" fill="#eff6ff" stroke="#60a5fa"/>
+    <text x="785" y="150" font-family="Inter, Arial, sans-serif" font-size="15" font-weight="700" fill="#1e3a8a" text-anchor="middle">Predictor</text>
+    <text x="785" y="172" font-family="Inter, Arial, sans-serif" font-size="12" fill="#3b82f6" text-anchor="middle">guesses hidden</text>
+    <text x="785" y="190" font-family="Inter, Arial, sans-serif" font-size="11" fill="#6b7280" text-anchor="middle">~2.8M params</text>
+  </g>
+  <!-- Target encoder -->
+  <g filter="url(#sh)">
+    <rect x="470" y="250" width="185" height="96" rx="14" fill="#fff7ed" stroke="#fb923c"/>
+    <text x="562" y="284" font-family="Inter, Arial, sans-serif" font-size="15" font-weight="700" fill="#9a3412" text-anchor="middle">Target encoder</text>
+    <text x="562" y="306" font-family="Inter, Arial, sans-serif" font-size="12" fill="#c2410c" text-anchor="middle">sees hidden tokens</text>
+    <text x="562" y="324" font-family="Inter, Arial, sans-serif" font-size="11" fill="#6b7280" text-anchor="middle">EMA copy · no gradient</text>
+  </g>
+
+  <!-- Compare -->
+  <g filter="url(#sh)">
+    <rect x="915" y="180" width="150" height="106" rx="14" fill="#ffffff" stroke="#cbd5e1"/>
+    <text x="990" y="214" font-family="Inter, Arial, sans-serif" font-size="15" font-weight="700" fill="#111827" text-anchor="middle">Compare</text>
+    <text x="990" y="236" font-family="Inter, Arial, sans-serif" font-size="12" fill="#6b7280" text-anchor="middle">predicted vs true</text>
+    <text x="990" y="258" font-family="Inter, Arial, sans-serif" font-size="12" fill="#6b7280" text-anchor="middle">features → loss</text>
+  </g>
+
+  <!-- arrows -->
+  <line x1="220" y1="225" x2="266" y2="225" stroke="#334155" stroke-width="2.5" marker-end="url(#arw)"/>
+  <path d="M420 210 Q445 200 466 175" fill="none" stroke="#334155" stroke-width="2.5" marker-end="url(#arw)"/>
+  <path d="M420 250 Q445 270 466 296" fill="none" stroke="#334155" stroke-width="2.5" marker-end="url(#arw)"/>
+  <line x1="655" y1="158" x2="701" y2="158" stroke="#334155" stroke-width="2.5" marker-end="url(#arw)"/>
+  <path d="M865 175 Q895 190 915 210" fill="none" stroke="#334155" stroke-width="2.5" marker-end="url(#arw)"/>
+  <path d="M655 300 Q800 300 915 255" fill="none" stroke="#334155" stroke-width="2.5" marker-end="url(#arw)"/>
+
+  <!-- EMA feedback: target slowly tracks the context (online) encoder -->
+  <line x1="500" y1="206" x2="500" y2="248" stroke="#059669" stroke-width="2.2" stroke-dasharray="7 5" marker-end="url(#arwG)"/>
+  <text x="515" y="232" font-family="Inter, Arial, sans-serif" font-size="12" font-weight="600" fill="#059669">EMA update: target tracks the context encoder</text>
+
+  <!-- safeguard callout -->
+  <g filter="url(#sh)">
+    <rect x="270" y="335" width="795" height="96" rx="14" fill="#ecfdf5" stroke="#34d399"/>
+    <text x="292" y="366" font-family="Inter, Arial, sans-serif" font-size="14.5" font-weight="700" fill="#065f46">Anti-collapse safeguards (new this run)</text>
+    <text x="292" y="390" font-family="Inter, Arial, sans-serif" font-size="13" fill="#047857">VICReg-style variance + covariance penalties and target standardization stop the model from cheating by making every</text>
+    <text x="292" y="410" font-family="Inter, Arial, sans-serif" font-size="13" fill="#047857">feature identical — the rank-2 collapse that ruined the two prior EMA-only runs (90881, 91023).</text>
+  </g>
+</svg>

@@ -1,0 +1,87 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="500" viewBox="0 0 1200 500" role="img" aria-labelledby="t3 d3">
+  <title id="t3">From prototype to downstream ambient-intelligence and biomechanics tasks</title>
+  <desc id="d3">Self-supervised pretraining produces motion-focused features that fine-tune V-JEPA 2 and SAM 3D, powering next-action prediction and balance scoring for ambient intelligence and biomechanics, with subject-disjoint splits and the wrong-context diagnostic guaranteeing the model learns motion rather than shortcuts.</desc>
+  <defs>
+    <marker id="a3" markerWidth="13" markerHeight="13" refX="9" refY="6" orient="auto"><path d="M2,2 L11,6 L2,10 Z" fill="#475569"/></marker>
+    <filter id="sh3" x="-8%" y="-8%" width="116%" height="130%"><feDropShadow dx="0" dy="3" stdDeviation="3" flood-color="#111827" flood-opacity="0.15"/></filter>
+  </defs>
+  <rect width="1200" height="500" fill="#f8fafc"/>
+  <text x="40" y="44" font-family="Inter, Arial, sans-serif" font-size="25" font-weight="700" fill="#111827">Why it matters: a direct path to downstream tasks</text>
+  <text x="40" y="70" font-family="Inter, Arial, sans-serif" font-size="15" fill="#4b5563">This prototype validates step 1. Each later stage reuses the same pipeline and the same collapse / context checks proven here.</text>
+
+  <!-- stage headers -->
+  <g font-family="Inter, Arial, sans-serif" font-size="13" font-weight="700" text-anchor="middle">
+    <text x="147" y="110" fill="#1e40af">1 · PRETRAIN (this run)</text>
+    <text x="447" y="110" fill="#7c3aed">2 · FINE-TUNE BACKBONES</text>
+    <text x="747" y="110" fill="#0f766e">3 · DOWNSTREAM TASKS</text>
+    <text x="1047" y="110" fill="#9a3412">4 · REAL-WORLD USE</text>
+  </g>
+
+  <!-- Stage 1 -->
+  <g filter="url(#sh3)">
+    <rect x="40" y="130" width="215" height="180" rx="14" fill="#eff6ff" stroke="#60a5fa"/>
+    <text x="147" y="162" font-family="Inter, Arial, sans-serif" font-size="14.5" font-weight="700" fill="#1e3a8a" text-anchor="middle">CoDy-JEPA pretraining</text>
+    <text x="147" y="184" font-family="Inter, Arial, sans-serif" font-size="12.5" fill="#3b82f6" text-anchor="middle">on unlabeled silhouettes</text>
+    <rect x="58" y="204" width="179" height="58" rx="9" fill="#ffffff" stroke="#93c5fd"/>
+    <text x="147" y="227" font-family="Inter, Arial, sans-serif" font-size="12.5" font-weight="600" fill="#1e3a8a" text-anchor="middle">motion-focused,</text>
+    <text x="147" y="245" font-family="Inter, Arial, sans-serif" font-size="12.5" font-weight="600" fill="#1e3a8a" text-anchor="middle">identity-suppressed features</text>
+    <text x="147" y="288" font-family="Inter, Arial, sans-serif" font-size="12" fill="#16a34a" text-anchor="middle">✓ pipeline validated by</text>
+    <text x="147" y="304" font-family="Inter, Arial, sans-serif" font-size="12" fill="#16a34a" text-anchor="middle">run 91108</text>
+  </g>
+
+  <!-- Stage 2 -->
+  <g filter="url(#sh3)">
+    <rect x="340" y="140" width="215" height="72" rx="12" fill="#f5f3ff" stroke="#a78bfa"/>
+    <text x="447" y="170" font-family="Inter, Arial, sans-serif" font-size="14.5" font-weight="700" fill="#5b21b6" text-anchor="middle">V-JEPA 2</text>
+    <text x="447" y="192" font-family="Inter, Arial, sans-serif" font-size="12" fill="#7c3aed" text-anchor="middle">video motion backbone</text>
+  </g>
+  <g filter="url(#sh3)">
+    <rect x="340" y="228" width="215" height="72" rx="12" fill="#f5f3ff" stroke="#a78bfa"/>
+    <text x="447" y="258" font-family="Inter, Arial, sans-serif" font-size="14.5" font-weight="700" fill="#5b21b6" text-anchor="middle">SAM 3D</text>
+    <text x="447" y="280" font-family="Inter, Arial, sans-serif" font-size="12" fill="#7c3aed" text-anchor="middle">3D pose / structure backbone</text>
+  </g>
+
+  <!-- Stage 3 -->
+  <g filter="url(#sh3)">
+    <rect x="640" y="140" width="215" height="72" rx="12" fill="#f0fdfa" stroke="#2dd4bf"/>
+    <text x="747" y="170" font-family="Inter, Arial, sans-serif" font-size="14.5" font-weight="700" fill="#115e59" text-anchor="middle">Next-action prediction</text>
+    <text x="747" y="192" font-family="Inter, Arial, sans-serif" font-size="12" fill="#0d9488" text-anchor="middle">forecast the next step / gesture</text>
+  </g>
+  <g filter="url(#sh3)">
+    <rect x="640" y="228" width="215" height="72" rx="12" fill="#f0fdfa" stroke="#2dd4bf"/>
+    <text x="747" y="258" font-family="Inter, Arial, sans-serif" font-size="14.5" font-weight="700" fill="#115e59" text-anchor="middle">Balance-score estimation</text>
+    <text x="747" y="280" font-family="Inter, Arial, sans-serif" font-size="12" fill="#0d9488" text-anchor="middle">score stability over time</text>
+  </g>
+
+  <!-- Stage 4 -->
+  <g filter="url(#sh3)">
+    <rect x="940" y="140" width="220" height="72" rx="12" fill="#fff7ed" stroke="#fb923c"/>
+    <text x="1050" y="167" font-family="Inter, Arial, sans-serif" font-size="14.5" font-weight="700" fill="#9a3412" text-anchor="middle">Ambient intelligence</text>
+    <text x="1050" y="188" font-family="Inter, Arial, sans-serif" font-size="11.5" fill="#c2410c" text-anchor="middle">passive fall / activity monitoring,</text>
+    <text x="1050" y="203" font-family="Inter, Arial, sans-serif" font-size="11.5" fill="#c2410c" text-anchor="middle">privacy-aligned (silhouettes)</text>
+  </g>
+  <g filter="url(#sh3)">
+    <rect x="940" y="228" width="220" height="72" rx="12" fill="#fff7ed" stroke="#fb923c"/>
+    <text x="1050" y="255" font-family="Inter, Arial, sans-serif" font-size="14.5" font-weight="700" fill="#9a3412" text-anchor="middle">Biomechanics</text>
+    <text x="1050" y="276" font-family="Inter, Arial, sans-serif" font-size="11.5" fill="#c2410c" text-anchor="middle">clinical gait &amp; fall-risk assessment</text>
+    <text x="1050" y="291" font-family="Inter, Arial, sans-serif" font-size="11.5" fill="#c2410c" text-anchor="middle">from low-cost video</text>
+  </g>
+
+  <!-- arrows between stages -->
+  <g>
+    <line x1="257" y1="220" x2="336" y2="220" stroke="#475569" stroke-width="2.6" marker-end="url(#a3)"/>
+    <line x1="557" y1="220" x2="636" y2="220" stroke="#475569" stroke-width="2.6" marker-end="url(#a3)"/>
+    <line x1="857" y1="220" x2="936" y2="220" stroke="#475569" stroke-width="2.6" marker-end="url(#a3)"/>
+  </g>
+
+  <!-- trust banner -->
+  <g filter="url(#sh3)">
+    <rect x="40" y="352" width="1120" height="118" rx="14" fill="#ecfeff" stroke="#22d3ee"/>
+    <text x="64" y="380" font-family="Inter, Arial, sans-serif" font-size="15" font-weight="700" fill="#155e75">What makes the whole chain trustworthy for clinical use</text>
+    <circle cx="72" cy="406" r="5.5" fill="#0891b2"/>
+    <text x="88" y="411" font-family="Inter, Arial, sans-serif" font-size="13" fill="#164e63"><tspan font-weight="700">Subject-disjoint splits </tspan>— 318 train vs 80 validation people, verified at load. Proves the model learned motion, not who is walking.</text>
+    <circle cx="72" cy="434" r="5.5" fill="#0891b2"/>
+    <text x="88" y="439" font-family="Inter, Arial, sans-serif" font-size="13" fill="#164e63"><tspan font-weight="700">Wrong-context diagnostic </tspan>— a built-in test of whether a fine-tuned model relies on real motion, so a balance score transfers to a</text>
+    <text x="88" y="458" font-family="Inter, Arial, sans-serif" font-size="13" fill="#164e63">new patient instead of exploiting a shortcut that would fail in the clinic.</text>
+  </g>
+</svg>

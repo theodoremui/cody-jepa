@@ -12,11 +12,11 @@ set -euo pipefail
 
 cd "/hai/scratch/$USER/cody-jepa"
 
-# New-run configuration. Use a different directory name for another fresh run.
+# New-run directory. jepa-v4 is retained evidence, so never overwrite it.
 export CODY_JEPA_RUN_FULL_TRAINING=1
 export CODY_JEPA_RUN_DATA_AUDIT=0
 export CODY_JEPA_RUN_EXHAUSTIVE_DATA_AUDIT=0
-export CODY_JEPA_OUTPUT_DIR=outputs/single-stream-jepa-h100-v3
+export CODY_JEPA_OUTPUT_DIR=outputs/jepa-v5
 unset CODY_JEPA_RESUME_CHECKPOINT
 export MPLCONFIGDIR=/tmp/mpl
 
