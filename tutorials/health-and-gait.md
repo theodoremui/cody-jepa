@@ -19,9 +19,9 @@ The self-supervised loader should see video-like frame sequences and only the mi
 Health&Gait is hosted on Zenodo:
 
 - Zenodo record: <https://zenodo.org/records/14039922>
-- Local upstream reference code: [`healthgait/`](healthgait/)
-- Dataset-use agreement: [`healthgait/DUA.txt`](healthgait/DUA.txt)
-- Upstream README: [`healthgait/README.md`](healthgait/README.md)
+- Upstream reference code: [AVAuco/healthgait](https://github.com/AVAuco/healthgait)
+- Dataset-use agreement: [upstream `DUA.txt`](https://github.com/AVAuco/healthgait/blob/main/DUA.txt)
+- Upstream README: [Health&Gait README](https://github.com/AVAuco/healthgait/blob/main/README.md)
 
 The upstream README describes 1,564 videos from 398 participants, with these available modalities:
 
@@ -50,11 +50,11 @@ data/
     probe_exports/  # latent vectors and probe-ready labels
 ```
 
-The repo already ignores `data/`, `*.zip`, and split archive files matching `*.z[0-9][0-9]` in [`.gitignore`](.gitignore). Keep it that way. Do not commit raw data, frame grids that reveal participants, extracted archives, or latent exports that include subject-identifying metadata.
+The repo already ignores `data/`, `*.zip`, and split archive files matching `*.z[0-9][0-9]` in [`.gitignore`](../.gitignore). Keep it that way. Do not commit raw data, frame grids that reveal participants, extracted archives, or latent exports that include subject-identifying metadata.
 
 ## 3. Review Data-Use Constraints
 
-Before downloading the full dataset, read [`healthgait/DUA.txt`](healthgait/DUA.txt). In practical terms:
+Before downloading the full dataset, read the upstream [Health&Gait data-use agreement](https://github.com/AVAuco/healthgait/blob/main/DUA.txt). In practical terms:
 
 1. Use the dataset only for academic or research work unless the provider gives separate written permission.
 2. Do not attempt to identify or contact participants.
@@ -160,7 +160,7 @@ Do not hard-code a machine-specific absolute path in committed code.
 
 ## 7. Expected Dataset Shape
 
-The upstream loader in [`healthgait/code/train/train_MoviNet_classification.py`](healthgait/code/train/train_MoviNet_classification.py) expects modality-specific frame directories. Its path logic is approximately:
+The upstream repository's [loading recommendations](https://github.com/AVAuco/healthgait#recommendations-to-load-and-use-the-dataset) expect modality-specific frame directories. Their path logic is approximately:
 
 ```text
 DATA_ROOT/

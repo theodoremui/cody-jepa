@@ -2,7 +2,6 @@
   "schema_version": 1,
   "baseline_job_id": 91108,
   "read_only_baseline_directory": "outputs/jepa-v4",
-  "retired_directory": "outputs/jepa-v3",
   "canonical_checkpoint": {
     "filename": "best_loss.pt",
     "identifier": "sha256:ab1e24043b2ba453e03fa427b0e845b74b2771682220732267d966be360097a5",

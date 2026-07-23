@@ -213,7 +213,7 @@
   },
   "reproducibility": {
     "code_sha256": {
-      "notebooks/single-stream-jepa.ipynb": "6433b58f69210f3593acf42eb801b976b00b5fa79e964b89ff08cf2e3aefe976",
+      "notebooks/single-stream-jepa.ipynb": "69eac10e14dd3c42310f8a6ede863cd213ad6d5eb275e6f6e4e53a793f4b75c1",
       "scripts/eval_probes.py": "4cb3ebdae76401854894e3b7002b9683ac6f8aabe398020b38995e9250fe83ae",
       "scripts/export_single_stream_features.py": "2b436fd429dc0f9ed69f25dcba374d354c7095c535607153d06ec08665cf577d",
       "scripts/run_phase0_pipeline.py": "32ff3df57ac8e6d62a158f73020fb1205ed2b4bbda0b409fc3c73b67521ef6c4",
@@ -221,7 +221,7 @@
       "src/cody_jepa/data/dataset.py": "a66be3d2cec30579bd71b73ee9d55d39ce71c64df2d18a00bafbbd9d661d952b",
       "src/cody_jepa/data/healthgait.py": "7895f13ae8675f628069616038a152b33a20cb119a66383c98263773ca15437a",
       "src/cody_jepa/phase0.py": "6af84b2c0f926431e00caa8636e19cc5a5e80e3c6fa5a66f2f298c7b27fa82bb",
-      "src/cody_jepa/probes.py": "75baa6bbb32aa8f271e701879d6b862168cd540397ffd34c20be6b5494c242f2",
+      "src/cody_jepa/probes.py": "228464eefce2c416e29a598652b34a6af61ae089159e9a65c4ad20108cadc373",
       "src/cody_jepa/single_stream_jepa.py": "667e7d7f3120bd66e873b8f89b98dc39af3e3618893c66ced16982a60ab36a94"
     },
     "protocol_path": "protocols/phase0-baseline.json",

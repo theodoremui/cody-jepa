@@ -24,6 +24,18 @@ from .single_stream_jepa import (
 
 FEATURE_TABLE_SCHEMA = 1
 PROBE_RESULTS_SCHEMA = 1
+PROBE_SUMMARY_COLUMNS = (
+    "task",
+    "protocol",
+    "feature_source",
+    "train_examples",
+    "val_examples",
+    "num_classes",
+    "majority_baseline",
+    "accuracy",
+    "balanced_accuracy",
+    "macro_f1",
+)
 FEATURE_SOURCE = "target_encoder_pre_norm_mean"
 FEATURE_FORMULA = "target_encoder(video, return_pre_norm=True)[1].mean(dim=1)"
 METADATA_COLUMNS = (
@@ -610,7 +622,12 @@ def evaluate_all_probes(
 
 
 def write_probe_results(results, output_dir, run_metadata=None):
-    """Write full JSON plus a one-row-per-task CSV summary."""
+    """Write canonical full-detail JSON and a compact scalar CSV summary.
+
+    Nested diagnostic data such as class labels and confusion matrices belong
+    in JSON. Keeping them out of the one-row-per-task CSV makes that file easy
+    to scan and load in spreadsheet and dataframe tools.
+    """
     output_dir = Path(output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
     json_path = output_dir / "probe_metrics.json"
@@ -623,15 +640,19 @@ def write_probe_results(results, output_dir, run_metadata=None):
     _write_json_atomic(payload, json_path)
     csv_rows = []
     for result in payload["results"]:
-        csv_rows.append({
-            key: json.dumps(value, separators=(",", ":"))
-            if isinstance(value, (list, dict))
-            else value
-            for key, value in result.items()
-        })
+        if not isinstance(result, Mapping):
+            raise TypeError("each probe result must be a mapping")
+        missing = [column for column in PROBE_SUMMARY_COLUMNS if column not in result]
+        if missing:
+            raise ValueError(
+                "probe result is missing summary columns: " + ", ".join(missing)
+            )
+        csv_rows.append({column: result[column] for column in PROBE_SUMMARY_COLUMNS})
     temporary = _atomic_path(csv_path)
     try:
-        pd.DataFrame(csv_rows).to_csv(temporary, index=False)
+        pd.DataFrame(csv_rows, columns=PROBE_SUMMARY_COLUMNS).to_csv(
+            temporary, index=False, float_format="%.9g"
+        )
         os.replace(temporary, csv_path)
     finally:
         temporary.unlink(missing_ok=True)
@@ -642,6 +663,7 @@ __all__ = [
     "FEATURE_FORMULA",
     "FEATURE_SOURCE",
     "METADATA_COLUMNS",
+    "PROBE_SUMMARY_COLUMNS",
     "build_frozen_target_encoder",
     "checkpoint_sha256",
     "evaluate_all_probes",

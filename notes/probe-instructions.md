@@ -69,7 +69,7 @@ majority_baseline
 accuracy
 balanced_accuracy
 macro_f1
-confusion_matrix
+confusion_matrix (in the canonical JSON artifact; the CSV is a compact scalar summary)
 
 For gait_system, prioritize balanced_accuracy because class balance may vary. For subject identity, report top-1 accuracy plus the majority baseline, and later add retrieval accuracy.
 

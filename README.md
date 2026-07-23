@@ -332,7 +332,7 @@ The notebook is safe by default. With no environment flags, `Run All` validates 
 | `CODY_JEPA_RUN_FULL_TRAINING` | `0` | Set to `1` to run the full CUDA training path after the real-batch CUDA preflight. |
 | `CODY_JEPA_RUN_DATA_AUDIT` | `1` for preflight, `0` for full training | Runs the all-sequence clip-quality audit separately from expensive GPU training. |
 | `CODY_JEPA_RUN_EXHAUSTIVE_DATA_AUDIT` | `0` | Verifies and hashes every frame. Use as a separate CPU/I/O certification job. |
-| `CODY_JEPA_OUTPUT_DIR` | `outputs/single-stream-jepa` | Selects the checkpoint directory. A new run refuses to overwrite an existing `latest.pt`. |
+| `CODY_JEPA_OUTPUT_DIR` | `outputs/jepa-v5` | Selects the checkpoint directory. A new run refuses to overwrite an existing `latest.pt`. |
 | `CODY_JEPA_RESUME_CHECKPOINT` | unset | Resumes from an explicit epoch-boundary checkpoint after validating its model and data contract. |
 
 The trainer uses multiblock tube masking, an online context encoder, an exponential-moving-average target encoder, and a predictor. It supports BF16, gradient accumulation, optional `torch.compile`, target batch standardization, and VICReg-style variance and covariance safeguards. Validation reports prediction metrics, feature variance and effective rank, and a seeded wrong-subject context-shuffle gap. Every run writes `latest.pt` and `best_loss.pt`; `best_healthy.pt` is written only when the representation-health checks pass.
@@ -366,7 +366,7 @@ uv run python scripts/eval_probes.py \
 
 The exporter restores only the EMA target encoder, freezes it, switches it to evaluation mode, and runs under `torch.inference_mode()`. Each deterministic clip window becomes one row containing its manifest metadata and the mean-pooled, pre-final-LayerNorm target tokens. It accepts `.csv` or compressed `.npz` output; both carry a JSON provenance sidecar with the checkpoint hash and the exact feature formula.
 
-The probe evaluator reports three protocols in both JSON and CSV: a sequence-disjoint closed-set identity classifier over training subjects, nearest-centroid identity retrieval over separately enrolled validation subjects, and a `gait_system` linear classifier trained on training subjects and evaluated on subject-disjoint validation subjects. Balanced accuracy is the primary gait metric.
+The probe evaluator reports three protocols: a sequence-disjoint closed-set identity classifier over training subjects, nearest-centroid identity retrieval over separately enrolled validation subjects, and a `gait_system` linear classifier trained on training subjects and evaluated on subject-disjoint validation subjects. `probe_metrics.csv` is a compact, one-row-per-task scalar summary; `probe_metrics.json` is the canonical full-detail artifact containing class labels, confusion matrices, protocol settings, and provenance. Balanced accuracy is the primary gait metric. Use [`notebooks/linear-probe-results.ipynb`](notebooks/linear-probe-results.ipynb) to validate, compare, and visualize these artifacts.
 
 ## Repository Map
 

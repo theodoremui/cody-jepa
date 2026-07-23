@@ -432,8 +432,9 @@ Do not silently substitute `best_loss.pt`; report the failed health metrics and
 start a corrected run instead.
 
 Archive a completed result only after inspecting it. For job 91108, the curated
-copy is `haic-results/job_91108.ipynb`; strings inside it still record the HAIC
-paths used when it executed and should not be rewritten after the fact.
+copy is `haic-results/job_91108.ipynb`. Its saved outputs use the canonical HAIC
+location `outputs/jepa-v4`; checkpoint and artifact hashes, rather than a
+directory spelling, preserve the identity of the retained evidence.
 
 When a notebook run contains errors or is unsafe to compare directly:
 

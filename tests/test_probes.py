@@ -10,6 +10,7 @@ from torch import nn
 
 from cody_jepa.probes import (
     FEATURE_SOURCE,
+    PROBE_SUMMARY_COLUMNS,
     evaluate_all_probes,
     evaluate_gait_system,
     export_frozen_features,
@@ -166,15 +167,40 @@ class ProbeTest(unittest.TestCase):
             paths = write_probe_results(results, tmp, {"seed": 0})
             payload = json.loads(paths["json"].read_text())
             csv_table = pd.read_csv(paths["csv"])
-        required = {
+        required_json = {
             "task", "feature_source", "train_examples", "val_examples", "num_classes",
             "majority_baseline", "accuracy", "balanced_accuracy", "macro_f1",
-            "confusion_matrix",
+            "class_labels", "confusion_matrix",
         }
         self.assertEqual(payload["seed"], 0)
         self.assertEqual(len(csv_table), 3)
-        self.assertTrue(required.issubset(payload["results"][0]))
-        self.assertTrue(required.issubset(csv_table.columns))
+        self.assertTrue(required_json.issubset(payload["results"][0]))
+        self.assertEqual(list(csv_table.columns), list(PROBE_SUMMARY_COLUMNS))
+        self.assertNotIn("class_labels", csv_table.columns)
+        self.assertNotIn("confusion_matrix", csv_table.columns)
+        self.assertEqual(
+            list(csv_table["task"]),
+            [result["task"] for result in payload["results"]],
+        )
+        for row, result in zip(csv_table.to_dict("records"), payload["results"]):
+            for column in PROBE_SUMMARY_COLUMNS:
+                if isinstance(result[column], float):
+                    self.assertAlmostEqual(row[column], result[column])
+                else:
+                    self.assertEqual(row[column], result[column])
+
+    def test_confusion_matrices_are_complete_and_well_formed(self):
+        for result in evaluate_all_probes(
+            synthetic_feature_table(), seed=9, max_iter=500
+        ):
+            labels = result["class_labels"]
+            matrix = np.asarray(result["confusion_matrix"])
+            self.assertEqual(len(labels), result["num_classes"])
+            self.assertEqual(len(set(labels)), len(labels))
+            self.assertEqual(matrix.shape, (len(labels), len(labels)))
+            self.assertTrue(np.issubdtype(matrix.dtype, np.integer))
+            self.assertTrue((matrix >= 0).all())
+            self.assertEqual(int(matrix.sum()), result["val_examples"])
 
 
 if __name__ == "__main__":
