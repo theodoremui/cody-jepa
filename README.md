@@ -396,38 +396,6 @@ cody-jepa/
 │   └── train-cody-jepa-on-haic.md        # Full H100 operator runbook
 └── haic-results/
     └── job_91108.ipynb                    # Retained stabilized HAIC execution
-```
-
-### Source modules and change map
-
-| Area | Read or modify | Verify with |
-| --- | --- | --- |
-| Manifest rules, frame discovery, temporal windows, augmentation, or sample metadata | `src/cody_jepa/data/dataset.py` and `src/cody_jepa/data/healthgait.py` | `tests/test_healthgait_dataset.py` |
-| Dataset summaries, contact sheets, difference maps, or motion-energy checks | `src/cody_jepa/data/healthgait_diagnostics.py` | `tests/test_healthgait_diagnostics.py` |
-| Mask generation, video transformer, predictor, schedules, training, validation, or checkpoint resume | `src/cody_jepa/single_stream_jepa.py` | `tests/test_single_stream_jepa.py` |
-| Frozen feature schema, checkpoint restoration, identity protocols, or gait-system probe | `src/cody_jepa/probes.py` | `tests/test_probes.py` |
-| Experiment configuration and the boundary between CPU audit and CUDA training | `notebooks/single-stream-jepa.ipynb` | `tests/test_single_stream_notebook.py` |
-| Dependency or environment policy | `pyproject.toml`, `uv.lock`, and notebook shell commands | `tests/test_uv_policy.py` |
-| HAIC resource requests and job lifecycle | `slurm/train-single-stream-jepa.sbatch` | `bash -n slurm/train-single-stream-jepa.sbatch` and the HAIC tutorial |
-
-### Data, outputs, and archived evidence
-
-The tracked repository is intentionally small. A fresh clone does not contain Health&Gait frames or trained checkpoints.
-
-| Path | Lifecycle |
-| --- | --- |
-| `data/healthgait/raw/` | Local dataset extracted from Zenodo; ignored by Git. |
-| `data/healthgait/manifests/` and `data/healthgait/diagnostics/` | Reproducible local products of the manifest and diagnostic workflows; the whole `data/` tree is ignored. |
-| `outputs/jepa-v4/` | Local copy of the retained HAIC job 91108 results; ignored by Git. |
-| Other `outputs/`, `checkpoints/`, `runs/`, `*.pt`, `*.pth`, `*.ckpt` paths | Local training and evaluation products; ignored by Git. |
-| `logs/` and `notebook-runs/` | Created by the Slurm workflow for scheduler/GPU logs and executed notebooks. Treat them as run artifacts and review them before committing. |
-| `haic-results/` | Curated, tracked evidence from retained HAIC experiments. It is for inspection, not imported by training code or tests. |
-
-When adding behavior, keep reusable logic in `src/cody_jepa/`, keep notebooks thin, add the corresponding focused test, and run the full suite before submitting changes:
-
-```bash
-MPLCONFIGDIR=/tmp/mpl uv run python -m unittest discover -s tests -v
-```
 
 ## References
 
