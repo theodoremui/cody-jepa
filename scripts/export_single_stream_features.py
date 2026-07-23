@@ -10,6 +10,7 @@ import json
 import torch
 from torch.utils.data import DataLoader
 
+from cody_jepa.phase0 import guard_research_path, portable_path, require_unchanged_hash
 from cody_jepa.data import (
     HealthGaitLoaderConfig,
     build_healthgait_datasets_from_config,
@@ -135,8 +136,15 @@ def _sequential_loaders(config, datasets, device):
 
 def main():
     args = parse_args()
+    repo_root = args.repo_root.expanduser().resolve()
     checkpoint_path = args.checkpoint.expanduser().resolve()
-    output_path = args.output.expanduser()
+    checkpoint_path = guard_research_path(checkpoint_path, repo_root, write=False)
+    output_path = guard_research_path(args.output, repo_root, write=True)
+    if output_path.exists() or output_path.with_suffix(
+        output_path.suffix + ".metadata.json"
+    ).exists():
+        raise FileExistsError(f"refusing to overwrite feature artifact: {output_path}")
+    checkpoint_hash = checkpoint_sha256(checkpoint_path)
     checkpoint = load_checkpoint(checkpoint_path)
     config = _probe_loader_config(args, checkpoint)
     datasets = build_healthgait_datasets_from_config(config)
@@ -151,12 +159,13 @@ def main():
         device,
         show_progress=True,
     )
+    require_unchanged_hash(checkpoint_path, checkpoint_hash, "checkpoint")
     paths = write_feature_table(
         table,
         output_path,
         {
-            "checkpoint": str(checkpoint_path),
-            "checkpoint_sha256": checkpoint_sha256(checkpoint_path),
+            "checkpoint": portable_path(checkpoint_path, repo_root),
+            "checkpoint_sha256": checkpoint_hash,
             "checkpoint_schema": checkpoint["schema"],
             "checkpoint_architecture": checkpoint["architecture"],
             "checkpoint_completed_epochs": checkpoint.get("completed_epochs"),
@@ -166,6 +175,22 @@ def main():
             "encoder_frozen": True,
             "feature_source": FEATURE_SOURCE,
             "feature_formula": FEATURE_FORMULA,
+            "preprocessing": {
+                "channels": int(checkpoint["config"]["in_channels"]),
+                "clip_length": int(checkpoint["config"]["num_frames"]),
+                "image_size": [
+                    int(checkpoint["config"]["img_size"]),
+                    int(checkpoint["config"]["img_size"]),
+                ],
+                "resize_interpolation": "bilinear",
+                "decoded_range": [0.0, 1.0],
+                "input_mean": float(checkpoint["config"]["input_mean"]),
+                "input_std": float(checkpoint["config"]["input_std"]),
+                "encoder": "ema_target_encoder",
+                "token_stage": "pre_final_layer_norm",
+                "pooling_axis": "token",
+                "output_dtype": "float32",
+            },
             "windows_per_sequence": config.eval_windows,
             "window_policy": "deterministic_evenly_spaced_no_augmentation",
             "dataset_signatures": {

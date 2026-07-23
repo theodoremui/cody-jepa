@@ -12,22 +12,23 @@ set -euo pipefail
 
 cd "/hai/scratch/$USER/cody-jepa"
 
-# New-run directory. jepa-v4 is retained evidence, so never overwrite it.
-export CODY_JEPA_RUN_FULL_TRAINING=1
-export CODY_JEPA_RUN_DATA_AUDIT=0
-export CODY_JEPA_RUN_EXHAUSTIVE_DATA_AUDIT=0
-export CODY_JEPA_OUTPUT_DIR=outputs/jepa-v5
-unset CODY_JEPA_RESUME_CHECKPOINT
+# The documented pipeline CLI must export every destination and the predeclared
+# criterion. jepa-v4 is retained evidence and is rejected by the CLI.
+: "${CODY_JEPA_OUTPUT_DIR:?submit through scripts/run_phase0_pipeline.py}"
+: "${CODY_JEPA_ARTIFACT_DIR:?submit through scripts/run_phase0_pipeline.py}"
+: "${CODY_JEPA_REPORT_PATH:?submit through scripts/run_phase0_pipeline.py}"
+: "${CODY_JEPA_CHECKPOINT_NAME:?submit through scripts/run_phase0_pipeline.py}"
+: "${CODY_JEPA_SUCCESS_CRITERION:?submit through scripts/run_phase0_pipeline.py}"
 export MPLCONFIGDIR=/tmp/mpl
 
-# Refuse to overwrite or accidentally resume an existing run.
-if [[ -e "$CODY_JEPA_OUTPUT_DIR/latest.pt" ]]; then
-  echo "Refusing to overwrite $CODY_JEPA_OUTPUT_DIR/latest.pt" >&2
-  echo "Choose a new CODY_JEPA_OUTPUT_DIR or configure an explicit resume." >&2
+# Claiming and all writes happen only inside the allocation. Reject existing
+# destinations before expensive setup; the Python entry point claims atomically.
+if [[ -e "$CODY_JEPA_OUTPUT_DIR" || -e "$CODY_JEPA_ARTIFACT_DIR" ]]; then
+  echo "Refusing to overwrite an existing run or artifact directory" >&2
   exit 2
 fi
 
-mkdir -p logs notebook-runs "$CODY_JEPA_OUTPUT_DIR"
+mkdir -p logs notebook-runs
 
 echo "Training environment:"
 env | sort | grep -E '^(CODY_JEPA_|MPLCONFIGDIR)'
@@ -54,9 +55,18 @@ cleanup() {
 }
 trap cleanup EXIT
 
-uv run --no-sync jupyter nbconvert \
-  --to notebook \
-  --execute notebooks/single-stream-jepa.ipynb \
-  --output-dir notebook-runs \
-  --output "single-stream-jepa-${SLURM_JOB_ID}.executed.ipynb" \
-  --ExecutePreprocessor.timeout=-1
+uv run --frozen --no-sync python scripts/run_phase0_pipeline.py run \
+  --run-dir "$CODY_JEPA_OUTPUT_DIR" \
+  --artifact-dir "$CODY_JEPA_ARTIFACT_DIR" \
+  --report "$CODY_JEPA_REPORT_PATH" \
+  --checkpoint-name "$CODY_JEPA_CHECKPOINT_NAME" \
+  --success-criterion "$CODY_JEPA_SUCCESS_CRITERION" \
+  --notebook-dir notebook-runs \
+  --device cuda \
+  --batch-size 16 \
+  --num-workers 4 \
+  --windows-per-sequence 3 \
+  --seed 0 \
+  --max-iter 2000 \
+  --identity-validation-fraction 0.25 \
+  --retrieval-enrollment-sequences 1

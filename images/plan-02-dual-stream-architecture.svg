@@ -1,0 +1,97 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1000" height="530" viewBox="0 0 1000 530" role="img" aria-labelledby="title desc">
+  <title id="title">Dual-stream CoDy-JEPA architecture</title>
+  <desc id="desc">A video clip passes through a patch and tubelet stem into a stable encoder and a dynamic encoder. Each stream has its own predictor and stop-gradient target. Both streams feed a fusion head for downstream probes, and both send projections to a shared diagnostics block for HSIC, decorrelation, and variance monitoring.</desc>
+  <defs>
+    <marker id="arr" markerWidth="12" markerHeight="12" refX="10" refY="6" orient="auto" markerUnits="userSpaceOnUse">
+      <path d="M2,2 L10,6 L2,10 Z" fill="#334155"/>
+    </marker>
+    <marker id="arrdot" markerWidth="12" markerHeight="12" refX="10" refY="6" orient="auto" markerUnits="userSpaceOnUse">
+      <path d="M2,2 L10,6 L2,10 Z" fill="#ca8a04"/>
+    </marker>
+  </defs>
+  <style>
+    text { font-family: Inter, Arial, sans-serif; }
+    .edge { fill: none; stroke: #334155; stroke-width: 2.5; stroke-linecap: round; marker-end: url(#arr); }
+    .proj { fill: none; stroke: #ca8a04; stroke-width: 2; stroke-dasharray: 3 5; stroke-linecap: round; marker-end: url(#arrdot); }
+  </style>
+  <rect x="0" y="0" width="1000" height="530" fill="#ffffff"/>
+
+  <text x="40" y="36" font-size="22" font-weight="700" fill="#0f172a" text-anchor="start">Dual-stream CoDy-JEPA architecture (Phase 3)</text>
+
+  <!-- input column -->
+  <rect x="40" y="225" width="110" height="60" rx="8" fill="#f1f5f9" stroke="#64748b" stroke-width="2"/>
+  <text x="95" y="260" font-size="15" font-weight="700" fill="#0f172a" text-anchor="middle">Video clip</text>
+
+  <!-- stem -->
+  <rect x="210" y="215" width="160" height="80" rx="8" fill="#f1f5f9" stroke="#64748b" stroke-width="2"/>
+  <text x="290" y="248" font-size="15" font-weight="700" fill="#0f172a" text-anchor="middle">Patch/tubelet stem</text>
+  <text x="290" y="270" font-size="13" fill="#475569" text-anchor="middle">(shared or partial)</text>
+
+  <!-- stable encoder -->
+  <rect x="415" y="80" width="190" height="80" rx="8" fill="#dbeafe" stroke="#2563eb" stroke-width="2"/>
+  <text x="510" y="113" font-size="15" font-weight="700" fill="#0f172a" text-anchor="middle">Stable encoder</text>
+  <text x="510" y="136" font-size="14" font-style="italic" fill="#1e40af" text-anchor="middle">S_attr</text>
+
+  <!-- dynamic encoder -->
+  <rect x="415" y="350" width="190" height="80" rx="8" fill="#ffedd5" stroke="#ea580c" stroke-width="2"/>
+  <text x="510" y="383" font-size="15" font-weight="700" fill="#0f172a" text-anchor="middle">Dynamic encoder</text>
+  <text x="510" y="406" font-size="14" font-style="italic" fill="#9a3412" text-anchor="middle">S_dyn</text>
+
+  <!-- diagnostics (between encoders) -->
+  <rect x="415" y="215" width="190" height="80" rx="8" fill="#fef9c3" stroke="#ca8a04" stroke-width="2"/>
+  <text x="510" y="243" font-size="15" font-weight="700" fill="#0f172a" text-anchor="middle">Stream diagnostics</text>
+  <text x="510" y="263" font-size="13" fill="#475569" text-anchor="middle">HSIC, decorrelation,</text>
+  <text x="510" y="280" font-size="13" fill="#475569" text-anchor="middle">variance floors</text>
+
+  <!-- predictors and fusion -->
+  <rect x="655" y="80" width="160" height="80" rx="8" fill="#dbeafe" stroke="#2563eb" stroke-width="2"/>
+  <text x="735" y="125" font-size="15" font-weight="700" fill="#0f172a" text-anchor="middle">Stable predictor</text>
+
+  <rect x="655" y="350" width="160" height="80" rx="8" fill="#ffedd5" stroke="#ea580c" stroke-width="2"/>
+  <text x="735" y="395" font-size="15" font-weight="700" fill="#0f172a" text-anchor="middle">Dynamic predictor</text>
+
+  <rect x="655" y="215" width="160" height="80" rx="8" fill="#ede9fe" stroke="#7c3aed" stroke-width="2"/>
+  <text x="735" y="260" font-size="15" font-weight="700" fill="#0f172a" text-anchor="middle">Fusion head</text>
+
+  <!-- targets and probes -->
+  <rect x="860" y="70" width="125" height="100" rx="8" fill="#f8fafc" stroke="#94a3b8" stroke-width="2" stroke-dasharray="6 4"/>
+  <text x="922.5" y="103" font-size="15" font-weight="700" fill="#0f172a" text-anchor="middle">Stable target</text>
+  <text x="922.5" y="124" font-size="13" fill="#475569" text-anchor="middle">invariant and</text>
+  <text x="922.5" y="141" font-size="13" fill="#475569" text-anchor="middle">static context</text>
+
+  <rect x="860" y="340" width="125" height="100" rx="8" fill="#f8fafc" stroke="#94a3b8" stroke-width="2" stroke-dasharray="6 4"/>
+  <text x="922.5" y="373" font-size="15" font-weight="700" fill="#0f172a" text-anchor="middle">Dynamic target</text>
+  <text x="922.5" y="394" font-size="13" fill="#475569" text-anchor="middle">motion, future,</text>
+  <text x="922.5" y="431" font-size="13" fill="#475569" text-anchor="middle">context change</text>
+
+  <rect x="860" y="215" width="125" height="80" rx="8" fill="#ede9fe" stroke="#7c3aed" stroke-width="2"/>
+  <text x="922.5" y="248" font-size="15" font-weight="700" fill="#0f172a" text-anchor="middle">Downstream</text>
+  <text x="922.5" y="268" font-size="15" font-weight="700" fill="#0f172a" text-anchor="middle">probes</text>
+
+  <!-- edges -->
+  <line class="edge" x1="150" y1="255" x2="210" y2="255"/>
+  <line class="edge" x1="370" y1="235" x2="415" y2="140"/>
+  <line class="edge" x1="370" y1="275" x2="415" y2="370"/>
+  <line class="edge" x1="605" y1="105" x2="655" y2="105"/>
+  <line class="edge" x1="605" y1="405" x2="655" y2="405"/>
+  <line class="edge" x1="605" y1="150" x2="655" y2="235"/>
+  <line class="edge" x1="605" y1="360" x2="655" y2="275"/>
+  <line class="edge" x1="815" y1="120" x2="860" y2="120"/>
+  <line class="edge" x1="815" y1="415" x2="860" y2="415"/>
+  <line class="edge" x1="815" y1="255" x2="860" y2="255"/>
+  <!-- projections to diagnostics -->
+  <line class="proj" x1="510" y1="160" x2="510" y2="215"/>
+  <line class="proj" x1="510" y1="350" x2="510" y2="295"/>
+
+  <!-- legend -->
+  <rect x="40" y="472" width="14" height="14" fill="#dbeafe" stroke="#2563eb" stroke-width="1.5"/>
+  <text x="62" y="484" font-size="13" fill="#475569" text-anchor="start">stable stream</text>
+  <rect x="165" y="472" width="14" height="14" fill="#ffedd5" stroke="#ea580c" stroke-width="1.5"/>
+  <text x="187" y="484" font-size="13" fill="#475569" text-anchor="start">dynamic stream</text>
+  <rect x="302" y="472" width="14" height="14" fill="#ede9fe" stroke="#7c3aed" stroke-width="1.5"/>
+  <text x="324" y="484" font-size="13" fill="#475569" text-anchor="start">fused</text>
+  <rect x="382" y="472" width="14" height="14" fill="#f8fafc" stroke="#94a3b8" stroke-width="1.5" stroke-dasharray="4 3"/>
+  <text x="404" y="484" font-size="13" fill="#475569" text-anchor="start">stop-gradient EMA target</text>
+  <line x1="580" y1="479" x2="612" y2="479" stroke="#ca8a04" stroke-width="2" stroke-dasharray="3 5"/>
+  <text x="620" y="484" font-size="13" fill="#475569" text-anchor="start">projection head to diagnostics</text>
+</svg>

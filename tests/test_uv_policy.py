@@ -11,6 +11,7 @@ class UvWorkflowPolicyTest(unittest.TestCase):
     def test_maintained_docs_and_scripts_do_not_use_other_environment_managers(self):
         paths = [PROJECT_ROOT / "README.md"]
         paths.extend(sorted((PROJECT_ROOT / "tutorials").rglob("*.md")))
+        paths.extend(sorted((PROJECT_ROOT / "notes").rglob("*.md")))
         paths.extend(sorted((PROJECT_ROOT / "slurm").glob("*.sbatch")))
         forbidden = re.compile(
             r"(?im)^\s*(?:python(?:3)?|jupyter|pip(?:3)?|conda|poetry)(?:\s|$)"
@@ -28,7 +29,9 @@ class UvWorkflowPolicyTest(unittest.TestCase):
             r"(?im)^\s*(?:!|%)(?:python(?:3)?|jupyter|pip(?:3)?|conda|poetry)\b"
         )
         violations = []
-        for path in sorted((PROJECT_ROOT / "notebooks").glob("*.ipynb")):
+        paths = sorted((PROJECT_ROOT / "notebooks").glob("*.ipynb"))
+        paths.append(PROJECT_ROOT / "haic-results" / "job_91108.ipynb")
+        for path in paths:
             notebook = json.loads(path.read_text())
             source = "\n".join(
                 "".join(cell.get("source", []))

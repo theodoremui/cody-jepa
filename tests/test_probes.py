@@ -14,6 +14,7 @@ from cody_jepa.probes import (
     evaluate_gait_system,
     export_frozen_features,
     read_feature_table,
+    validate_feature_metadata,
     validate_feature_table,
     write_feature_table,
     write_probe_results,
@@ -112,6 +113,30 @@ class ProbeTest(unittest.TestCase):
                     loaded[[f"feature_{i}" for i in range(5)]],
                     table[[f"feature_{i}" for i in range(5)]],
                 )
+
+    def test_feature_sidecar_reserves_contract_fields_and_detects_table_drift(self):
+        table = synthetic_feature_table()
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "features.npz"
+            write_feature_table(
+                table,
+                path,
+                {
+                    "schema_version": 999,
+                    "feature_formula": "tampered",
+                    "row_count": 0,
+                    "checkpoint": "checkpoint.pt",
+                    "checkpoint_sha256": "a" * 64,
+                },
+            )
+            loaded, metadata = read_feature_table(path)
+            validate_feature_metadata(loaded, path, metadata)
+            self.assertEqual(metadata["schema_version"], 1)
+            self.assertNotEqual(metadata["feature_formula"], "tampered")
+            with path.open("ab") as handle:
+                handle.write(b"drift")
+            with self.assertRaisesRegex(ValueError, "feature_table_sha256"):
+                validate_feature_metadata(loaded, path, metadata)
 
     def test_all_protocols_recover_synthetic_linear_signal(self):
         results = evaluate_all_probes(synthetic_feature_table(), seed=9, max_iter=500)

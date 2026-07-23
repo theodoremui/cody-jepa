@@ -12,8 +12,10 @@ from cody_jepa.probes import (
     checkpoint_sha256,
     evaluate_all_probes,
     read_feature_table,
+    validate_feature_metadata,
     write_probe_results,
 )
+from cody_jepa.phase0 import guard_research_path, portable_path, require_unchanged_hash
 
 
 def parse_args():
@@ -24,14 +26,24 @@ def parse_args():
     parser.add_argument("--max-iter", type=int, default=2000)
     parser.add_argument("--identity-validation-fraction", type=float, default=0.25)
     parser.add_argument("--retrieval-enrollment-sequences", type=int, default=1)
+    parser.add_argument("--repo-root", type=Path, default=Path.cwd())
     return parser.parse_args()
 
 
 def main():
     args = parse_args()
-    feature_path = args.features.expanduser().resolve()
+    repo_root = args.repo_root.expanduser().resolve()
+    feature_path = guard_research_path(args.features, repo_root, write=False)
+    output_dir = guard_research_path(args.output_dir, repo_root, write=True)
+    for name in ("probe_metrics.json", "probe_metrics.csv"):
+        if (output_dir / name).exists():
+            raise FileExistsError(f"refusing to overwrite probe artifact: {output_dir / name}")
+    feature_sidecar = feature_path.with_suffix(feature_path.suffix + ".metadata.json")
+    feature_hash = checkpoint_sha256(feature_path)
+    sidecar_hash = checkpoint_sha256(feature_sidecar)
     table, feature_metadata = read_feature_table(feature_path)
-    feature_source = str(feature_metadata.get("feature_source", FEATURE_SOURCE))
+    validate_feature_metadata(table, feature_path, feature_metadata)
+    feature_source = str(feature_metadata["feature_source"])
     results = evaluate_all_probes(
         table,
         feature_source=feature_source,
@@ -40,14 +52,23 @@ def main():
         max_iter=args.max_iter,
         seed=args.seed,
     )
+    require_unchanged_hash(feature_path, feature_hash, "feature table")
+    require_unchanged_hash(feature_sidecar, sidecar_hash, "feature metadata")
     paths = write_probe_results(
         results,
-        args.output_dir.expanduser(),
+        output_dir,
         {
-            "feature_table": str(feature_path),
-            "feature_table_sha256": checkpoint_sha256(feature_path),
+            "feature_table": portable_path(feature_path, repo_root),
+            "feature_table_sha256": feature_hash,
+            "feature_metadata_sha256": sidecar_hash,
             "feature_source": feature_source,
+            "feature_formula": feature_metadata["feature_formula"],
+            "checkpoint": feature_metadata["checkpoint"],
+            "checkpoint_sha256": feature_metadata["checkpoint_sha256"],
             "seed": args.seed,
+            "max_iter": args.max_iter,
+            "identity_validation_fraction": args.identity_validation_fraction,
+            "retrieval_enrollment_sequences": args.retrieval_enrollment_sequences,
         },
     )
     print(json.dumps({key: str(value) for key, value in paths.items()}, indent=2))

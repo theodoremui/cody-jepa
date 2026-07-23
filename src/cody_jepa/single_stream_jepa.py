@@ -32,6 +32,10 @@ from torch import optim
 from torch.utils.data import DataLoader, SequentialSampler
 
 
+# Checkpoint compatibility identifiers. These are independent of experiment/run
+# directory labels such as outputs/jepa-v4. Bump MODEL_ARCHITECTURE only when the
+# model/state-dict contract becomes incompatible; bump CHECKPOINT_SCHEMA only when
+# the serialized payload structure changes.
 MODEL_ARCHITECTURE = "cody-jepa-single-stream-masked-v3"
 CHECKPOINT_SCHEMA = 3
 
@@ -1341,6 +1345,14 @@ def train_jepa(
     mask_groups=DEFAULT_MASK_GROUPS,
     train_eval_loader=None,
 ):
+    if checkpoint_dir is not None:
+        checkpoint_path = Path(checkpoint_dir).expanduser().resolve()
+        for ancestor in (checkpoint_path, *checkpoint_path.parents):
+            if ancestor.name in {"jepa-v3", "jepa-v4"} and ancestor.parent.name == "outputs":
+                purpose = "retired" if ancestor.name == "jepa-v3" else "read-only baseline"
+                raise ValueError(
+                    f"refusing to train into {purpose} directory: {checkpoint_path}"
+                )
     updates_per_epoch = validate_training_config(cfg, train_loader)
     seed = int(cfg.get("seed", 0))
     torch.manual_seed(seed)
@@ -1703,7 +1715,11 @@ def train_jepa(
 
 
 def load_checkpoint(path):
-    return torch.load(Path(path), map_location="cpu", weights_only=False)
+    # Checkpoints contain tensor state plus Python/NumPy RNG state, all covered
+    # by the restricted weights-only unpickler. Never execute arbitrary pickle
+    # payloads merely to inspect or evaluate a research artifact.
+    with torch.serialization.safe_globals([torch.torch_version.TorchVersion]):
+        return torch.load(Path(path), map_location="cpu", weights_only=True)
 
 
 def healthy_checkpoint_path(checkpoint_dir, best_healthy_epoch):

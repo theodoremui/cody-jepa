@@ -1,0 +1,115 @@
+{
+  "schema_version": 1,
+  "baseline_job_id": 91108,
+  "read_only_baseline_directory": "outputs/jepa-v4",
+  "retired_directory": "outputs/jepa-v3",
+  "canonical_checkpoint": {
+    "filename": "best_loss.pt",
+    "identifier": "sha256:ab1e24043b2ba453e03fa427b0e845b74b2771682220732267d966be360097a5",
+    "selection_metric": "subject_balanced_loss",
+    "selection_policy": "Use the checkpoint selected during training without consulting downstream probe results. The latest checkpoint is a sensitivity comparison only."
+  },
+  "candidate_checkpoints": {
+    "best_loss.pt": {
+      "sha256": "ab1e24043b2ba453e03fa427b0e845b74b2771682220732267d966be360097a5",
+      "completed_epochs": 80,
+      "global_step": 3120,
+      "artifacts": {
+        "feature_sha256": "db3e57a09b33bf9a3f4e32ab71880f97d1a056574e7c8c3ca276a00c6727da53",
+        "feature_metadata_sha256": "9caa052b64758d402a2e8da36626358191d3c48978c7fc40736e5d5fa1af7363",
+        "probe_json_sha256": "3909f8620903f10b1dbe2e8a097ec28f5aeff8cb0a02717eb3385766fb92cdcf"
+      }
+    },
+    "latest.pt": {
+      "sha256": "5571a59c045dab3d4fd87d57e0baa296ad13f28992ab6d32f425f9340a848dad",
+      "completed_epochs": 100,
+      "global_step": 3900,
+      "artifacts": {
+        "feature_sha256": "191dfad0cb49cbd1636496794ee539769b3bb36133dd39b31d37bd2b9743fb65",
+        "feature_metadata_sha256": "e66f3be44340f787e757c50122c8c81193bfbeb3d63d06a6368c17131dbbb7bd",
+        "probe_json_sha256": "baa4cd41ed07bc2734e7ff449587c84e43622552e9a008d9ffbbbe3626784921"
+      }
+    }
+  },
+  "checkpoint_schema": 3,
+  "checkpoint_architecture": "cody-jepa-single-stream-masked-v3",
+  "manifest": {
+    "path": "data/healthgait/manifests/silhouette_subject_split_seed0.csv",
+    "sha256": "3074603602400af0b639c9569d69f5da99f43daebf3980b480154adddfdfb10e",
+    "sampled_inventory_sha256": "b46c484e8af0a4e31f0669aa436a92936e1725ee0082d8615065c617bb29576d",
+    "inventory_hash_scope": "All frame names and sizes plus first, middle, and last image bytes per sequence; this is not a full byte hash of every frame.",
+    "metadata_schema": [
+      "subject_id",
+      "modality",
+      "gait_system",
+      "trial",
+      "frame_dir",
+      "num_frames",
+      "split"
+    ],
+    "splits": {
+      "train": {
+        "sequences": 2506,
+        "subjects": 318
+      },
+      "val": {
+        "sequences": 624,
+        "subjects": 80
+      }
+    }
+  },
+  "feature_export": {
+    "schema_version": 1,
+    "source": "target_encoder_pre_norm_mean",
+    "formula": "target_encoder(video, return_pre_norm=True)[1].mean(dim=1)",
+    "metadata_schema": [
+      "sequence_id",
+      "split",
+      "subject_id",
+      "gait_system",
+      "trial",
+      "window_start"
+    ],
+    "windows_per_sequence": 3,
+    "window_policy": "deterministic_evenly_spaced_no_augmentation",
+    "reference_device": "mps",
+    "reference_batch_size": 4,
+    "reference_num_workers": 4,
+    "preprocessing": {
+      "channels": 1,
+      "clip_length": 16,
+      "image_size": [
+        112,
+        112
+      ],
+      "resize_interpolation": "bilinear",
+      "decoded_range": [
+        0.0,
+        1.0
+      ],
+      "input_mean": 0.5,
+      "input_std": 0.5,
+      "encoder": "ema_target_encoder",
+      "token_stage": "pre_final_layer_norm",
+      "pooling_axis": "token",
+      "output_dtype": "float32"
+    },
+    "expected_rows": {
+      "train": 7518,
+      "val": 1872
+    },
+    "expected_total_rows": 9390
+  },
+  "probes": {
+    "seed": 0,
+    "max_iter": 2000,
+    "identity_validation_fraction": 0.25,
+    "retrieval_enrollment_sequences": 1,
+    "tasks": [
+      "identity_closed_set",
+      "identity_heldout_retrieval",
+      "gait_system"
+    ],
+    "primary_gait_metric": "balanced_accuracy"
+  }
+}

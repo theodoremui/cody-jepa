@@ -1,0 +1,81 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1000" height="500" viewBox="0 0 1000 500" role="img" aria-labelledby="title desc">
+  <title id="title">CI-TSI counterfactual context and target alignment</title>
+  <desc id="desc">Clip A from subject i supplies stable tokens and clip B from subject j supplies dynamic tokens. They combine into a counterfactual context that feeds a predictor. The prediction is compared to the stop-gradient future dynamics of clip B, never clip A.</desc>
+  <defs>
+    <marker id="arr" markerWidth="12" markerHeight="12" refX="10" refY="6" orient="auto" markerUnits="userSpaceOnUse">
+      <path d="M2,2 L10,6 L2,10 Z" fill="#334155"/>
+    </marker>
+    <marker id="arrgray" markerWidth="12" markerHeight="12" refX="10" refY="6" orient="auto" markerUnits="userSpaceOnUse">
+      <path d="M2,2 L10,6 L2,10 Z" fill="#64748b"/>
+    </marker>
+  </defs>
+  <style>
+    text { font-family: Inter, Arial, sans-serif; }
+    .edge { fill: none; stroke: #334155; stroke-width: 2.5; stroke-linecap: round; stroke-linejoin: round; marker-end: url(#arr); }
+    .sg { fill: none; stroke: #64748b; stroke-width: 2; stroke-dasharray: 3 5; stroke-linecap: round; stroke-linejoin: round; marker-end: url(#arrgray); }
+  </style>
+  <rect x="0" y="0" width="1000" height="500" fill="#ffffff"/>
+
+  <text x="40" y="36" font-size="22" font-weight="700" fill="#0f172a" text-anchor="start">CI-TSI: counterfactual context and target alignment (Phase 4)</text>
+
+  <!-- target alignment rule note -->
+  <rect x="540" y="60" width="420" height="92" rx="8" fill="#fef9c3" stroke="#ca8a04" stroke-width="2"/>
+  <text x="558" y="84" font-size="14" font-weight="700" fill="#854d0e" text-anchor="start">Target alignment rule</text>
+  <text x="558" y="106" font-size="13" fill="#475569" text-anchor="start">The context carries B's motion, so the target must be</text>
+  <text x="558" y="123" font-size="13" fill="#475569" text-anchor="start">B's future dynamics. Misaligning the target to A</text>
+  <text x="558" y="140" font-size="13" fill="#475569" text-anchor="start">teaches the model to ignore the dynamic tokens.</text>
+
+  <!-- clip A -->
+  <rect x="40" y="90" width="170" height="80" rx="8" fill="#dbeafe" stroke="#2563eb" stroke-width="2"/>
+  <text x="125" y="118" font-size="15" font-weight="700" fill="#0f172a" text-anchor="middle">Clip A, subject i</text>
+  <text x="125" y="140" font-size="13" fill="#475569" text-anchor="middle">supplies appearance</text>
+  <text x="125" y="157" font-size="13" fill="#475569" text-anchor="middle">and structure</text>
+
+  <!-- clip B -->
+  <rect x="40" y="310" width="170" height="80" rx="8" fill="#ffedd5" stroke="#ea580c" stroke-width="2"/>
+  <text x="125" y="338" font-size="15" font-weight="700" fill="#0f172a" text-anchor="middle">Clip B, subject j</text>
+  <text x="125" y="360" font-size="13" fill="#475569" text-anchor="middle">supplies motion</text>
+
+  <!-- counterfactual context -->
+  <rect x="300" y="200" width="205" height="80" rx="8" fill="#f8fafc" stroke="#334155" stroke-width="2"/>
+  <text x="402.5" y="230" font-size="15" font-weight="700" fill="#0f172a" text-anchor="middle">Counterfactual context</text>
+  <text x="402.5" y="255" font-size="13.5" text-anchor="middle"><tspan font-style="italic" fill="#1e40af">S_attr(A)</tspan><tspan fill="#475569"> + </tspan><tspan font-style="italic" fill="#9a3412">S_dyn(B, 1:t)</tspan></text>
+
+  <!-- predictor -->
+  <rect x="560" y="200" width="120" height="80" rx="8" fill="#f1f5f9" stroke="#64748b" stroke-width="2"/>
+  <text x="620" y="234" font-size="15" font-weight="700" fill="#0f172a" text-anchor="middle">Predictor</text>
+  <text x="620" y="256" font-size="13" font-style="italic" fill="#475569" text-anchor="middle">q(context, k)</text>
+
+  <!-- prediction -->
+  <rect x="740" y="200" width="220" height="80" rx="8" fill="#ffedd5" stroke="#ea580c" stroke-width="2"/>
+  <text x="850" y="234" font-size="15" font-weight="700" fill="#0f172a" text-anchor="middle">Prediction</text>
+  <text x="850" y="256" font-size="13.5" font-style="italic" fill="#9a3412" text-anchor="middle">S_dyn(B, t+k), predicted</text>
+
+  <!-- target -->
+  <rect x="740" y="360" width="220" height="80" rx="8" fill="#f8fafc" stroke="#94a3b8" stroke-width="2" stroke-dasharray="6 4"/>
+  <text x="850" y="390" font-size="15" font-weight="700" fill="#0f172a" text-anchor="middle">Target</text>
+  <text x="850" y="412" font-size="13" fill="#475569" text-anchor="middle">future dynamics of B, stop-gradient</text>
+
+  <!-- token routes: elbows with labels in clear space -->
+  <polyline class="edge" points="210,130 355,130 355,200" stroke="#2563eb"/>
+  <text x="222" y="120" font-size="13" fill="#1e40af" text-anchor="start">stable tokens from A</text>
+
+  <polyline class="edge" points="210,350 405,350 405,280" stroke="#ea580c"/>
+  <text x="222" y="368" font-size="13" fill="#9a3412" text-anchor="start">dynamic tokens from B</text>
+
+  <!-- forward path -->
+  <line class="edge" x1="505" y1="240" x2="560" y2="240"/>
+  <line class="edge" x1="680" y1="240" x2="740" y2="240"/>
+
+  <!-- stop-gradient target branch, routed below everything -->
+  <polyline class="sg" points="125,390 125,420 740,420"/>
+  <text x="435" y="410" font-size="13" fill="#64748b" text-anchor="middle">stop-gradient EMA target branch</text>
+
+  <!-- prediction vs target comparison -->
+  <line class="edge" x1="850" y1="280" x2="850" y2="352"/>
+  <text x="862" y="315" font-size="13" fill="#475569" text-anchor="start">L_pred: embedding</text>
+  <text x="862" y="331" font-size="13" fill="#475569" text-anchor="start">distance</text>
+
+  <!-- caption -->
+  <text x="40" y="478" font-size="13" fill="#475569" text-anchor="start">Because A no longer moves like A, associations such as "person A usually walks slowly" stop solving the task; only B's motion does.</text>
+</svg>

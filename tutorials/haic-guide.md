@@ -6,7 +6,8 @@ The workflow has three separate phases:
 
 1. Verify the Python environment and CUDA runtime in a short interactive H100 session.
 2. Validate the dataset in a CPU-only Slurm session.
-3. Submit the full training notebook as a batch job.
+3. Use the pipeline entry point to submit training, validation, feature export,
+   all probes, and report generation as one Slurm job.
 
 Keeping these phases separate prevents slow dataset checks from consuming H100 time. It also makes failures easier to locate.
 
@@ -256,52 +257,21 @@ exit
 
 ## 4. Configure a new training run
 
-The checked-in batch script is [`slurm/train-single-stream-jepa.sbatch`](../slurm/train-single-stream-jepa.sbatch). Treat this file as the source of truth for the HAIC job. The tutorial does not duplicate the full script because duplicated copies can drift apart.
+Choose three fresh, distinct destinations: checkpoints, evaluation artifacts,
+and the versioned report. Never reuse a directory from an existing experiment.
+The pipeline rejects every `outputs/jepa-v3` path and all writes under retained
+baseline evidence in `outputs/jepa-v4`.
 
-For a new run, confirm that the script contains these environment settings:
+The current compatibility identifiers remain
+`MODEL_ARCHITECTURE = "cody-jepa-single-stream-masked-v3"` and
+`CHECKPOINT_SCHEMA = 3`. Run-directory names such as `outputs/jepa-v5` identify
+experiments, not model architectures or checkpoint schemas; do not bump either
+constant merely because a new run is launched.
 
-```bash
-export CODY_JEPA_RUN_FULL_TRAINING=1
-export CODY_JEPA_RUN_DATA_AUDIT=0
-export CODY_JEPA_RUN_EXHAUSTIVE_DATA_AUDIT=0
-export CODY_JEPA_OUTPUT_DIR=outputs/jepa-v5
-unset CODY_JEPA_RESUME_CHECKPOINT
-export MPLCONFIGDIR=/tmp/mpl
-```
-
-These variables have distinct jobs:
-
-| Variable | New-run value | Purpose |
-| --- | --- | --- |
-| `CODY_JEPA_RUN_FULL_TRAINING` | `1` | Enables the full CUDA training path. |
-| `CODY_JEPA_RUN_DATA_AUDIT` | `0` | Skips the all-sequence audit that already passed in Section 3. |
-| `CODY_JEPA_RUN_EXHAUSTIVE_DATA_AUDIT` | `0` | Avoids reading and hashing every frame before GPU work begins. |
-| `CODY_JEPA_OUTPUT_DIR` | A new directory | Keeps checkpoints from separate runs isolated. |
-| `CODY_JEPA_RESUME_CHECKPOINT` | Unset | Tells the notebook to initialize a new model. |
-| `MPLCONFIGDIR` | `/tmp/mpl` | Gives Matplotlib a writable cache directory. |
-
-### Choose a fresh output directory
-
-The provided script uses:
-
-```text
-outputs/jepa-v5
-```
-
-Check whether that directory already contains a checkpoint:
-
-```bash
-cd /hai/scratch/$USER/cody-jepa
-ls -la outputs/jepa-v5 2>/dev/null || true
-```
-
-If `latest.pt` exists, do not delete it. Either resume that run as described in Section 8 or choose a new directory, such as:
-
-```bash
-export CODY_JEPA_OUTPUT_DIR=outputs/jepa-v6
-```
-
-Update the value inside the batch script. Variables exported only in your login shell do not override values that the script exports itself.
+Select the checkpoint policy before submission. Use `best_healthy.pt` when the
+experiment is predeclared to require the health gate, or `best_loss.pt` for a
+loss-selected comparison. The workflow never silently falls back when the
+declared checkpoint is absent.
 
 ### Validate the batch script
 
@@ -311,21 +281,25 @@ bash -n slurm/train-single-stream-jepa.sbatch
 
 No output means that the shell syntax is valid.
 
-## 5. Submit the training job
+## 5. Submit the train-to-report job
 
-Slurm opens the `#SBATCH --output` file before the script starts. Create the log directory before calling `sbatch`:
-
-```bash
-cd /hai/scratch/$USER/cody-jepa
-mkdir -p logs notebook-runs
-```
-
-Submit the job and save its numeric ID:
+From the HAIC head node, run the single documented entry point:
 
 ```bash
-JOB_ID=$(sbatch --parsable slurm/train-single-stream-jepa.sbatch)
-echo "Submitted job $JOB_ID"
+uv run python scripts/run_phase0_pipeline.py submit \
+  --run-dir outputs/jepa-v5 \
+  --artifact-dir outputs/pipeline/jepa-v5 \
+  --report reports/jepa-v5.md \
+  --checkpoint-name best_loss.pt \
+  --success-criterion "Named scientific change: pass the predeclared Phase 1 health gate"
 ```
+
+The command creates scheduler prerequisites and submits
+[`slurm/train-single-stream-jepa.sbatch`](../slurm/train-single-stream-jepa.sbatch).
+It returns immediately with the numeric job ID. The batch worker invokes the
+same pipeline in `run` mode, so training, completed-run validation, feature
+export, probes, and report generation all remain inside the H100 allocation.
+Do not run those compute-heavy stages on the head node.
 
 Check its state:
 
@@ -399,6 +373,11 @@ A completed run should produce:
 notebook-runs/single-stream-jepa-<JOB_ID>.executed.ipynb
 outputs/jepa-v5/latest.pt
 outputs/jepa-v5/best_loss.pt
+outputs/pipeline/jepa-v5/features.npz
+outputs/pipeline/jepa-v5/features.npz.metadata.json
+outputs/pipeline/jepa-v5/probes/probe_metrics.json
+reports/jepa-v5.md
+reports/jepa-v5.json
 logs/single-stream-jepa-<JOB_ID>.out
 logs/gpu-<JOB_ID>.csv
 ```
@@ -463,8 +442,9 @@ When a notebook run contains errors or is unsafe to compare directly:
 2. Inspect checkpoint schema and `best_healthy_epoch`. A null healthy epoch
    means the run failed the representation-health contract; do not silently use
    `best_loss.pt` as an equivalent result.
-3. If a compatible checkpoint survives, re-export frozen features and rerun
-   `scripts/eval_probes.py` under the current code for every candidate run.
+3. If a compatible checkpoint survives, use `uv run python
+   scripts/run_phase0_pipeline.py evaluate ...` to re-export frozen features,
+   rerun every probe, and write a hashed report under current code.
 4. If the schema is incompatible or no checkpoint survives, record the failure
    reason and exclude the run from metric tables and direct plot comparisons.
 5. Keep only a concise failure summary or external job log when the full failed
@@ -473,54 +453,14 @@ When a notebook run contains errors or is unsafe to compare directly:
 
 ## 8. Resume an interrupted run
 
-Resume only from a checkpoint written by the same training configuration and data contract. Keep the original output directory so the run continues in place.
-
-The corrected diagnostics use checkpoint schema 3. Schema-2 checkpoints from
-the legacy pre-normalization/one-batch diagnostics cannot be resumed because
-their `best_healthy_*` state is not comparable. If one exists outside the
-curated repository, use it only for an explicitly labeled weights-only probe or
-failure analysis. Start a new training directory for corrected health-based
-checkpoint selection.
-
-In `slurm/train-single-stream-jepa.sbatch`, replace:
-
-```bash
-unset CODY_JEPA_RESUME_CHECKPOINT
-```
-
-with:
-
-```bash
-export CODY_JEPA_RESUME_CHECKPOINT=outputs/jepa-v5/latest.pt
-```
-
-The new-run script intentionally exits when `latest.pt` already exists. For a resume job, replace that guard with:
-
-```bash
-if [[ ! -f "$CODY_JEPA_RESUME_CHECKPOINT" ]]; then
-  echo "Resume checkpoint does not exist: $CODY_JEPA_RESUME_CHECKPOINT" >&2
-  exit 2
-fi
-```
-
-Keep these values unchanged:
-
-```bash
-export CODY_JEPA_RUN_FULL_TRAINING=1
-export CODY_JEPA_RUN_DATA_AUDIT=0
-export CODY_JEPA_RUN_EXHAUSTIVE_DATA_AUDIT=0
-export CODY_JEPA_OUTPUT_DIR=outputs/jepa-v5
-```
-
-Validate and submit the edited script:
-
-```bash
-bash -n slurm/train-single-stream-jepa.sbatch
-JOB_ID=$(sbatch --parsable slurm/train-single-stream-jepa.sbatch)
-echo "Submitted resume job $JOB_ID"
-```
-
-Before loading weights, the notebook compares the checkpoint with the current architecture, masks, optimizer behavior, loader configuration, manifest hash, and frame-inventory fingerprint. A mismatch stops the resume rather than mixing two experiments.
+The train-to-report command intentionally accepts only fresh run directories;
+this makes accidental continuation or overwrite impossible. Resume remains a
+separate recovery operation and must use an epoch-boundary `latest.pt` with the
+same architecture, masks, optimizer behavior, loader configuration, manifest
+hash, and frame-inventory fingerprint. Do not edit the production Slurm wrapper
+in place or resume job 91108. After an audited resume finishes, evaluate its
+declared checkpoint with the pipeline's `evaluate` command into a fresh artifact
+directory and report.
 
 ## 9. Run exhaustive data certification when needed
 
@@ -580,7 +520,7 @@ Do not enable compilation for the production notebook until this test passes and
 | GPU utilization stays near zero for more than 15 minutes | Inspect the Slurm log, confirm all three run-mode variables, and check whether dataset construction is blocked on HAIC storage. |
 | Job receives a non-H100 GPU | Keep `--gres=gpu:h100:1`. The batch script intentionally exits when the device name does not contain `H100`. |
 | CUDA reports no compatible kernel image | Reinstall the locked PyTorch packages and confirm that `sm_90` appears in `torch.cuda.get_arch_list()`. |
-| Notebook refuses to overwrite `latest.pt` | Choose a new `CODY_JEPA_OUTPUT_DIR` for a new run, or configure an explicit resume. Do not delete an existing checkpoint unless you have intentionally discarded that experiment. |
+| Pipeline refuses an existing run directory | Choose a new versioned run directory. Resume is a separate audited recovery operation; never delete or overwrite an existing checkpoint to make the fresh-run workflow proceed. |
 | GPU runs out of memory during the BF16 preflight | Reduce the physical `batch_size` and increase `accumulation_steps` by the same factor to preserve the effective batch size. Recheck that the number of microbatches remains divisible by the accumulation count. |
 | Executed notebook is missing while the job is running | This is expected. `nbconvert` writes the final executed notebook after execution ends. Use the GPU CSV and checkpoints to monitor an active run. |
 | Job stops before `latest.pt` appears | No complete epoch was saved. Start a new run in the same empty directory or choose another fresh output directory. |

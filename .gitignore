@@ -15,4 +15,3 @@ checkpoints/
 *.pt
 *.pth
 *.ckpt
-tutorials/cody-jepa-plan.md

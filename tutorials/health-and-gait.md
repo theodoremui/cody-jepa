@@ -2,6 +2,10 @@
 
 This tutorial explains how to download the full Health&Gait dataset and prepare it for CoDy-JEPA experiments without mixing self-supervised training data with evaluation metadata.
 
+Use uv exclusively for this workflow: install with `uv sync --frozen`, launch
+all Python and Jupyter commands through `uv run`, and change dependencies only with `uv add`,
+`uv remove`, or `uv lock`.
+
 The guiding rule is simple:
 
 $$

@@ -1,0 +1,233 @@
+{
+  "baseline_job_id": 91108,
+  "candidates": {
+    "best_loss.pt": {
+      "checkpoint": {
+        "best_epoch": 80,
+        "best_healthy_epoch": null,
+        "best_val_loss": 0.3873943766579033,
+        "completed_epochs": 80,
+        "filename": "best_loss.pt",
+        "global_step": 3120,
+        "identifier": "sha256:ab1e24043b2ba453e03fa427b0e845b74b2771682220732267d966be360097a5",
+        "manifest_sha256": "3074603602400af0b639c9569d69f5da99f43daebf3980b480154adddfdfb10e",
+        "sha256": "ab1e24043b2ba453e03fa427b0e845b74b2771682220732267d966be360097a5",
+        "validation": {
+          "effective_rank": 10.451756477355957,
+          "effective_rank_ratio": 0.027218115826447804,
+          "feature_std": 0.01855556108057499,
+          "health_issues": [
+            "effective_rank_below_threshold",
+            "context_shuffle_gap_below_threshold"
+          ],
+          "loss": 0.38738191306081593,
+          "near_zero_variance_fraction": 0.0,
+          "representations_healthy": false,
+          "subject_balanced_context_shuffle_loss_gap": 0.0001537602084378401,
+          "subject_balanced_loss": 0.3873943766579033
+        }
+      },
+      "features": {
+        "device": "mps",
+        "feature_dim": 384,
+        "metadata_sha256": "9caa052b64758d402a2e8da36626358191d3c48978c7fc40736e5d5fa1af7363",
+        "path": "outputs/phase0/job-91108/best_loss/features.npz",
+        "rows": {
+          "train": 7518,
+          "val": 1872
+        },
+        "sha256": "db3e57a09b33bf9a3f4e32ab71880f97d1a056574e7c8c3ca276a00c6727da53"
+      },
+      "probes": {
+        "json_path": "outputs/phase0/job-91108/best_loss/probes/probe_metrics.json",
+        "json_sha256": "3909f8620903f10b1dbe2e8a097ec28f5aeff8cb0a02717eb3385766fb92cdcf",
+        "metrics": {
+          "gait_system": {
+            "accuracy": 0.9257478632478633,
+            "balanced_accuracy": 0.9257478632478633,
+            "macro_f1": 0.925744282242956,
+            "majority_baseline": 0.5
+          },
+          "identity_closed_set": {
+            "accuracy": 0.09250398724082935,
+            "balanced_accuracy": 0.09119496855345911,
+            "macro_f1": 0.08724927906392946,
+            "majority_baseline": 0.003189792663476874
+          },
+          "identity_heldout_retrieval": {
+            "accuracy": 0.024509803921568627,
+            "balanced_accuracy": 0.024603174603174603,
+            "macro_f1": 0.0280751862847076,
+            "majority_baseline": 0.012867647058823529
+          }
+        }
+      }
+    },
+    "latest.pt": {
+      "checkpoint": {
+        "best_epoch": 80,
+        "best_healthy_epoch": null,
+        "best_val_loss": 0.3873943766579033,
+        "completed_epochs": 100,
+        "filename": "latest.pt",
+        "global_step": 3900,
+        "identifier": "sha256:5571a59c045dab3d4fd87d57e0baa296ad13f28992ab6d32f425f9340a848dad",
+        "manifest_sha256": "3074603602400af0b639c9569d69f5da99f43daebf3980b480154adddfdfb10e",
+        "sha256": "5571a59c045dab3d4fd87d57e0baa296ad13f28992ab6d32f425f9340a848dad",
+        "validation": {
+          "effective_rank": 10.167006492614746,
+          "effective_rank_ratio": 0.026476579407850902,
+          "feature_std": 0.0185603778809309,
+          "health_issues": [
+            "effective_rank_below_threshold",
+            "context_shuffle_gap_below_threshold"
+          ],
+          "loss": 0.3874717606947972,
+          "near_zero_variance_fraction": 0.0,
+          "representations_healthy": false,
+          "subject_balanced_context_shuffle_loss_gap": 0.00015955910397072635,
+          "subject_balanced_loss": 0.38748371621283395
+        }
+      },
+      "features": {
+        "device": "mps",
+        "feature_dim": 384,
+        "metadata_sha256": "e66f3be44340f787e757c50122c8c81193bfbeb3d63d06a6368c17131dbbb7bd",
+        "path": "outputs/phase0/job-91108/latest/features.npz",
+        "rows": {
+          "train": 7518,
+          "val": 1872
+        },
+        "sha256": "191dfad0cb49cbd1636496794ee539769b3bb36133dd39b31d37bd2b9743fb65"
+      },
+      "probes": {
+        "json_path": "outputs/phase0/job-91108/latest/probes/probe_metrics.json",
+        "json_sha256": "baa4cd41ed07bc2734e7ff449587c84e43622552e9a008d9ffbbbe3626784921",
+        "metrics": {
+          "gait_system": {
+            "accuracy": 0.9246794871794872,
+            "balanced_accuracy": 0.9246794871794872,
+            "macro_f1": 0.9246777461880437,
+            "majority_baseline": 0.5
+          },
+          "identity_closed_set": {
+            "accuracy": 0.09409888357256778,
+            "balanced_accuracy": 0.09276729559748427,
+            "macro_f1": 0.0890596479014319,
+            "majority_baseline": 0.003189792663476874
+          },
+          "identity_heldout_retrieval": {
+            "accuracy": 0.02696078431372549,
+            "balanced_accuracy": 0.02777777777777778,
+            "macro_f1": 0.03037774558098119,
+            "majority_baseline": 0.012867647058823529
+          }
+        }
+      }
+    }
+  },
+  "canonical_checkpoint": {
+    "filename": "best_loss.pt",
+    "identifier": "sha256:ab1e24043b2ba453e03fa427b0e845b74b2771682220732267d966be360097a5",
+    "selection_metric": "subject_balanced_loss",
+    "selection_policy": "Use the checkpoint selected during training without consulting downstream probe results. The latest checkpoint is a sensitivity comparison only."
+  },
+  "feature_export": {
+    "expected_rows": {
+      "train": 7518,
+      "val": 1872
+    },
+    "expected_total_rows": 9390,
+    "formula": "target_encoder(video, return_pre_norm=True)[1].mean(dim=1)",
+    "metadata_schema": [
+      "sequence_id",
+      "split",
+      "subject_id",
+      "gait_system",
+      "trial",
+      "window_start"
+    ],
+    "preprocessing": {
+      "channels": 1,
+      "clip_length": 16,
+      "decoded_range": [
+        0.0,
+        1.0
+      ],
+      "encoder": "ema_target_encoder",
+      "image_size": [
+        112,
+        112
+      ],
+      "input_mean": 0.5,
+      "input_std": 0.5,
+      "output_dtype": "float32",
+      "pooling_axis": "token",
+      "resize_interpolation": "bilinear",
+      "token_stage": "pre_final_layer_norm"
+    },
+    "reference_batch_size": 4,
+    "reference_device": "mps",
+    "reference_num_workers": 4,
+    "schema_version": 1,
+    "source": "target_encoder_pre_norm_mean",
+    "window_policy": "deterministic_evenly_spaced_no_augmentation",
+    "windows_per_sequence": 3
+  },
+  "manifest": {
+    "inventory_hash_scope": "All frame names and sizes plus first, middle, and last image bytes per sequence; this is not a full byte hash of every frame.",
+    "metadata_schema": [
+      "subject_id",
+      "modality",
+      "gait_system",
+      "trial",
+      "frame_dir",
+      "num_frames",
+      "split"
+    ],
+    "path": "data/healthgait/manifests/silhouette_subject_split_seed0.csv",
+    "sampled_inventory_sha256": "b46c484e8af0a4e31f0669aa436a92936e1725ee0082d8615065c617bb29576d",
+    "sha256": "3074603602400af0b639c9569d69f5da99f43daebf3980b480154adddfdfb10e",
+    "splits": {
+      "train": {
+        "sequences": 2506,
+        "subjects": 318
+      },
+      "val": {
+        "sequences": 624,
+        "subjects": 80
+      }
+    }
+  },
+  "probe_protocol": {
+    "identity_validation_fraction": 0.25,
+    "max_iter": 2000,
+    "primary_gait_metric": "balanced_accuracy",
+    "retrieval_enrollment_sequences": 1,
+    "seed": 0,
+    "tasks": [
+      "identity_closed_set",
+      "identity_heldout_retrieval",
+      "gait_system"
+    ]
+  },
+  "reproducibility": {
+    "code_sha256": {
+      "notebooks/single-stream-jepa.ipynb": "6433b58f69210f3593acf42eb801b976b00b5fa79e964b89ff08cf2e3aefe976",
+      "scripts/eval_probes.py": "4cb3ebdae76401854894e3b7002b9683ac6f8aabe398020b38995e9250fe83ae",
+      "scripts/export_single_stream_features.py": "2b436fd429dc0f9ed69f25dcba374d354c7095c535607153d06ec08665cf577d",
+      "scripts/run_phase0_pipeline.py": "32ff3df57ac8e6d62a158f73020fb1205ed2b4bbda0b409fc3c73b67521ef6c4",
+      "src/cody_jepa/data/__init__.py": "c96a039741f9788f5e5f5cdca726d1658bc8bd57c3df2b640330232cc100e3a5",
+      "src/cody_jepa/data/dataset.py": "a66be3d2cec30579bd71b73ee9d55d39ce71c64df2d18a00bafbbd9d661d952b",
+      "src/cody_jepa/data/healthgait.py": "7895f13ae8675f628069616038a152b33a20cb119a66383c98263773ca15437a",
+      "src/cody_jepa/phase0.py": "6af84b2c0f926431e00caa8636e19cc5a5e80e3c6fa5a66f2f298c7b27fa82bb",
+      "src/cody_jepa/probes.py": "75baa6bbb32aa8f271e701879d6b862168cd540397ffd34c20be6b5494c242f2",
+      "src/cody_jepa/single_stream_jepa.py": "667e7d7f3120bd66e873b8f89b98dc39af3e3618893c66ced16982a60ab36a94"
+    },
+    "protocol_path": "protocols/phase0-baseline.json",
+    "protocol_sha256": "0f05f7eec236fa43bb052fed7d2d2945e0da7059fe188d0cd230033d3c81d1ae",
+    "uv_lock_sha256": "b451e7d444758b160a580151add8554a60b4160e081980f83e2bea261da45034"
+  },
+  "schema_version": 1,
+  "status": "locked"
+}

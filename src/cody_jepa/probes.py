@@ -8,6 +8,7 @@ import hashlib
 import json
 import os
 import tempfile
+import warnings
 
 import numpy as np
 import pandas as pd
@@ -241,15 +242,48 @@ def write_feature_table(table, output_path, metadata=None):
         temporary.unlink(missing_ok=True)
 
     sidecar = {
+        **(dict(metadata) if metadata is not None else {}),
         "schema_version": FEATURE_TABLE_SCHEMA,
         "feature_source": FEATURE_SOURCE,
         "feature_formula": FEATURE_FORMULA,
         "row_count": int(len(table)),
         "feature_dim": len(feature_columns),
-        **(dict(metadata) if metadata is not None else {}),
+        "feature_table_sha256": checkpoint_sha256(output_path),
     }
     _write_json_atomic(sidecar, _sidecar_path(output_path))
     return {"features": output_path, "metadata": _sidecar_path(output_path)}
+
+
+def validate_feature_metadata(table, feature_path, metadata):
+    """Validate the provenance sidecar required by reproducible probe runs."""
+    feature_path = Path(feature_path)
+    if not isinstance(metadata, Mapping) or not metadata:
+        raise ValueError(f"feature metadata sidecar is required for {feature_path}")
+    feature_columns = validate_feature_table(table)
+    required = {
+        "schema_version": FEATURE_TABLE_SCHEMA,
+        "feature_source": FEATURE_SOURCE,
+        "feature_formula": FEATURE_FORMULA,
+        "row_count": int(len(table)),
+        "feature_dim": len(feature_columns),
+        "feature_table_sha256": checkpoint_sha256(feature_path),
+    }
+    for key, expected in required.items():
+        if metadata.get(key) != expected:
+            raise ValueError(
+                f"feature metadata {key!r} mismatch: "
+                f"expected={expected!r}, actual={metadata.get(key)!r}"
+            )
+    checkpoint_hash = metadata.get("checkpoint_sha256")
+    if (
+        not isinstance(checkpoint_hash, str)
+        or len(checkpoint_hash) != 64
+        or any(character not in "0123456789abcdef" for character in checkpoint_hash)
+    ):
+        raise ValueError("feature metadata checkpoint_sha256 must be a lowercase SHA-256")
+    if not isinstance(metadata.get("checkpoint"), str) or not metadata["checkpoint"].strip():
+        raise ValueError("feature metadata checkpoint must identify its source path")
+    return feature_columns
 
 
 def read_feature_table(path):
@@ -268,6 +302,14 @@ def read_feature_table(path):
             features = np.asarray(archive["features"], dtype=np.float32)
             if features.ndim != 2:
                 raise ValueError("NPZ features array must have shape [examples, dimensions]")
+            if "schema_version" not in archive:
+                raise ValueError("NPZ feature table is missing schema_version")
+            schema_version = int(np.asarray(archive["schema_version"]).item())
+            if schema_version != FEATURE_TABLE_SCHEMA:
+                raise ValueError(
+                    f"NPZ feature schema must be {FEATURE_TABLE_SCHEMA}; "
+                    f"got {schema_version}"
+                )
             metadata_frame = pd.DataFrame({
                 column: archive[column] for column in METADATA_COLUMNS
             })
@@ -345,9 +387,23 @@ def _linear_predictions(train_features, train_labels, val_features, max_iter, se
             random_state=int(seed),
         ),
     )
-    model.fit(train_features, train_labels)
+    # LBFGS can briefly explore non-finite trial weights during its line search
+    # even with finite standardized inputs, then converge normally. Suppress
+    # only NumPy's transient matmul warning; convergence and final predictions
+    # remain checked and recorded below.
+    with warnings.catch_warnings():
+        warnings.filterwarnings(
+            "ignore",
+            message=r"(?:divide by zero|overflow|invalid value) encountered in matmul",
+            category=RuntimeWarning,
+        )
+        model.fit(train_features, train_labels)
+        predictions = model.predict(val_features)
     logistic = model.named_steps["logisticregression"]
-    return model.predict(val_features), int(np.max(logistic.n_iter_))
+    iterations = int(np.max(logistic.n_iter_))
+    if iterations >= int(max_iter):
+        raise RuntimeError("logistic-regression probe did not converge before max_iter")
+    return predictions, iterations
 
 
 def _closed_set_masks(table, validation_fraction, seed):
@@ -594,6 +650,7 @@ __all__ = [
     "evaluate_identity_heldout_retrieval",
     "export_frozen_features",
     "read_feature_table",
+    "validate_feature_metadata",
     "validate_feature_table",
     "write_feature_table",
     "write_probe_results",

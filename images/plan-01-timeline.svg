@@ -1,0 +1,80 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1000" height="410" viewBox="0 0 1000 410" role="img" aria-labelledby="title desc">
+  <title id="title">CoDy-JEPA ICLR roadmap timeline</title>
+  <desc id="desc">Ten phases from July 21 to September 24, 2026, arranged in three lanes: Foundations, Method, and Paper. Each phase ends at a decision gate, and the abstract deadline on September 19 is marked as hard.</desc>
+  <style>
+    text { font-family: Inter, Arial, sans-serif; }
+  </style>
+  <rect x="0" y="0" width="1000" height="410" fill="#ffffff"/>
+
+  <!-- title and deadline note -->
+  <text x="40" y="34" font-size="22" font-weight="700" fill="#0f172a" text-anchor="start">CoDy-JEPA ICLR roadmap &#183; July 21 to September 24, 2026</text>
+  <text x="970" y="56" font-size="12.5" font-weight="700" fill="#dc2626" text-anchor="end">Sep 19: abstract hard deadline, no extensions</text>
+
+  <!-- date axis -->
+  <line x1="150" y1="86" x2="970" y2="86" stroke="#94a3b8" stroke-width="1.5"/>
+  <line x1="150" y1="82" x2="150" y2="90" stroke="#94a3b8" stroke-width="1.5"/>
+  <line x1="286.7" y1="82" x2="286.7" y2="90" stroke="#94a3b8" stroke-width="1.5"/>
+  <line x1="671.8" y1="82" x2="671.8" y2="90" stroke="#94a3b8" stroke-width="1.5"/>
+  <line x1="970" y1="82" x2="970" y2="90" stroke="#94a3b8" stroke-width="1.5"/>
+  <text x="150" y="76" font-size="12.5" fill="#475569" text-anchor="middle">Jul 21</text>
+  <text x="286.7" y="76" font-size="12.5" fill="#475569" text-anchor="middle">Aug 1</text>
+  <text x="671.8" y="76" font-size="12.5" fill="#475569" text-anchor="middle">Sep 1</text>
+  <text x="970" y="76" font-size="12.5" fill="#475569" text-anchor="middle">Sep 24</text>
+
+  <!-- lane labels -->
+  <text x="40" y="130" font-size="14" font-weight="700" fill="#334155" text-anchor="start">Foundations</text>
+  <text x="40" y="210" font-size="14" font-weight="700" fill="#334155" text-anchor="start">Method</text>
+  <text x="40" y="290" font-size="14" font-weight="700" fill="#334155" text-anchor="start">Paper</text>
+
+  <!-- Foundations lane, y 108 -->
+  <rect x="150" y="108" width="47.7" height="34" rx="6" fill="#64748b"/>
+  <rect x="199.7" y="108" width="85" height="34" rx="6" fill="#64748b"/>
+  <rect x="286.7" y="108" width="85" height="34" rx="6" fill="#64748b"/>
+  <text x="173.8" y="130" font-size="14" font-weight="700" fill="#ffffff" text-anchor="middle">P0</text>
+  <text x="242.2" y="130" font-size="14" font-weight="700" fill="#ffffff" text-anchor="middle">P1</text>
+  <text x="329.2" y="130" font-size="14" font-weight="700" fill="#ffffff" text-anchor="middle">P2</text>
+  <text x="173.8" y="158" font-size="12.5" fill="#475569" text-anchor="middle">Baseline handoff</text>
+  <text x="242.2" y="172" font-size="12.5" fill="#475569" text-anchor="middle">Healthy single stream</text>
+  <text x="329.2" y="158" font-size="12.5" fill="#475569" text-anchor="middle">Mask study</text>
+
+  <!-- Method lane, y 188 -->
+  <rect x="373.6" y="188" width="109.8" height="34" rx="6" fill="#2563eb"/>
+  <rect x="485.5" y="188" width="97.2" height="34" rx="6" fill="#2563eb"/>
+  <rect x="584.8" y="188" width="85" height="34" rx="6" fill="#2563eb"/>
+  <text x="428.5" y="210" font-size="14" font-weight="700" fill="#ffffff" text-anchor="middle">P3</text>
+  <text x="534.1" y="210" font-size="14" font-weight="700" fill="#ffffff" text-anchor="middle">P4</text>
+  <text x="627.3" y="210" font-size="14" font-weight="700" fill="#ffffff" text-anchor="middle">P5</text>
+  <text x="428.5" y="238" font-size="12.5" fill="#475569" text-anchor="middle">Dual streams</text>
+  <text x="534.1" y="252" font-size="12.5" fill="#475569" text-anchor="middle">CI-TSI factorization</text>
+  <text x="627.3" y="238" font-size="12.5" fill="#475569" text-anchor="middle">GaitLU-1M pretraining</text>
+
+  <!-- Paper lane, y 268 -->
+  <rect x="671.8" y="268" width="85" height="34" rx="6" fill="#7c3aed"/>
+  <rect x="758.8" y="268" width="85" height="34" rx="6" fill="#7c3aed"/>
+  <rect x="845.8" y="268" width="60.1" height="34" rx="6" fill="#7c3aed"/>
+  <rect x="907.9" y="268" width="60.1" height="34" rx="6" fill="#7c3aed"/>
+  <text x="714.2" y="290" font-size="14" font-weight="700" fill="#ffffff" text-anchor="middle">P6</text>
+  <text x="801.2" y="290" font-size="14" font-weight="700" fill="#ffffff" text-anchor="middle">P7</text>
+  <text x="875.9" y="290" font-size="14" font-weight="700" fill="#ffffff" text-anchor="middle">P8</text>
+  <text x="938" y="290" font-size="14" font-weight="700" fill="#ffffff" text-anchor="middle">P9</text>
+  <text x="714.2" y="318" font-size="12.5" fill="#475569" text-anchor="middle">Baselines, ablations</text>
+  <text x="801.2" y="332" font-size="12.5" fill="#475569" text-anchor="middle">Paper lock</text>
+  <text x="875.9" y="318" font-size="12.5" fill="#475569" text-anchor="middle">Abstract, setup</text>
+  <text x="938" y="332" font-size="12.5" fill="#475569" text-anchor="middle">Final sprint</text>
+
+  <!-- gate diamonds at each phase end -->
+  <polygon points="197.7,119 203.7,125 197.7,131 191.7,125" fill="#0f172a" stroke="#ffffff" stroke-width="1.5"/>
+  <polygon points="284.7,119 290.7,125 284.7,131 278.7,125" fill="#0f172a" stroke="#ffffff" stroke-width="1.5"/>
+  <polygon points="371.7,119 377.7,125 371.7,131 365.7,125" fill="#0f172a" stroke="#ffffff" stroke-width="1.5"/>
+  <polygon points="483.4,199 489.4,205 483.4,211 477.4,205" fill="#0f172a" stroke="#ffffff" stroke-width="1.5"/>
+  <polygon points="582.7,199 588.7,205 582.7,211 576.7,205" fill="#0f172a" stroke="#ffffff" stroke-width="1.5"/>
+  <polygon points="669.8,199 675.8,205 669.8,211 663.8,205" fill="#0f172a" stroke="#ffffff" stroke-width="1.5"/>
+  <polygon points="756.8,279 762.8,285 756.8,291 750.8,285" fill="#0f172a" stroke="#ffffff" stroke-width="1.5"/>
+  <polygon points="843.8,279 849.8,285 843.8,291 837.8,285" fill="#0f172a" stroke="#ffffff" stroke-width="1.5"/>
+  <polygon points="905.9,279 911.9,285 905.9,291 899.9,285" fill="#dc2626" stroke="#ffffff" stroke-width="1.5"/>
+  <polygon points="968,279 974,285 968,291 962,285" fill="#0f172a" stroke="#ffffff" stroke-width="1.5"/>
+
+  <!-- legend -->
+  <polygon points="150,376 156,382 150,388 144,382" fill="#0f172a" stroke="#ffffff" stroke-width="1.5"/>
+  <text x="166" y="386" font-size="13" fill="#475569" text-anchor="start">= decision gate with a predecided fallback (see Gate Summary); the red gate is a hard external deadline.</text>
+</svg>

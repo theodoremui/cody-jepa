@@ -153,9 +153,8 @@ Everything below this point is practical. The sections form one pipeline, run in
 | 1. Install the locked environment | `uv sync --frozen` | [Getting Started](#getting-started) |
 | 2. Run the tests (no dataset needed) | `uv run python -m unittest discover -s tests -v` | [Getting Started](#getting-started) |
 | 3. Download Health&Gait and build the manifest | `uv run python scripts/build_healthgait_manifest.py` | [Data: Health&Gait](#data-healthgait) |
-| 4. Smoke-test, then train | `notebooks/single-stream-jepa.ipynb` | [Training](#training) |
-| 5. Export frozen features from a checkpoint | `scripts/export_single_stream_features.py` | [Evaluating a Checkpoint](#evaluating-a-checkpoint) |
-| 6. Run linear probes on the features | `scripts/eval_probes.py` | [Evaluating a Checkpoint](#evaluating-a-checkpoint) |
+| 4. Submit or run train-to-report | `uv run python scripts/run_phase0_pipeline.py ...` | [Training](#training) |
+| 5. Inspect the hashed compact report | `reports/*.md` plus adjacent JSON | [Evaluating a Checkpoint](#evaluating-a-checkpoint) |
 
 ## Getting Started
 
@@ -269,11 +268,62 @@ The notebook walks through manifest validation, train and validation datasets, `
 
 ## Training
 
-The runnable trainer in this repository is the single-stream JEPA baseline: the shared masked-prediction infrastructure that the dual-stream mechanisms in the [Method](#method) section build on. [`notebooks/single-stream-jepa.ipynb`](notebooks/single-stream-jepa.ipynb) is its experiment controller. The reusable model, masking, evaluation, and checkpoint code lives in [`src/cody_jepa/single_stream_jepa.py`](src/cody_jepa/single_stream_jepa.py); the notebook configures that code rather than duplicating it.
+The runnable trainer in this repository is the single-stream JEPA baseline: the shared masked-prediction infrastructure that the dual-stream mechanisms in the [Method](#method) section build on. The production entry point is [`scripts/run_phase0_pipeline.py`](scripts/run_phase0_pipeline.py); it trains, validates a declared checkpoint, exports features, runs all probes, and writes a compact Markdown/JSON report. The notebook remains the experiment controller used by that entry point and for interactive exploration.
+
+Checkpoint compatibility is identified by `MODEL_ARCHITECTURE = "cody-jepa-single-stream-masked-v3"` and `CHECKPOINT_SCHEMA = 3`. These identifiers are independent of experiment directory names such as `outputs/jepa-v4` and `outputs/jepa-v5`: bump the architecture only for an incompatible model/state-dict change, and bump the schema only when the serialized checkpoint payload changes.
 
 ```bash
 uv run jupyter lab notebooks/single-stream-jepa.ipynb
 ```
+
+Run a fresh pipeline in an existing local GPU allocation with explicit destinations and checkpoint policy:
+
+```bash
+uv run python scripts/run_phase0_pipeline.py run \
+  --run-dir outputs/jepa-v5 \
+  --artifact-dir outputs/pipeline/jepa-v5 \
+  --report reports/jepa-v5.md \
+  --checkpoint-name best_loss.pt \
+  --device cuda \
+  --success-criterion "Named scientific change: pass the predeclared Phase 1 health gate" \
+  --allow-local-run
+```
+
+On HAIC, use the same entry point from the head node. It submits the full workflow; training, feature export, and probes execute inside the Slurm allocation:
+
+```bash
+uv run python scripts/run_phase0_pipeline.py submit \
+  --run-dir outputs/jepa-v5 \
+  --artifact-dir outputs/pipeline/jepa-v5 \
+  --report reports/jepa-v5.md \
+  --checkpoint-name best_loss.pt \
+  --success-criterion "Named scientific change: pass the predeclared Phase 1 health gate"
+```
+
+Every destination must be fresh. The workflow rejects all `outputs/jepa-v3` paths and every write under the read-only `outputs/jepa-v4` baseline.
+
+Phase 0 itself has a frozen, checked-in contract. This command creates distinct
+MPS reference exports for both retained checkpoints, reruns all three probes,
+and writes a verified report into a unique ignored directory under
+`outputs/phase0/regenerations/`:
+
+```bash
+uv run python scripts/run_phase0_pipeline.py baseline
+```
+
+The command prints the fresh artifact and report paths. To verify the locked
+artifacts and deliberately refresh the checked-in compact report without
+re-exporting features, run:
+
+```bash
+uv run python scripts/run_phase0_pipeline.py baseline-report \
+  --artifact-dir outputs/phase0/job-91108 \
+  --report reports/phase0-baseline.md
+```
+
+The immutable contract is `protocols/phase0-baseline.json`; large feature and
+probe artifacts remain under ignored `outputs/phase0/`, while the compact report
+is versioned at `reports/phase0-baseline.md` with adjacent machine-readable JSON.
 
 The notebook is safe by default. With no environment flags, `Run All` validates the configured Health&Gait data and executes a one-step synthetic CPU smoke test. A real training run requires a CUDA worker and is deliberately opt-in through these controls:
 
@@ -291,17 +341,27 @@ For production H100 settings, submission commands, monitoring, the resume proced
 
 ## Evaluating a Checkpoint
 
-Evaluation is a two-stage workflow: export frozen features from a trained checkpoint, then fit linear probes on them. It requires a completed training run; replace `<run>` below with your checkpoint directory.
+The orchestration entry point evaluates one completed checkpoint and produces a compact, hashed report:
+
+```bash
+uv run python scripts/run_phase0_pipeline.py evaluate \
+  --checkpoint outputs/<run>/best_loss.pt \
+  --artifact-dir outputs/pipeline/<run> \
+  --report reports/<run>.md \
+  --device auto
+```
+
+The lower-level two-stage commands remain available for diagnosis:
 
 ```bash
 uv run python scripts/export_single_stream_features.py \
   --checkpoint outputs/<run>/best_loss.pt \
-  --output outputs/<run>/frozen_features.npz \
+  --output outputs/pipeline/<run>/features.npz \
   --device auto
 
 uv run python scripts/eval_probes.py \
-  --features outputs/<run>/frozen_features.npz \
-  --output-dir outputs/<run>
+  --features outputs/pipeline/<run>/features.npz \
+  --output-dir outputs/pipeline/<run>/probes
 ```
 
 The exporter restores only the EMA target encoder, freezes it, switches it to evaluation mode, and runs under `torch.inference_mode()`. Each deterministic clip window becomes one row containing its manifest metadata and the mean-pooled, pre-final-LayerNorm target tokens. It accepts `.csv` or compressed `.npz` output; both carry a JSON provenance sidecar with the checkpoint hash and the exact feature formula.
@@ -321,8 +381,11 @@ Health&Gait frames
     ├─ cody_jepa.data
     │      └─ validated datasets → deterministic DataLoaders → diagnostics
     │
+    ├─ scripts/run_phase0_pipeline.py
+    │      └─ local or Slurm training → checkpoint validation → export → probes → report
+    │
     ├─ notebooks/single-stream-jepa.ipynb
-    │      └─ cody_jepa.single_stream_jepa → training → checkpoints
+    │      └─ training controller invoked inside the allocation
     │
     ├─ scripts/export_single_stream_features.py
     │      └─ frozen EMA-target features + provenance sidecar
@@ -336,7 +399,7 @@ Health&Gait frames
 | Path | Contents |
 | --- | --- |
 | `src/cody_jepa/` | Tested library code: model, masking, training, probes, and the data pipeline |
-| `scripts/` | Command-line workflows: manifest building, feature export, probe evaluation |
+| `scripts/` | One train-to-report entry point plus lower-level manifest, export, and probe tools |
 | `notebooks/` | Data-pipeline walkthrough and the training controller |
 | `slurm/` | HAIC H100 batch job definition |
 | `tutorials/` | Operator runbooks and research plans |
