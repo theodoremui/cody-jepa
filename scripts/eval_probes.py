@@ -15,7 +15,12 @@ from cody_jepa.probes import (
     validate_feature_metadata,
     write_probe_results,
 )
-from cody_jepa.phase0 import guard_research_path, portable_path, require_unchanged_hash
+from cody_jepa.phase0 import (
+    guard_research_path,
+    load_protocol,
+    portable_path,
+    require_unchanged_hash,
+)
 
 
 def parse_args():
@@ -27,7 +32,40 @@ def parse_args():
     parser.add_argument("--identity-validation-fraction", type=float, default=0.25)
     parser.add_argument("--retrieval-enrollment-sequences", type=int, default=1)
     parser.add_argument("--repo-root", type=Path, default=Path.cwd())
+    parser.add_argument(
+        "--locked-phase0-provenance-label",
+        help=argparse.SUPPRESS,
+    )
     return parser.parse_args()
+
+
+def _feature_table_provenance(
+    args, repo_root, feature_path, feature_metadata, feature_hash, sidecar_hash
+):
+    if args.locked_phase0_provenance_label is None:
+        return portable_path(feature_path, repo_root)
+    protocol = load_protocol(repo_root)
+    checkpoint_hash = feature_metadata.get("checkpoint_sha256")
+    matches = [
+        filename
+        for filename, contract in protocol["candidate_checkpoints"].items()
+        if contract["sha256"] == checkpoint_hash
+    ]
+    if len(matches) != 1:
+        raise ValueError("locked Phase-0 provenance requires one protocol checkpoint")
+    filename = matches[0]
+    expected_label = (
+        f"outputs/phase0/job-{protocol['baseline_job_id']}/"
+        f"{Path(filename).stem}/features.npz"
+    )
+    if args.locked_phase0_provenance_label != expected_label:
+        raise ValueError("locked Phase-0 provenance label does not match the protocol")
+    artifacts = protocol["candidate_checkpoints"][filename]["artifacts"]
+    if feature_hash != artifacts["feature_sha256"]:
+        raise ValueError("locked Phase-0 feature hash does not match the protocol")
+    if sidecar_hash != artifacts["feature_metadata_sha256"]:
+        raise ValueError("locked Phase-0 feature metadata hash does not match the protocol")
+    return expected_label
 
 
 def main():
@@ -54,11 +92,14 @@ def main():
     )
     require_unchanged_hash(feature_path, feature_hash, "feature table")
     require_unchanged_hash(feature_sidecar, sidecar_hash, "feature metadata")
+    feature_table_provenance = _feature_table_provenance(
+        args, repo_root, feature_path, feature_metadata, feature_hash, sidecar_hash
+    )
     paths = write_probe_results(
         results,
         output_dir,
         {
-            "feature_table": portable_path(feature_path, repo_root),
+            "feature_table": feature_table_provenance,
             "feature_table_sha256": feature_hash,
             "feature_metadata_sha256": sidecar_hash,
             "feature_source": feature_source,

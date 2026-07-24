@@ -5,6 +5,7 @@ from __future__ import annotations
 
 from pathlib import Path
 import argparse
+from contextlib import contextmanager
 import json
 import os
 import subprocess
@@ -17,9 +18,12 @@ from cody_jepa.phase0 import (
     guard_research_path,
     load_protocol,
     prepare_empty_directory,
+    require_unchanged_hash,
+    validate_checkpoint_from_completed_run,
     validate_completed_run,
     validate_manifest,
-    write_text_atomic,
+    validate_read_only_evidence,
+    write_texts_atomic,
 )
 from cody_jepa.probes import (
     FEATURE_FORMULA,
@@ -63,6 +67,7 @@ def _baseline_destinations(args, repo_root):
 def _evaluate_checkpoint(
     *,
     checkpoint,
+    completed_run_checkpoint,
     artifact_dir,
     repo_root,
     device,
@@ -73,74 +78,151 @@ def _evaluate_checkpoint(
     max_iter,
     identity_validation_fraction,
     retrieval_enrollment_sequences,
+    protocol=None,
 ):
     checkpoint = guard_research_path(checkpoint, repo_root, write=False)
+    completed_run_checkpoint = guard_research_path(
+        completed_run_checkpoint, repo_root, write=False
+    )
+    validate_checkpoint_from_completed_run(
+        checkpoint, completed_run_checkpoint, protocol
+    )
     artifact_dir = prepare_empty_directory(artifact_dir, repo_root)
     features = artifact_dir / "features.npz"
     probes = artifact_dir / "probes"
-    _run(
-        [
-            sys.executable,
-            str(repo_root / "scripts" / "export_single_stream_features.py"),
-            "--checkpoint",
-            str(checkpoint),
-            "--output",
-            str(features),
-            "--repo-root",
-            str(repo_root),
-            "--device",
-            device,
-            "--batch-size",
-            str(batch_size),
-            "--num-workers",
-            str(num_workers),
-            "--windows-per-sequence",
-            str(windows_per_sequence),
-            "--image-verify-mode",
-            "none",
-        ],
-        cwd=repo_root,
-    )
-    _run(
-        [
-            sys.executable,
-            str(repo_root / "scripts" / "eval_probes.py"),
-            "--features",
-            str(features),
-            "--output-dir",
-            str(probes),
-            "--seed",
-            str(seed),
-            "--max-iter",
-            str(max_iter),
-            "--identity-validation-fraction",
-            str(identity_validation_fraction),
-            "--retrieval-enrollment-sequences",
-            str(retrieval_enrollment_sequences),
-        ],
-        cwd=repo_root,
-    )
+    export_command = [
+        sys.executable,
+        str(repo_root / "scripts" / "export_single_stream_features.py"),
+        "--checkpoint",
+        str(checkpoint),
+        "--output",
+        str(features),
+        "--repo-root",
+        str(repo_root),
+        "--device",
+        device,
+        "--batch-size",
+        str(batch_size),
+        "--num-workers",
+        str(num_workers),
+        "--windows-per-sequence",
+        str(windows_per_sequence),
+        "--image-verify-mode",
+        "none",
+    ]
+    if protocol is not None:
+        export_command.append("--locked-phase0-legacy")
+    _run(export_command, cwd=repo_root)
+    probe_command = [
+        sys.executable,
+        str(repo_root / "scripts" / "eval_probes.py"),
+        "--features",
+        str(features),
+        "--output-dir",
+        str(probes),
+        "--seed",
+        str(seed),
+        "--max-iter",
+        str(max_iter),
+        "--identity-validation-fraction",
+        str(identity_validation_fraction),
+        "--retrieval-enrollment-sequences",
+        str(retrieval_enrollment_sequences),
+    ]
+    if protocol is not None:
+        checkpoint_name = Path(checkpoint).name
+        provenance_label = (
+            f"outputs/phase0/job-{protocol['baseline_job_id']}/"
+            f"{Path(checkpoint_name).stem}/features.npz"
+        )
+        probe_command.extend(
+            ["--locked-phase0-provenance-label", provenance_label]
+        )
+    _run(probe_command, cwd=repo_root)
     return {"features": features, "probe_json": probes / "probe_metrics.json"}
 
 
-def _write_generic_report(
-    checkpoint, artifacts, report_path, repo_root, success_criterion=None
-):
+def _preflight_generic_report(report_path, repo_root):
     report_path = guard_research_path(report_path, repo_root, write=True)
     if report_path.suffix.casefold() != ".md":
         raise ValueError("report path must end in .md")
-    if report_path.exists() or report_path.with_suffix(".json").exists():
+    if os.path.lexists(report_path) or os.path.lexists(report_path.with_suffix(".json")):
         raise FileExistsError(f"report destination must be fresh: {report_path}")
-    checkpoint = checkpoint_record(checkpoint)
-    table, feature_metadata = read_feature_table(artifacts["features"])
-    validate_feature_metadata(table, artifacts["features"], feature_metadata)
+    return report_path
+
+
+@contextmanager
+def _claim_generic_report(report_path, repo_root):
+    """Serialize cooperative writers for one generic Markdown/JSON report pair."""
+    report_path = _preflight_generic_report(report_path, repo_root)
+    report_path.parent.mkdir(parents=True, exist_ok=True)
+    claim = report_path.with_name(f".{report_path.name}.pipeline-claim")
+    flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL | getattr(os, "O_NOFOLLOW", 0)
+    try:
+        descriptor = os.open(claim, flags, 0o600)
+    except FileExistsError as error:
+        raise FileExistsError(f"report destination is already claimed: {report_path}") from error
+    try:
+        os.write(descriptor, f"pid={os.getpid()}\n".encode())
+        os.fsync(descriptor)
+        yield report_path
+    finally:
+        os.close(descriptor)
+        claim.unlink(missing_ok=True)
+
+
+def _write_generic_report(
+    checkpoint,
+    completed_run_checkpoint,
+    artifacts,
+    report_path,
+    repo_root,
+    success_criterion=None,
+    _claim_held=False,
+):
+    if not _claim_held:
+        with _claim_generic_report(report_path, repo_root) as claimed_report:
+            return _write_generic_report(
+                checkpoint,
+                completed_run_checkpoint,
+                artifacts,
+                claimed_report,
+                repo_root,
+                success_criterion,
+                _claim_held=True,
+            )
+    report_path = _preflight_generic_report(report_path, repo_root)
+    selected_checkpoint_path = guard_research_path(checkpoint, repo_root, write=False)
+    completed_run_checkpoint_path = guard_research_path(
+        completed_run_checkpoint, repo_root, write=False
+    )
+    feature_path = guard_research_path(artifacts["features"], repo_root, write=False)
+    sidecar = feature_path.with_suffix(".npz.metadata.json")
+    probe_path = guard_research_path(artifacts["probe_json"], repo_root, write=False)
+    artifact_hashes = {
+        selected_checkpoint_path: checkpoint_sha256(selected_checkpoint_path),
+        completed_run_checkpoint_path: checkpoint_sha256(completed_run_checkpoint_path),
+        feature_path: checkpoint_sha256(feature_path),
+        sidecar: checkpoint_sha256(sidecar),
+        probe_path: checkpoint_sha256(probe_path),
+    }
+    checkpoint_validation = validate_checkpoint_from_completed_run(
+        selected_checkpoint_path, completed_run_checkpoint_path
+    )
+    checkpoint = checkpoint_validation["selected_checkpoint"]
+    completed_run_checkpoint = checkpoint_validation["completed_run_checkpoint"]
+    checkpoint["path"] = _relative_or_absolute(selected_checkpoint_path, repo_root)
+    completed_run_checkpoint["path"] = _relative_or_absolute(
+        completed_run_checkpoint_path, repo_root
+    )
+    table, feature_metadata = read_feature_table(feature_path)
+    validate_feature_metadata(table, feature_path, feature_metadata)
     if feature_metadata["checkpoint_sha256"] != checkpoint["sha256"]:
         raise ValueError("feature table was not exported from the declared checkpoint")
-    probes = json.loads(artifacts["probe_json"].read_text())
-    sidecar = artifacts["features"].with_suffix(".npz.metadata.json")
+    probes = json.loads(probe_path.read_text())
     expected_probe_metadata = {
-        "feature_table_sha256": checkpoint_sha256(artifacts["features"]),
-        "feature_metadata_sha256": checkpoint_sha256(sidecar),
+        "feature_table_sha256": artifact_hashes[feature_path],
+        "feature_metadata_sha256": artifact_hashes[sidecar],
         "checkpoint_sha256": checkpoint["sha256"],
         "feature_source": FEATURE_SOURCE,
         "feature_formula": FEATURE_FORMULA,
@@ -165,20 +247,21 @@ def _write_generic_report(
         "schema_version": 1,
         "success_criterion": success_criterion,
         "checkpoint": checkpoint,
+        "completed_run_checkpoint": completed_run_checkpoint,
         "feature_table": {
-            "path": _relative_or_absolute(artifacts["features"], repo_root),
-            "sha256": checkpoint_sha256(artifacts["features"]),
-            "metadata_sha256": checkpoint_sha256(
-                artifacts["features"].with_suffix(".npz.metadata.json")
-            ),
+            "path": _relative_or_absolute(feature_path, repo_root),
+            "sha256": artifact_hashes[feature_path],
+            "metadata_sha256": artifact_hashes[sidecar],
         },
+        "probe_results_sha256": artifact_hashes[probe_path],
         "probe_results": probes,
     }
-    write_text_atomic(report_path.with_suffix(".json"), json.dumps(payload, indent=2, sort_keys=True) + "\n")
     lines = [
         "# Single-stream checkpoint report",
         "",
         f"Checkpoint: `{checkpoint['identifier']}` (epoch {checkpoint['completed_epochs']}).",
+        f"Completed run: `{completed_run_checkpoint['identifier']}` "
+        f"(epoch {completed_run_checkpoint['completed_epochs']}).",
         f"Predeclared success criterion: {success_criterion or 'evaluation-only; no training claim'}.",
         "",
         "| Probe | Accuracy | Balanced accuracy | Macro F1 |",
@@ -190,7 +273,22 @@ def _write_generic_report(
             f"{result['balanced_accuracy']:.4f} | {result['macro_f1']:.4f} |"
         )
     lines.append("")
-    write_text_atomic(report_path, "\n".join(lines))
+    def recheck_artifacts():
+        for path, digest in artifact_hashes.items():
+            require_unchanged_hash(path, digest, path.name)
+
+    recheck_artifacts()
+    write_texts_atomic(
+        {
+            report_path.with_suffix(".json"): json.dumps(
+                payload, indent=2, sort_keys=True
+            )
+            + "\n",
+            report_path: "\n".join(lines),
+        },
+        validate_after=recheck_artifacts,
+        require_absent=True,
+    )
     return {"markdown": str(report_path), "json": str(report_path.with_suffix('.json'))}
 
 
@@ -198,6 +296,7 @@ def command_baseline(args):
     repo_root = args.repo_root.resolve()
     artifact_dir, report_path = _baseline_destinations(args, repo_root)
     protocol = load_protocol(repo_root, args.protocol)
+    validate_read_only_evidence(protocol, repo_root)
     validate_manifest(protocol, repo_root)
     frozen = protocol["probes"]
     export = protocol["feature_export"]
@@ -216,11 +315,16 @@ def command_baseline(args):
     baseline_dir = guard_research_path(
         protocol["read_only_baseline_directory"], repo_root, write=False
     )
-    validate_completed_run(baseline_dir / "latest.pt")
+    latest_path = baseline_dir / "latest.pt"
+    validate_completed_run(latest_path, protocol)
     for filename in protocol["candidate_checkpoints"]:
+        validate_checkpoint_from_completed_run(
+            baseline_dir / filename, latest_path, protocol
+        )
         checkpoint_record(baseline_dir / filename, protocol, filename)
         _evaluate_checkpoint(
             checkpoint=baseline_dir / filename,
+            completed_run_checkpoint=latest_path,
             artifact_dir=artifact_root / Path(filename).stem,
             repo_root=repo_root,
             device=args.device,
@@ -231,10 +335,12 @@ def command_baseline(args):
             max_iter=frozen["max_iter"],
             identity_validation_fraction=frozen["identity_validation_fraction"],
             retrieval_enrollment_sequences=frozen["retrieval_enrollment_sequences"],
+            protocol=protocol,
         )
     result = build_baseline_report(
         repo_root, artifact_root, report_path, args.protocol
     )
+    validate_read_only_evidence(protocol, repo_root)
     print(json.dumps({key: str(value) for key, value in result.items() if key != "payload"}, indent=2))
 
 
@@ -247,20 +353,37 @@ def command_baseline_report(args):
 
 def command_evaluate(args):
     repo_root = args.repo_root.resolve()
-    artifacts = _evaluate_checkpoint(
-        checkpoint=args.checkpoint,
-        artifact_dir=args.artifact_dir,
-        repo_root=repo_root,
-        device=args.device,
-        batch_size=args.batch_size,
-        num_workers=args.num_workers,
-        windows_per_sequence=args.windows_per_sequence,
-        seed=args.seed,
-        max_iter=args.max_iter,
-        identity_validation_fraction=args.identity_validation_fraction,
-        retrieval_enrollment_sequences=args.retrieval_enrollment_sequences,
+    completed_run_checkpoint = getattr(args, "completed_run_checkpoint", None)
+    if completed_run_checkpoint is None:
+        completed_run_checkpoint = Path(args.checkpoint).with_name("latest.pt")
+    report_path = _preflight_generic_report(args.report, repo_root)
+    validate_checkpoint_from_completed_run(
+        guard_research_path(args.checkpoint, repo_root, write=False),
+        guard_research_path(completed_run_checkpoint, repo_root, write=False),
     )
-    result = _write_generic_report(args.checkpoint, artifacts, args.report, repo_root)
+    with _claim_generic_report(report_path, repo_root) as claimed_report:
+        artifacts = _evaluate_checkpoint(
+            checkpoint=args.checkpoint,
+            completed_run_checkpoint=completed_run_checkpoint,
+            artifact_dir=args.artifact_dir,
+            repo_root=repo_root,
+            device=args.device,
+            batch_size=args.batch_size,
+            num_workers=args.num_workers,
+            windows_per_sequence=args.windows_per_sequence,
+            seed=args.seed,
+            max_iter=args.max_iter,
+            identity_validation_fraction=args.identity_validation_fraction,
+            retrieval_enrollment_sequences=args.retrieval_enrollment_sequences,
+        )
+        result = _write_generic_report(
+            args.checkpoint,
+            completed_run_checkpoint,
+            artifacts,
+            claimed_report,
+            repo_root,
+            _claim_held=True,
+        )
     print(json.dumps(result, indent=2))
 
 
@@ -272,12 +395,10 @@ def command_run(args):
         )
     run_dir = guard_research_path(args.run_dir, repo_root, write=True)
     artifact_dir = guard_research_path(args.artifact_dir, repo_root, write=True)
-    report_path = guard_research_path(args.report, repo_root, write=True)
+    report_path = _preflight_generic_report(args.report, repo_root)
     resolved_destinations = {run_dir, artifact_dir, report_path}
     if len(resolved_destinations) != 3:
         raise ValueError("run, artifact, and report destinations must be distinct")
-    if report_path.exists() or report_path.with_suffix(".json").exists():
-        raise FileExistsError(f"report destination must be fresh: {report_path}")
     if run_dir.exists():
         raise FileExistsError(f"training run directory must be fresh: {run_dir}")
     run_dir.mkdir(parents=True)
@@ -315,7 +436,8 @@ def command_run(args):
         cwd=repo_root,
         env=env,
     )
-    validate_completed_run(run_dir / "latest.pt")
+    completed_run_checkpoint = run_dir / "latest.pt"
+    validate_completed_run(completed_run_checkpoint)
     selected = run_dir / args.checkpoint_name
     if not selected.is_file():
         raise FileNotFoundError(
@@ -323,6 +445,7 @@ def command_run(args):
         )
     artifacts = _evaluate_checkpoint(
         checkpoint=selected,
+        completed_run_checkpoint=completed_run_checkpoint,
         artifact_dir=artifact_dir,
         repo_root=repo_root,
         device=args.device,
@@ -335,7 +458,12 @@ def command_run(args):
         retrieval_enrollment_sequences=args.retrieval_enrollment_sequences,
     )
     result = _write_generic_report(
-        selected, artifacts, report_path, repo_root, args.success_criterion
+        selected,
+        completed_run_checkpoint,
+        artifacts,
+        report_path,
+        repo_root,
+        args.success_criterion,
     )
     print(json.dumps(result, indent=2))
 
@@ -434,6 +562,11 @@ def parse_args():
 
     evaluate = subparsers.add_parser("evaluate", help="evaluate one completed checkpoint")
     evaluate.add_argument("--checkpoint", type=Path, required=True)
+    evaluate.add_argument(
+        "--completed-run-checkpoint",
+        type=Path,
+        help="terminal checkpoint proving run completion (default: sibling latest.pt)",
+    )
     evaluate.add_argument("--artifact-dir", type=Path, required=True)
     evaluate.add_argument("--report", type=Path, required=True)
     _add_shared_evaluation(evaluate)

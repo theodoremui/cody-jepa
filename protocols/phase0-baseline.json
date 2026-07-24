@@ -1,7 +1,32 @@
 {
-  "schema_version": 1,
+  "schema_version": 2,
   "baseline_job_id": 91108,
   "read_only_baseline_directory": "outputs/jepa-v4",
+  "retired_baseline_directories": [
+    "outputs/jepa-v3"
+  ],
+  "read_only_evidence": {
+    "haic-results/job_91108.ipynb": {
+      "sha256": "11c62c4f8a5d365e97a2e111cc2375993481a4331cd2a05175e561a35f11cb93",
+      "role": "retained HAIC execution notebook"
+    },
+    "outputs/jepa-v4/probe_metrics.csv": {
+      "sha256": "787a47fee5e1db880ed6b2effc7d73d77c82bcc7100c6c2821fe9256cb512bde",
+      "role": "legacy probe scalar and diagnostic table"
+    },
+    "outputs/jepa-v4/probe_metrics.json": {
+      "sha256": "8c1c7ed83b90f791cf7ce9881633fe0ff53c911224a2d65eca96526de5f5fc4c",
+      "role": "legacy probe results and provenance"
+    },
+    "outputs/jepa-v4/best_loss.pt": {
+      "sha256": "ab1e24043b2ba453e03fa427b0e845b74b2771682220732267d966be360097a5",
+      "role": "training-time selected checkpoint"
+    },
+    "outputs/jepa-v4/latest.pt": {
+      "sha256": "5571a59c045dab3d4fd87d57e0baa296ad13f28992ab6d32f425f9340a848dad",
+      "role": "terminal completed-run checkpoint"
+    }
+  },
   "canonical_checkpoint": {
     "filename": "best_loss.pt",
     "identifier": "sha256:ab1e24043b2ba453e03fa427b0e845b74b2771682220732267d966be360097a5",

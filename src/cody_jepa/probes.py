@@ -130,11 +130,11 @@ def export_frozen_features(target_encoder, loaders, cfg, device, show_progress=F
     return table
 
 
-def build_frozen_target_encoder(checkpoint, device):
+def build_frozen_target_encoder(checkpoint, device, *, expected_schema=CHECKPOINT_SCHEMA):
     """Construct and strictly restore only the EMA target encoder."""
-    if checkpoint.get("schema") != CHECKPOINT_SCHEMA:
+    if checkpoint.get("schema") != expected_schema:
         raise ValueError(
-            f"checkpoint schema must be {CHECKPOINT_SCHEMA}; got {checkpoint.get('schema')!r}"
+            f"checkpoint schema must be {expected_schema}; got {checkpoint.get('schema')!r}"
         )
     if checkpoint.get("architecture") != MODEL_ARCHITECTURE:
         raise ValueError(

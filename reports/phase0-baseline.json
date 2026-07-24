@@ -5,12 +5,16 @@
       "checkpoint": {
         "best_epoch": 80,
         "best_healthy_epoch": null,
+        "best_healthy_model_state_sha256": null,
+        "best_loss_model_state_sha256": null,
         "best_val_loss": 0.3873943766579033,
         "completed_epochs": 80,
         "filename": "best_loss.pt",
         "global_step": 3120,
         "identifier": "sha256:ab1e24043b2ba453e03fa427b0e845b74b2771682220732267d966be360097a5",
         "manifest_sha256": "3074603602400af0b639c9569d69f5da99f43daebf3980b480154adddfdfb10e",
+        "model_state_sha256": null,
+        "schema": 3,
         "sha256": "ab1e24043b2ba453e03fa427b0e845b74b2771682220732267d966be360097a5",
         "validation": {
           "effective_rank": 10.451756477355957,
@@ -31,7 +35,7 @@
         "device": "mps",
         "feature_dim": 384,
         "metadata_sha256": "9caa052b64758d402a2e8da36626358191d3c48978c7fc40736e5d5fa1af7363",
-        "path": "outputs/phase0/job-91108/best_loss/features.npz",
+        "path": "outputs/phase0/regenerations/11aabfedb69e40f9acef7cde04dd8e25/artifacts/best_loss/features.npz",
         "rows": {
           "train": 7518,
           "val": 1872
@@ -39,7 +43,7 @@
         "sha256": "db3e57a09b33bf9a3f4e32ab71880f97d1a056574e7c8c3ca276a00c6727da53"
       },
       "probes": {
-        "json_path": "outputs/phase0/job-91108/best_loss/probes/probe_metrics.json",
+        "json_path": "outputs/phase0/regenerations/11aabfedb69e40f9acef7cde04dd8e25/artifacts/best_loss/probes/probe_metrics.json",
         "json_sha256": "3909f8620903f10b1dbe2e8a097ec28f5aeff8cb0a02717eb3385766fb92cdcf",
         "metrics": {
           "gait_system": {
@@ -67,12 +71,16 @@
       "checkpoint": {
         "best_epoch": 80,
         "best_healthy_epoch": null,
+        "best_healthy_model_state_sha256": null,
+        "best_loss_model_state_sha256": null,
         "best_val_loss": 0.3873943766579033,
         "completed_epochs": 100,
         "filename": "latest.pt",
         "global_step": 3900,
         "identifier": "sha256:5571a59c045dab3d4fd87d57e0baa296ad13f28992ab6d32f425f9340a848dad",
         "manifest_sha256": "3074603602400af0b639c9569d69f5da99f43daebf3980b480154adddfdfb10e",
+        "model_state_sha256": null,
+        "schema": 3,
         "sha256": "5571a59c045dab3d4fd87d57e0baa296ad13f28992ab6d32f425f9340a848dad",
         "validation": {
           "effective_rank": 10.167006492614746,
@@ -93,7 +101,7 @@
         "device": "mps",
         "feature_dim": 384,
         "metadata_sha256": "e66f3be44340f787e757c50122c8c81193bfbeb3d63d06a6368c17131dbbb7bd",
-        "path": "outputs/phase0/job-91108/latest/features.npz",
+        "path": "outputs/phase0/regenerations/11aabfedb69e40f9acef7cde04dd8e25/artifacts/latest/features.npz",
         "rows": {
           "train": 7518,
           "val": 1872
@@ -101,7 +109,7 @@
         "sha256": "191dfad0cb49cbd1636496794ee539769b3bb36133dd39b31d37bd2b9743fb65"
       },
       "probes": {
-        "json_path": "outputs/phase0/job-91108/latest/probes/probe_metrics.json",
+        "json_path": "outputs/phase0/regenerations/11aabfedb69e40f9acef7cde04dd8e25/artifacts/latest/probes/probe_metrics.json",
         "json_sha256": "baa4cd41ed07bc2734e7ff449587c84e43622552e9a008d9ffbbbe3626784921",
         "metrics": {
           "gait_system": {
@@ -211,23 +219,189 @@
       "gait_system"
     ]
   },
+  "read_only_evidence": {
+    "haic-results/job_91108.ipynb": {
+      "role": "retained HAIC execution notebook",
+      "sha256": "11c62c4f8a5d365e97a2e111cc2375993481a4331cd2a05175e561a35f11cb93"
+    },
+    "outputs/jepa-v4/best_loss.pt": {
+      "role": "training-time selected checkpoint",
+      "sha256": "ab1e24043b2ba453e03fa427b0e845b74b2771682220732267d966be360097a5"
+    },
+    "outputs/jepa-v4/latest.pt": {
+      "role": "terminal completed-run checkpoint",
+      "sha256": "5571a59c045dab3d4fd87d57e0baa296ad13f28992ab6d32f425f9340a848dad"
+    },
+    "outputs/jepa-v4/probe_metrics.csv": {
+      "role": "legacy probe scalar and diagnostic table",
+      "sha256": "787a47fee5e1db880ed6b2effc7d73d77c82bcc7100c6c2821fe9256cb512bde"
+    },
+    "outputs/jepa-v4/probe_metrics.json": {
+      "role": "legacy probe results and provenance",
+      "sha256": "8c1c7ed83b90f791cf7ce9881633fe0ff53c911224a2d65eca96526de5f5fc4c"
+    }
+  },
   "reproducibility": {
     "code_sha256": {
-      "notebooks/single-stream-jepa.ipynb": "69eac10e14dd3c42310f8a6ede863cd213ad6d5eb275e6f6e4e53a793f4b75c1",
-      "scripts/eval_probes.py": "4cb3ebdae76401854894e3b7002b9683ac6f8aabe398020b38995e9250fe83ae",
-      "scripts/export_single_stream_features.py": "2b436fd429dc0f9ed69f25dcba374d354c7095c535607153d06ec08665cf577d",
-      "scripts/run_phase0_pipeline.py": "32ff3df57ac8e6d62a158f73020fb1205ed2b4bbda0b409fc3c73b67521ef6c4",
+      "notebooks/single-stream-jepa.ipynb": "f0438e618d889f7789f343fd988002508fb7261cba3325421aba12cdbcf87dbf",
+      "pyproject.toml": "6de044446c3421ca46982ba0cd2d2f0082c3f91d6b8e3e392cf08bf35ebffbe1",
+      "scripts/eval_probes.py": "b1e79fd17092fab2efb6de523144ec8648f54a240c3b001d6761a90ea6fd9785",
+      "scripts/export_single_stream_features.py": "a957361cb28b281f3f805dcaeaf4ecfca58a87392214c35b95205d1a2f858c96",
+      "scripts/run_phase0_pipeline.py": "791baa70938fd7b4fe4669b743e23bb93bc912126d269bb24a0f3df0ed072885",
+      "slurm/train-single-stream-jepa.sbatch": "3ea337f16427f94710d17a2b7b3b734b9fd92731c1d940141dfcf2853edcd11b",
       "src/cody_jepa/data/__init__.py": "c96a039741f9788f5e5f5cdca726d1658bc8bd57c3df2b640330232cc100e3a5",
       "src/cody_jepa/data/dataset.py": "a66be3d2cec30579bd71b73ee9d55d39ce71c64df2d18a00bafbbd9d661d952b",
       "src/cody_jepa/data/healthgait.py": "7895f13ae8675f628069616038a152b33a20cb119a66383c98263773ca15437a",
-      "src/cody_jepa/phase0.py": "6af84b2c0f926431e00caa8636e19cc5a5e80e3c6fa5a66f2f298c7b27fa82bb",
-      "src/cody_jepa/probes.py": "228464eefce2c416e29a598652b34a6af61ae089159e9a65c4ad20108cadc373",
-      "src/cody_jepa/single_stream_jepa.py": "667e7d7f3120bd66e873b8f89b98dc39af3e3618893c66ced16982a60ab36a94"
+      "src/cody_jepa/phase0.py": "a98319edf79f771ac5f98ffa51633b2198d1a779b9935794ca174d79e94f03d2",
+      "src/cody_jepa/probes.py": "866ce7d42ccd92799a993aa2f9d5f9425315f6330b56a502d630e121d1567327",
+      "src/cody_jepa/single_stream_jepa.py": "a8833ee3d64638b3beb8df61fa2f90fd2c0939795dcea0796c6290a38d66d628"
     },
     "protocol_path": "protocols/phase0-baseline.json",
-    "protocol_sha256": "0f05f7eec236fa43bb052fed7d2d2945e0da7059fe188d0cd230033d3c81d1ae",
+    "protocol_payload": {
+      "baseline_job_id": 91108,
+      "candidate_checkpoints": {
+        "best_loss.pt": {
+          "artifacts": {
+            "feature_metadata_sha256": "9caa052b64758d402a2e8da36626358191d3c48978c7fc40736e5d5fa1af7363",
+            "feature_sha256": "db3e57a09b33bf9a3f4e32ab71880f97d1a056574e7c8c3ca276a00c6727da53",
+            "probe_json_sha256": "3909f8620903f10b1dbe2e8a097ec28f5aeff8cb0a02717eb3385766fb92cdcf"
+          },
+          "completed_epochs": 80,
+          "global_step": 3120,
+          "sha256": "ab1e24043b2ba453e03fa427b0e845b74b2771682220732267d966be360097a5"
+        },
+        "latest.pt": {
+          "artifacts": {
+            "feature_metadata_sha256": "e66f3be44340f787e757c50122c8c81193bfbeb3d63d06a6368c17131dbbb7bd",
+            "feature_sha256": "191dfad0cb49cbd1636496794ee539769b3bb36133dd39b31d37bd2b9743fb65",
+            "probe_json_sha256": "baa4cd41ed07bc2734e7ff449587c84e43622552e9a008d9ffbbbe3626784921"
+          },
+          "completed_epochs": 100,
+          "global_step": 3900,
+          "sha256": "5571a59c045dab3d4fd87d57e0baa296ad13f28992ab6d32f425f9340a848dad"
+        }
+      },
+      "canonical_checkpoint": {
+        "filename": "best_loss.pt",
+        "identifier": "sha256:ab1e24043b2ba453e03fa427b0e845b74b2771682220732267d966be360097a5",
+        "selection_metric": "subject_balanced_loss",
+        "selection_policy": "Use the checkpoint selected during training without consulting downstream probe results. The latest checkpoint is a sensitivity comparison only."
+      },
+      "checkpoint_architecture": "cody-jepa-single-stream-masked-v3",
+      "checkpoint_schema": 3,
+      "feature_export": {
+        "expected_rows": {
+          "train": 7518,
+          "val": 1872
+        },
+        "expected_total_rows": 9390,
+        "formula": "target_encoder(video, return_pre_norm=True)[1].mean(dim=1)",
+        "metadata_schema": [
+          "sequence_id",
+          "split",
+          "subject_id",
+          "gait_system",
+          "trial",
+          "window_start"
+        ],
+        "preprocessing": {
+          "channels": 1,
+          "clip_length": 16,
+          "decoded_range": [
+            0.0,
+            1.0
+          ],
+          "encoder": "ema_target_encoder",
+          "image_size": [
+            112,
+            112
+          ],
+          "input_mean": 0.5,
+          "input_std": 0.5,
+          "output_dtype": "float32",
+          "pooling_axis": "token",
+          "resize_interpolation": "bilinear",
+          "token_stage": "pre_final_layer_norm"
+        },
+        "reference_batch_size": 4,
+        "reference_device": "mps",
+        "reference_num_workers": 4,
+        "schema_version": 1,
+        "source": "target_encoder_pre_norm_mean",
+        "window_policy": "deterministic_evenly_spaced_no_augmentation",
+        "windows_per_sequence": 3
+      },
+      "manifest": {
+        "inventory_hash_scope": "All frame names and sizes plus first, middle, and last image bytes per sequence; this is not a full byte hash of every frame.",
+        "metadata_schema": [
+          "subject_id",
+          "modality",
+          "gait_system",
+          "trial",
+          "frame_dir",
+          "num_frames",
+          "split"
+        ],
+        "path": "data/healthgait/manifests/silhouette_subject_split_seed0.csv",
+        "sampled_inventory_sha256": "b46c484e8af0a4e31f0669aa436a92936e1725ee0082d8615065c617bb29576d",
+        "sha256": "3074603602400af0b639c9569d69f5da99f43daebf3980b480154adddfdfb10e",
+        "splits": {
+          "train": {
+            "sequences": 2506,
+            "subjects": 318
+          },
+          "val": {
+            "sequences": 624,
+            "subjects": 80
+          }
+        }
+      },
+      "probes": {
+        "identity_validation_fraction": 0.25,
+        "max_iter": 2000,
+        "primary_gait_metric": "balanced_accuracy",
+        "retrieval_enrollment_sequences": 1,
+        "seed": 0,
+        "tasks": [
+          "identity_closed_set",
+          "identity_heldout_retrieval",
+          "gait_system"
+        ]
+      },
+      "read_only_baseline_directory": "outputs/jepa-v4",
+      "read_only_evidence": {
+        "haic-results/job_91108.ipynb": {
+          "role": "retained HAIC execution notebook",
+          "sha256": "11c62c4f8a5d365e97a2e111cc2375993481a4331cd2a05175e561a35f11cb93"
+        },
+        "outputs/jepa-v4/best_loss.pt": {
+          "role": "training-time selected checkpoint",
+          "sha256": "ab1e24043b2ba453e03fa427b0e845b74b2771682220732267d966be360097a5"
+        },
+        "outputs/jepa-v4/latest.pt": {
+          "role": "terminal completed-run checkpoint",
+          "sha256": "5571a59c045dab3d4fd87d57e0baa296ad13f28992ab6d32f425f9340a848dad"
+        },
+        "outputs/jepa-v4/probe_metrics.csv": {
+          "role": "legacy probe scalar and diagnostic table",
+          "sha256": "787a47fee5e1db880ed6b2effc7d73d77c82bcc7100c6c2821fe9256cb512bde"
+        },
+        "outputs/jepa-v4/probe_metrics.json": {
+          "role": "legacy probe results and provenance",
+          "sha256": "8c1c7ed83b90f791cf7ce9881633fe0ff53c911224a2d65eca96526de5f5fc4c"
+        }
+      },
+      "retired_baseline_directories": [
+        "outputs/jepa-v3"
+      ],
+      "schema_version": 2
+    },
+    "protocol_sha256": "89e699b68dc4c278ddda0b0c5eb0b987455eaedffc50d9f764c8e329c217fe53",
     "uv_lock_sha256": "b451e7d444758b160a580151add8554a60b4160e081980f83e2bea261da45034"
   },
+  "retired_baseline_directories": [
+    "outputs/jepa-v3"
+  ],
   "schema_version": 1,
   "status": "locked"
 }

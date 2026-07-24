@@ -270,7 +270,7 @@ The notebook walks through manifest validation, train and validation datasets, `
 
 The runnable trainer in this repository is the single-stream JEPA baseline: the shared masked-prediction infrastructure that the dual-stream mechanisms in the [Method](#method) section build on. The production entry point is [`scripts/run_phase0_pipeline.py`](scripts/run_phase0_pipeline.py); it trains, validates a declared checkpoint, exports features, runs all probes, and writes a compact Markdown/JSON report. The notebook remains the experiment controller used by that entry point and for interactive exploration.
 
-Checkpoint compatibility is identified by `MODEL_ARCHITECTURE = "cody-jepa-single-stream-masked-v3"` and `CHECKPOINT_SCHEMA = 3`. These identifiers are independent of experiment directory names such as `outputs/jepa-v4` and `outputs/jepa-v5`: bump the architecture only for an incompatible model/state-dict change, and bump the schema only when the serialized checkpoint payload changes.
+Checkpoint compatibility is identified by `MODEL_ARCHITECTURE = "cody-jepa-single-stream-masked-v3"` and `CHECKPOINT_SCHEMA = 4`. Schema 4 commits model-state fingerprints and training-time selections; the exact retained Phase 0 schema-3 checkpoints remain readable only through their hash-locked protocol. These identifiers are independent of experiment directory names such as `outputs/jepa-v4` and `outputs/jepa-v5`: bump the architecture only for an incompatible model/state-dict change, and bump the schema only when the serialized checkpoint payload changes.
 
 ```bash
 uv run jupyter lab notebooks/single-stream-jepa.ipynb
@@ -346,10 +346,16 @@ The orchestration entry point evaluates one completed checkpoint and produces a 
 ```bash
 uv run python scripts/run_phase0_pipeline.py evaluate \
   --checkpoint outputs/<run>/best_loss.pt \
+  --completed-run-checkpoint outputs/<run>/latest.pt \
   --artifact-dir outputs/pipeline/<run> \
   --report reports/<run>.md \
   --device auto
 ```
+
+The terminal checkpoint is mandatory provenance: evaluation proves the selected
+checkpoint has the same configuration, mask, architecture, data contract, and
+history prefix as the genuinely completed run. The flag defaults to the
+selected checkpoint's sibling `latest.pt` when both files share a directory.
 
 The lower-level two-stage commands remain available for diagnosis:
 
@@ -367,6 +373,13 @@ uv run python scripts/eval_probes.py \
 The exporter restores only the EMA target encoder, freezes it, switches it to evaluation mode, and runs under `torch.inference_mode()`. Each deterministic clip window becomes one row containing its manifest metadata and the mean-pooled, pre-final-LayerNorm target tokens. It accepts `.csv` or compressed `.npz` output; both carry a JSON provenance sidecar with the checkpoint hash and the exact feature formula.
 
 The probe evaluator reports three protocols: a sequence-disjoint closed-set identity classifier over training subjects, nearest-centroid identity retrieval over separately enrolled validation subjects, and a `gait_system` linear classifier trained on training subjects and evaluated on subject-disjoint validation subjects. `probe_metrics.csv` is a compact, one-row-per-task scalar summary; `probe_metrics.json` is the canonical full-detail artifact containing class labels, confusion matrices, protocol settings, and provenance. Balanced accuracy is the primary gait metric. Use [`notebooks/linear-probe-results.ipynb`](notebooks/linear-probe-results.ipynb) to validate, compare, and visualize these artifacts.
+
+```bash
+uv run jupyter lab notebooks/linear-probe-results.ipynb
+```
+
+Without `CODY_JEPA_PROBE_DIR`, the notebook reads the canonical clean Phase 0
+artifacts at `outputs/phase0/job-91108/best_loss/probes`.
 
 ## Repository Map
 

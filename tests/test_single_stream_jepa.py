@@ -15,11 +15,13 @@ from cody_jepa.single_stream_jepa import (
     VisionTransformer,
     balanced_wrong_subject_permutation,
     build_models,
+    checkpoint_model_state_sha256,
     ema_tau_for_step,
     encode_targets,
     evaluate_jepa,
     healthy_checkpoint_path,
     learning_rate_for_step,
+    load_checkpoint,
     multiblock_mask,
     optimizer_param_groups,
     representation_diagnostics,
@@ -594,17 +596,32 @@ class SingleStreamJEPATest(unittest.TestCase):
         cfg = tiny_config(num_epochs=1)
         train, val = tiny_loaders()
         result = train_jepa(cfg, train, val, {"dataset": "a"}, device="cpu")
-        self.assertEqual(CHECKPOINT_SCHEMA, 3)
+        self.assertEqual(CHECKPOINT_SCHEMA, 4)
         self.assertEqual(result["checkpoint_state"]["schema"], CHECKPOINT_SCHEMA)
+        self.assertEqual(
+            result["checkpoint_state"]["model_state_sha256"],
+            checkpoint_model_state_sha256(result["checkpoint_state"]),
+        )
+        self.assertEqual(
+            result["checkpoint_state"]["best_loss_model_state_sha256"],
+            result["checkpoint_state"]["model_state_sha256"],
+        )
         with self.assertRaisesRegex(ValueError, "dataset/loader"):
             validate_resume_state(
                 result["checkpoint_state"], cfg, DEFAULT_MASK_GROUPS, {"dataset": "b"}
             )
         legacy = copy.deepcopy(result["checkpoint_state"])
-        legacy["schema"] = 2
+        legacy["schema"] = 3
         with self.assertRaisesRegex(ValueError, "schema"):
             validate_resume_state(
                 legacy, cfg, DEFAULT_MASK_GROUPS, {"dataset": "a"}
+            )
+        tampered = copy.deepcopy(result["checkpoint_state"])
+        first = next(iter(tampered["target_encoder"].values()))
+        first.view(-1)[0] += 1
+        with self.assertRaisesRegex(ValueError, "fingerprint"):
+            validate_resume_state(
+                tampered, cfg, DEFAULT_MASK_GROUPS, {"dataset": "a"}
             )
 
     def test_healthy_checkpoint_path_is_truthful_about_selection_and_files(self):
@@ -625,6 +642,14 @@ class SingleStreamJEPATest(unittest.TestCase):
             train_jepa(cfg, train, val, {"dataset": "a"}, checkpoint_dir=tmp, device="cpu")
             self.assertTrue((Path(tmp) / "latest.pt").is_file())
             self.assertTrue((Path(tmp) / "best_loss.pt").is_file())
+            latest = load_checkpoint(Path(tmp) / "latest.pt")
+            best = load_checkpoint(Path(tmp) / "best_loss.pt")
+            self.assertEqual(
+                latest["best_loss_model_state_sha256"], best["model_state_sha256"]
+            )
+            self.assertEqual(
+                best["model_state_sha256"], checkpoint_model_state_sha256(best)
+            )
             self.assertFalse(list(Path(tmp).glob("*.tmp")))
 
     def test_aligned_completion_reports_max_steps(self):

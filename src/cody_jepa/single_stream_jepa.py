@@ -17,7 +17,9 @@ from collections.abc import Mapping, Sequence
 from dataclasses import asdict, dataclass
 from pathlib import Path
 import contextlib
+import hashlib
 import importlib.util
+import json
 import math
 import os
 import random
@@ -37,7 +39,9 @@ from torch.utils.data import DataLoader, SequentialSampler
 # model/state-dict contract becomes incompatible; bump CHECKPOINT_SCHEMA only when
 # the serialized payload structure changes.
 MODEL_ARCHITECTURE = "cody-jepa-single-stream-masked-v3"
-CHECKPOINT_SCHEMA = 3
+LEGACY_CHECKPOINT_SCHEMA = 3
+CHECKPOINT_SCHEMA = 4
+MODEL_STATE_FINGERPRINT_SCHEMA = 1
 
 
 @dataclass(frozen=True)
@@ -1221,6 +1225,41 @@ def _checkpoint_config(cfg):
     }
 
 
+def checkpoint_model_state_sha256(state) -> str:
+    """Return a deterministic SHA-256 commitment to all learned model tensors."""
+    digest = hashlib.sha256()
+    digest.update(
+        f"cody-jepa-model-state-v{MODEL_STATE_FINGERPRINT_SCHEMA}\0".encode()
+    )
+    for component in ("context_encoder", "target_encoder", "predictor"):
+        component_state = state.get(component) if isinstance(state, Mapping) else None
+        if not isinstance(component_state, Mapping) or not component_state:
+            raise ValueError(f"checkpoint has no {component} model state")
+        for name in sorted(component_state):
+            tensor = component_state[name]
+            if not isinstance(tensor, torch.Tensor):
+                raise ValueError(
+                    f"checkpoint model state {component}.{name} is not a tensor"
+                )
+            tensor = tensor.detach().cpu().contiguous()
+            metadata = json.dumps(
+                {
+                    "component": component,
+                    "dtype": str(tensor.dtype),
+                    "name": name,
+                    "shape": list(tensor.shape),
+                },
+                sort_keys=True,
+                separators=(",", ":"),
+            ).encode()
+            digest.update(len(metadata).to_bytes(8, "big"))
+            digest.update(metadata)
+            raw = tensor.view(torch.uint8).numpy().tobytes()
+            digest.update(len(raw).to_bytes(8, "big"))
+            digest.update(raw)
+    return digest.hexdigest()
+
+
 def _checkpoint_payload(
     cfg,
     mask_groups,
@@ -1239,8 +1278,11 @@ def _checkpoint_payload(
     best_epoch,
     best_healthy_val_loss,
     best_healthy_epoch,
+    best_loss_model_state_sha256,
+    best_healthy_model_state_sha256,
+    model_state_sha256=None,
 ):
-    return {
+    payload = {
         "schema": CHECKPOINT_SCHEMA,
         "architecture": MODEL_ARCHITECTURE,
         "config": _checkpoint_config(cfg),
@@ -1258,6 +1300,8 @@ def _checkpoint_payload(
         "best_epoch": best_epoch,
         "best_healthy_val_loss": best_healthy_val_loss,
         "best_healthy_epoch": best_healthy_epoch,
+        "best_loss_model_state_sha256": best_loss_model_state_sha256,
+        "best_healthy_model_state_sha256": best_healthy_model_state_sha256,
         "mask_rng_state": mask_rng.getstate(),
         "torch_rng_state": torch.get_rng_state(),
         "loader_rng_state": (
@@ -1268,6 +1312,10 @@ def _checkpoint_payload(
         "cuda_rng_state": torch.cuda.get_rng_state_all() if torch.cuda.is_available() else None,
         "torch_version": torch.__version__,
     }
+    payload["model_state_sha256"] = (
+        model_state_sha256 or checkpoint_model_state_sha256(payload)
+    )
+    return payload
 
 
 def validate_resume_state(state, cfg, mask_groups, data_contract):
@@ -1279,6 +1327,30 @@ def validate_resume_state(state, cfg, mask_groups, data_contract):
         raise ValueError("checkpoint mask groups differ from this run")
     if state.get("data_contract") != data_contract:
         raise ValueError("checkpoint dataset/loader contract differs from this run")
+    expected_fingerprint = checkpoint_model_state_sha256(state)
+    if state.get("model_state_sha256") != expected_fingerprint:
+        raise ValueError("checkpoint model-state fingerprint mismatch")
+    for epoch_key, commitment_key in (
+        ("best_epoch", "best_loss_model_state_sha256"),
+        ("best_healthy_epoch", "best_healthy_model_state_sha256"),
+    ):
+        selected_epoch = state.get(epoch_key)
+        commitment = state.get(commitment_key)
+        if selected_epoch is None:
+            if commitment is not None:
+                raise ValueError(f"checkpoint {commitment_key} is unselected")
+            continue
+        if (
+            not isinstance(commitment, str)
+            or len(commitment) != 64
+            or any(character not in "0123456789abcdef" for character in commitment)
+        ):
+            raise ValueError(f"checkpoint {commitment_key} is invalid")
+        if (
+            selected_epoch == state.get("completed_epochs")
+            and commitment != expected_fingerprint
+        ):
+            raise ValueError(f"checkpoint {commitment_key} does not commit current state")
     mutable = {
         "num_epochs",
         "eval_every_epochs",
@@ -1385,6 +1457,8 @@ def train_jepa(
     best_epoch = None
     best_healthy_val_loss = math.inf
     best_healthy_epoch = None
+    best_loss_model_state_sha256 = None
+    best_healthy_model_state_sha256 = None
 
     if resume_state is not None:
         validate_resume_state(resume_state, cfg, mask_groups, data_contract)
@@ -1403,6 +1477,12 @@ def train_jepa(
             resume_state.get("best_healthy_val_loss", math.inf)
         )
         best_healthy_epoch = resume_state.get("best_healthy_epoch")
+        best_loss_model_state_sha256 = resume_state.get(
+            "best_loss_model_state_sha256"
+        )
+        best_healthy_model_state_sha256 = resume_state.get(
+            "best_healthy_model_state_sha256"
+        )
         mask_rng.setstate(resume_state["mask_rng_state"])
         torch.set_rng_state(resume_state["torch_rng_state"].cpu())
         if isinstance(loader_generator, torch.Generator) and resume_state.get("loader_rng_state") is not None:
@@ -1606,12 +1686,20 @@ def train_jepa(
             "train_eval": train_eval_metrics,
         }
         history.append(metrics)
+        current_model_state_sha256 = checkpoint_model_state_sha256(
+            {
+                "context_encoder": context_encoder.state_dict(),
+                "target_encoder": target_encoder.state_dict(),
+                "predictor": predictor.state_dict(),
+            }
+        )
         selection_metric = str(cfg.get("selection_metric", "subject_balanced_loss"))
         if val_metrics is not None and selection_metric not in val_metrics:
             raise KeyError(f"unknown selection_metric {selection_metric!r}")
         if val_metrics is not None and val_metrics[selection_metric] < best_val_loss:
             best_val_loss = val_metrics[selection_metric]
             best_epoch = completed_epochs
+            best_loss_model_state_sha256 = current_model_state_sha256
         if (
             val_metrics is not None
             and val_metrics["representations_healthy"]
@@ -1619,6 +1707,7 @@ def train_jepa(
         ):
             best_healthy_val_loss = val_metrics[selection_metric]
             best_healthy_epoch = completed_epochs
+            best_healthy_model_state_sha256 = current_model_state_sha256
 
         payload = _checkpoint_payload(
             cfg,
@@ -1638,6 +1727,9 @@ def train_jepa(
             best_epoch,
             best_healthy_val_loss,
             best_healthy_epoch,
+            best_loss_model_state_sha256,
+            best_healthy_model_state_sha256,
+            current_model_state_sha256,
         )
         if checkpoint_dir is not None and (
             completed_epochs % int(cfg.get("checkpoint_every_epochs", 1)) == 0
@@ -1710,6 +1802,8 @@ def train_jepa(
             best_epoch,
             best_healthy_val_loss,
             best_healthy_epoch,
+            best_loss_model_state_sha256,
+            best_healthy_model_state_sha256,
         ),
     }
 
@@ -1737,6 +1831,7 @@ def healthy_checkpoint_path(checkpoint_dir, best_healthy_epoch):
 __all__ = [
     "CHECKPOINT_SCHEMA",
     "DEFAULT_MASK_GROUPS",
+    "LEGACY_CHECKPOINT_SCHEMA",
     "MODEL_ARCHITECTURE",
     "AttentionBlock",
     "MaskGroupConfig",
@@ -1745,6 +1840,7 @@ __all__ = [
     "balanced_wrong_subject_permutation",
     "build_encoder",
     "build_models",
+    "checkpoint_model_state_sha256",
     "ema_tau_for_step",
     "ema_update",
     "evaluate_jepa",

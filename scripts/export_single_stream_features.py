@@ -10,7 +10,13 @@ import json
 import torch
 from torch.utils.data import DataLoader
 
-from cody_jepa.phase0 import guard_research_path, portable_path, require_unchanged_hash
+from cody_jepa.phase0 import (
+    checkpoint_record,
+    guard_research_path,
+    load_protocol,
+    portable_path,
+    require_unchanged_hash,
+)
 from cody_jepa.data import (
     HealthGaitLoaderConfig,
     build_healthgait_datasets_from_config,
@@ -25,11 +31,13 @@ from cody_jepa.probes import (
     write_feature_table,
 )
 from cody_jepa.single_stream_jepa import load_checkpoint, resolve_device
+from cody_jepa.single_stream_jepa import CHECKPOINT_SCHEMA, LEGACY_CHECKPOINT_SCHEMA
 
 
 def parse_args():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--checkpoint", type=Path, required=True)
+    parser.add_argument("--locked-phase0-legacy", action="store_true", help=argparse.SUPPRESS)
     parser.add_argument("--output", type=Path, required=True, help="A .csv or .npz path")
     parser.add_argument("--repo-root", type=Path, default=Path.cwd())
     parser.add_argument("--manifest", type=Path)
@@ -146,12 +154,20 @@ def main():
         raise FileExistsError(f"refusing to overwrite feature artifact: {output_path}")
     checkpoint_hash = checkpoint_sha256(checkpoint_path)
     checkpoint = load_checkpoint(checkpoint_path)
+    if args.locked_phase0_legacy:
+        protocol = load_protocol(repo_root)
+        checkpoint_record(checkpoint_path, protocol, checkpoint_path.name)
     config = _probe_loader_config(args, checkpoint)
     datasets = build_healthgait_datasets_from_config(config)
     _validate_checkpoint_data(checkpoint, datasets)
 
     device = resolve_device(args.device)
-    encoder = build_frozen_target_encoder(checkpoint, device)
+    expected_schema = (
+        LEGACY_CHECKPOINT_SCHEMA if args.locked_phase0_legacy else CHECKPOINT_SCHEMA
+    )
+    encoder = build_frozen_target_encoder(
+        checkpoint, device, expected_schema=expected_schema
+    )
     table = export_frozen_features(
         encoder,
         _sequential_loaders(config, datasets, device),

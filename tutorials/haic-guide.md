@@ -86,6 +86,13 @@ Always launch Python and Jupyter through `uv run`. This ensures that the noteboo
 Manage dependencies only with `uv add`, `uv remove`, `uv lock`, and `uv sync`;
 do not use pip, Conda, Poetry, or system-Python installation commands in this workflow.
 
+After entering an allocated worker shell, launch the training notebook interactively
+through the locked environment (never from the head node):
+
+```bash
+uv run jupyter lab notebooks/single-stream-jepa.ipynb --no-browser
+```
+
 ### Confirm that the dataset exists
 
 The notebook expects these paths:
@@ -264,7 +271,7 @@ baseline evidence in `outputs/jepa-v4`.
 
 The current compatibility identifiers remain
 `MODEL_ARCHITECTURE = "cody-jepa-single-stream-masked-v3"` and
-`CHECKPOINT_SCHEMA = 3`. Run-directory names such as `outputs/jepa-v5` identify
+`CHECKPOINT_SCHEMA = 4`. Run-directory names such as `outputs/jepa-v5` identify
 experiments, not model architectures or checkpoint schemas; do not bump either
 constant merely because a new run is launched.
 
@@ -444,8 +451,11 @@ When a notebook run contains errors or is unsafe to compare directly:
    means the run failed the representation-health contract; do not silently use
    `best_loss.pt` as an equivalent result.
 3. If a compatible checkpoint survives, use `uv run python
-   scripts/run_phase0_pipeline.py evaluate ...` to re-export frozen features,
-   rerun every probe, and write a hashed report under current code.
+   scripts/run_phase0_pipeline.py evaluate --checkpoint outputs/<run>/<selected>.pt
+   --completed-run-checkpoint outputs/<run>/latest.pt ...` to prove selection
+   against the completed run, re-export frozen features, rerun every probe, and
+   write a hashed report under current code. The terminal flag defaults to the
+   selected checkpoint's sibling `latest.pt` when omitted.
 4. If the schema is incompatible or no checkpoint survives, record the failure
    reason and exclude the run from metric tables and direct plot comparisons.
 5. Keep only a concise failure summary or external job log when the full failed
