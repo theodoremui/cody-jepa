@@ -24,9 +24,15 @@ cody-jepa-eval-probes = "cody_jepa.cli.eval_probes:main"
 cody-jepa-run-gfc = "cody_jepa.cli.run_gfc:main"
 cody-jepa-build-manifest = "cody_jepa.cli.build_manifest:main"
 cody-jepa-make-results = "cody_jepa.cli.make_results:main"
+cody-jepa-export-histories = "cody_jepa.cli.export_histories:main"
 
 [dependency-groups]
-dev = ["ruff>=0.12"]
+dev = [
+    "ipykernel>=6.29.5",
+    "jupyter>=1.1.1",
+    "nbconvert>=7.16.6",
+    "ruff>=0.12",
+]
 
 [tool.uv.sources]
 torch = [
