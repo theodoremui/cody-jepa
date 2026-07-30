@@ -1,0 +1,90 @@
+{
+  "checkpoint_label": "phase0-best-loss-epoch-80",
+  "participant_bootstrap": {
+    "resamples": 10000,
+    "seed": 0,
+    "confidence_level": 0.95
+  },
+  "context_substitution": [
+    {
+      "condition": "self",
+      "rows": 3744,
+      "participant_mean_gap": 0.0,
+      "interval_low": 0.0,
+      "interval_high": 0.0
+    },
+    {
+      "condition": "same_subject",
+      "rows": 3744,
+      "participant_mean_gap": 0.000161303037,
+      "interval_low": 0.000151967882,
+      "interval_high": 0.000170597179
+    },
+    {
+      "condition": "cross_subject",
+      "rows": 3744,
+      "participant_mean_gap": 0.00015634854,
+      "interval_low": 0.000148615128,
+      "interval_high": 0.000164237602
+    },
+    {
+      "condition": "temporal_shuffle",
+      "rows": 3744,
+      "participant_mean_gap": 0.0000475358684,
+      "interval_low": 0.000044482971,
+      "interval_high": 0.0000507267272
+    },
+    {
+      "condition": "blank",
+      "rows": 3744,
+      "participant_mean_gap": 0.0000956439568,
+      "interval_low": 0.0000922326243,
+      "interval_high": 0.0000991033375
+    }
+  ],
+  "foreground": {
+    "pixel_threshold": 0.05,
+    "mean_fraction_in_target_tokens": 0.096176,
+    "all_token_gap": 0.00015634854,
+    "foreground_only_gap": 0.0000466827297,
+    "background_only_gap": 0.000167932493,
+    "foreground_to_all_ratio": 0.298581
+  },
+  "representation_rank": [
+    {
+      "representation": "online_full_view_pooled",
+      "rows": 1872,
+      "dimension": 384,
+      "effective_rank": 10.437743,
+      "ratio": 0.027182
+    },
+    {
+      "representation": "ema_target_pre_norm_pooled",
+      "rows": 1872,
+      "dimension": 384,
+      "effective_rank": 11.519653,
+      "ratio": 0.029999
+    },
+    {
+      "representation": "context_tokens_all_mask_groups",
+      "rows": 1180672,
+      "dimension": 384,
+      "effective_rank": 381.581625,
+      "ratio": 0.993702
+    },
+    {
+      "representation": "context_tokens_large_blocks",
+      "rows": 446848,
+      "dimension": 384,
+      "effective_rank": 380.807851,
+      "ratio": 0.991687
+    },
+    {
+      "representation": "context_tokens_small_blocks",
+      "rows": 733824,
+      "dimension": 384,
+      "effective_rank": 380.658874,
+      "ratio": 0.991299
+    }
+  ]
+}

@@ -1,0 +1,117 @@
+{
+  "run_id": "training-baseline",
+  "seed": 0,
+  "batch_size": 16,
+  "accumulation_steps": 4,
+  "steps": 3900,
+  "num_epochs": 100,
+  "lr": 0.0001,
+  "start_lr": 0.00001,
+  "warmup_steps": 200,
+  "min_lr": 0.000001,
+  "weight_decay": 0.04,
+  "grad_clip": 1.0,
+  "ema_start": 0.99,
+  "ema_end": 1.0,
+  "loss_exp": 1.0,
+  "var_coef": 1.0,
+  "cov_coef": 0.04,
+  "clip_var_coef": 0.0,
+  "clip_cov_coef": 0.0,
+  "var_gamma": 1.0,
+  "target_batch_standardize": true,
+  "num_frames": 16,
+  "img_size": 112,
+  "patch_size": 8,
+  "tubelet_size": 2,
+  "in_channels": 1,
+  "num_tokens": 1568,
+  "min_context_tokens": 64,
+  "input_mean": 0.5,
+  "input_std": 0.5,
+  "train_horizontal_flip_prob": 0.0,
+  "embed_dim": 384,
+  "hidden_dim": 1536,
+  "num_heads": 6,
+  "num_layers": 6,
+  "pred_dim": 192,
+  "pred_depth": 6,
+  "dropout": 0.0,
+  "uniform_power": true,
+  "norm_eps": 0.000001,
+  "amp_dtype": "bfloat16",
+  "compile": false,
+  "tf32": true,
+  "required_device": "cuda",
+  "eval_every_epochs": 5,
+  "train_eval_every_epochs": 0,
+  "checkpoint_every_epochs": 1,
+  "selection_metric": "subject_balanced_loss",
+  "min_feature_std": 0.001,
+  "max_near_zero_variance_fraction": 0.5,
+  "min_effective_rank_ratio": 0.05,
+  "min_context_shuffle_loss_gap": 0.001,
+  "mask_preset": "medium",
+  "mask_presets": {
+    "light": [
+      {
+        "label": "small_blocks",
+        "num_blocks": 6,
+        "spatial_scale": 0.1,
+        "aspect_ratio": [
+          0.75,
+          1.5
+        ]
+      },
+      {
+        "label": "large_blocks",
+        "num_blocks": 2,
+        "spatial_scale": 0.35,
+        "aspect_ratio": [
+          0.75,
+          1.5
+        ]
+      }
+    ],
+    "medium": [
+      {
+        "label": "small_blocks",
+        "num_blocks": 8,
+        "spatial_scale": 0.15,
+        "aspect_ratio": [
+          0.75,
+          1.5
+        ]
+      },
+      {
+        "label": "large_blocks",
+        "num_blocks": 2,
+        "spatial_scale": 0.55,
+        "aspect_ratio": [
+          0.75,
+          1.5
+        ]
+      }
+    ],
+    "heavy": [
+      {
+        "label": "small_blocks",
+        "num_blocks": 10,
+        "spatial_scale": 0.2,
+        "aspect_ratio": [
+          0.75,
+          1.5
+        ]
+      },
+      {
+        "label": "large_blocks",
+        "num_blocks": 2,
+        "spatial_scale": 0.7,
+        "aspect_ratio": [
+          0.75,
+          1.5
+        ]
+      }
+    ]
+  }
+}
