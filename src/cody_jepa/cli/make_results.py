@@ -15,6 +15,8 @@ from matplotlib.patches import Patch
 import numpy as np
 import pandas as pd
 
+from cody_jepa.evaluation.gfc.core import GFC_PROTOCOL
+
 
 PHASE1_TABLE_COLUMNS = (
     "run_id",
@@ -169,9 +171,14 @@ def _gfc_summaries(results_dir: Path, output_dir: Path) -> list[tuple[str, dict]
 def _validate_gfc_summaries(summaries: list[tuple[str, dict]]) -> None:
     by_analysis: dict[tuple[str, str], list[tuple[str, dict]]] = {}
     for label, value in summaries:
+        protocol = str(value.get("protocol", ""))
         model_label = str(value.get("model_label", ""))
         split = str(value.get("split", ""))
         normalization = str(value.get("normalization", ""))
+        if protocol != GFC_PROTOCOL:
+            raise ValueError(
+                f"GFC summary {label!r} must declare protocol {GFC_PROTOCOL!r}"
+            )
         if not model_label or not split or normalization not in GFC_NORMALIZATIONS:
             raise ValueError(
                 f"invalid GFC model label, split, or normalization in {label!r}"
@@ -232,6 +239,7 @@ def _write_gfc_outputs(
         rows.append(
             {
                 "analysis": label,
+                "protocol": value["protocol"],
                 "model_label": value["model_label"],
                 "split": value["split"],
                 "normalization": value["normalization"],
@@ -244,7 +252,21 @@ def _write_gfc_outputs(
             }
         )
     table = pd.DataFrame(rows)
-    table_path = output_dir / "gfc_table.csv"
+    normalization_order = {
+        "raw_retain_all": 0,
+        "raw_effective_rank": 1,
+        "pca_effective_rank": 2,
+    }
+    table = table.sort_values(
+        ["model_label", "split", "normalization"],
+        key=lambda values: (
+            values.map(normalization_order)
+            if values.name == "normalization"
+            else values
+        ),
+        kind="stable",
+    ).reset_index(drop=True)
+    table_path = output_dir / "legacy_gfc_table.csv"
     table.to_csv(table_path, index=False)
     positions = np.arange(len(table))
     estimates = table["learned_minus_shortcut"].to_numpy(dtype=float)
@@ -256,11 +278,22 @@ def _write_gfc_outputs(
     axis.hlines(upper, positions - 0.06, positions + 0.06, color="#35618d")
     axis.scatter(positions, estimates, color="#35618d", zorder=3)
     axis.axhline(0.0, color="black", linewidth=1)
-    axis.set_xticks(positions, table["analysis"], rotation=35, ha="right")
-    axis.set_ylabel("Learned minus shortcut top-1")
-    axis.set_title("Participant-level Grounded Factorial Completion")
+    normalization_labels = {
+        "raw_retain_all": "primary",
+        "raw_effective_rank": "raw ER",
+        "pca_effective_rank": "PCA ER",
+    }
+    plot_labels = [
+        f"{model}\n{split}\n{normalization_labels[normalization]}"
+        for model, split, normalization in zip(
+            table["model_label"], table["split"], table["normalization"]
+        )
+    ]
+    axis.set_xticks(positions, plot_labels, rotation=25, ha="right")
+    axis.set_ylabel("Legacy learned minus shortcut top-1")
+    axis.set_title("Legacy donor-excluded Grounded Factorial Completion")
     axis.grid(axis="y", alpha=0.25)
-    figure_path = output_dir / "gfc_comparison.png"
+    figure_path = output_dir / "legacy_gfc_comparison.png"
     figure.savefig(figure_path, dpi=180)
     plt.close(figure)
     return table_path, figure_path
@@ -277,8 +310,15 @@ def make_paper_results(results_dir: Path, output_dir: Path) -> list[Path]:
     gfc_outputs = _write_gfc_outputs(_gfc_summaries(results_dir, output_dir), output_dir)
     if gfc_outputs is not None:
         generated.extend(gfc_outputs)
-    else:
         for stale_name in ("gfc_table.csv", "gfc_comparison.png"):
+            (output_dir / stale_name).unlink(missing_ok=True)
+    else:
+        for stale_name in (
+            "legacy_gfc_table.csv",
+            "legacy_gfc_comparison.png",
+            "gfc_table.csv",
+            "gfc_comparison.png",
+        ):
             (output_dir / stale_name).unlink(missing_ok=True)
     return generated
 

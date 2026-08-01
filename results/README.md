@@ -10,7 +10,7 @@ This directory contains compact, non-identifying inputs to the paper-result gene
 - `gfc-*` directories contain only the aggregate `summary.json` and `summary.csv` copied by `scripts/run_gfc.py --aggregate-output-dir`.
 - `generated/phase0_table.csv` and `generated/phase1_table.csv` are the paper-ready diagnostic tables.
 - `generated/phase1_diagnostics.png` and `generated/context_diagnosis.png` are the active diagnostic figures.
-- `generated/gfc_table.csv` and `generated/gfc_comparison.png` are added after a GFC summary exists.
+- `generated/legacy_gfc_table.csv` and `generated/legacy_gfc_comparison.png` are added after a protocol-tagged legacy GFC summary exists.
 
 Regenerate the active result presentation with:
 

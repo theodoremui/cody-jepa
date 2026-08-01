@@ -1,0 +1,10 @@
+analysis,protocol,model_label,split,normalization,participants,learned_top1,shortcut_top1,learned_minus_shortcut,interval_lower,interval_upper
+gfc-a00-baseline-raw-retain-all,legacy_donor_excluded_v1,a00-baseline,development,raw_retain_all,76,0.6979166666666667,0.6546052631578948,0.04331140350877192,0.0027412280701754384,0.08223684210526316
+gfc-a00-baseline-raw-er,legacy_donor_excluded_v1,a00-baseline,development,raw_effective_rank,76,0.6106542397660818,0.6125274122807017,-0.001873172514619883,-0.022021198830409358,0.017636376096491213
+gfc-a00-baseline-pca-er,legacy_donor_excluded_v1,a00-baseline,development,pca_effective_rank,76,0.6968201754385965,0.6125274122807017,0.08429276315789479,0.04783328764619887,0.12180190058479534
+gfc-b01-mask-light-raw-retain-all,legacy_donor_excluded_v1,b01-mask-light,development,raw_retain_all,76,0.6376096491228069,0.6546052631578948,-0.016995614035087713,-0.05975877192982455,0.024671052631578955
+gfc-b01-mask-light-raw-er,legacy_donor_excluded_v1,b01-mask-light,development,raw_effective_rank,76,0.5957419590643274,0.6125274122807017,-0.016785453216374268,-0.039190423976608185,0.005465780336257286
+gfc-b01-mask-light-pca-er,legacy_donor_excluded_v1,b01-mask-light,development,pca_effective_rank,76,0.6376096491228069,0.6125274122807017,0.025082236842105303,-0.019965277777777738,0.06971856725146203
+gfc-b02-raw-retain-all,legacy_donor_excluded_v1,b02-mask-light-clip-var,development,raw_retain_all,76,0.5751096491228069,0.6546052631578948,-0.07949561403508772,-0.12171052631578948,-0.03782894736842106
+gfc-b02-raw-er,legacy_donor_excluded_v1,b02-mask-light-clip-var,development,raw_effective_rank,76,0.5663194444444444,0.6125274122807017,-0.046207967836257295,-0.06818347953216373,-0.025072642543859647
+gfc-b02-pca-er,legacy_donor_excluded_v1,b02-mask-light-clip-var,development,pca_effective_rank,76,0.5751096491228069,0.6125274122807017,-0.037417763157894704,-0.07734946089181283,0.001965688961988317
