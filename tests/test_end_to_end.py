@@ -96,12 +96,14 @@ class EndToEndResearchTest(unittest.TestCase):
 
             self.assertEqual(summary["evaluation"]["participant_count"], 3)
             self.assertEqual(summary["evaluation"]["excluded_participant_count"], 0)
+            self.assertEqual(summary["protocol"], "legacy_donor_excluded_v1")
             self.assertAlmostEqual(summary["learned"]["top1"], 1.0)
             self.assertAlmostEqual(summary["shortcut"]["top1"], 1.0 / 6.0)
             self.assertEqual(summary["learned_minus_shortcut"]["resamples"], 10_000)
             self.assertTrue((output / "participants.csv").is_file())
             self.assertTrue((output / "summary.csv").is_file())
             scalar = pd.read_csv(output / "summary.csv").iloc[0]
+            self.assertEqual(scalar["protocol"], "legacy_donor_excluded_v1")
             self.assertEqual(scalar["model_label"], "synthetic-model")
             saved = json.loads((output / "summary.json").read_text())
             self.assertEqual(saved["normalization"], "raw_retain_all")

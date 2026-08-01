@@ -886,6 +886,27 @@ class ManifestBuilderTest(unittest.TestCase):
             self.assertAlmostEqual(shortcuts["shortcut_foreground_area_mean"], 2.5 / 16)
             self.assertGreater(shortcuts["shortcut_foreground_area_std"], 0.0)
 
+    def test_shortcuts_keep_empty_boundary_frames_but_use_observed_centroids(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            frames = []
+            for index, column in enumerate((None, 0, 3, None)):
+                image = Image.new("L", (4, 4), color=0)
+                if column is not None:
+                    for row in range(4):
+                        image.putpixel((column, row), 255)
+                path = root / f"{index:03d}.png"
+                image.save(path)
+                frames.append(path)
+
+            shortcuts = compute_shortcut_features(
+                frames, fps=10.0, foreground_threshold=0.5
+            )
+            self.assertAlmostEqual(
+                shortcuts["shortcut_horizontal_centroid_drift_signed"], 1.0
+            )
+            self.assertAlmostEqual(shortcuts["shortcut_foreground_area_mean"], 0.125)
+
     def test_paired_directions_share_source_video_id(self):
         with tempfile.TemporaryDirectory() as tmp:
             repo_root = Path(tmp)

@@ -1,4 +1,4 @@
-"""Participant-level paired inference for learned-over-shortcut GFC."""
+"""Participant-level paired inference for GFC gain over shortcut features."""
 
 from __future__ import annotations
 
@@ -67,7 +67,7 @@ def _validated_query_map(
     return query_map
 
 
-def paired_participant_lsg(
+def paired_participant_gfc_gain(
     learned: ParticipantScores,
     shortcut: ParticipantScores,
     *,
@@ -95,7 +95,7 @@ def paired_participant_lsg(
     )
 
 
-def paired_cohort_lsg(
+def paired_cohort_gfc_gain(
     learned: Sequence[ParticipantScores],
     shortcut: Sequence[ParticipantScores],
     *,
@@ -109,7 +109,7 @@ def paired_cohort_lsg(
     if not learned_by_subject or set(learned_by_subject) != set(shortcut_by_subject):
         raise ValueError("learned and shortcut cohorts must contain the same participants")
     participants = tuple(
-        paired_participant_lsg(
+        paired_participant_gfc_gain(
             learned_by_subject[subject_id],
             shortcut_by_subject[subject_id],
             learned_representation=learned_representation,
@@ -156,7 +156,7 @@ class BootstrapResult:
         }
 
 
-def bootstrap_lsg(
+def bootstrap_gfc_gain(
     cohort: PairedCohort,
     *,
     resamples: int = DEFAULT_BOOTSTRAP_RESAMPLES,
@@ -197,6 +197,14 @@ def bootstrap_lsg(
         resamples=resamples,
         seed=seed,
     )
+
+
+# Preserve the names published by the initial maintained release.  The GFC-gain
+# terminology is clearer, but callers of the top-level compatibility module should
+# not break merely because the internal metric was renamed.
+paired_participant_lsg = paired_participant_gfc_gain
+paired_cohort_lsg = paired_cohort_gfc_gain
+bootstrap_lsg = bootstrap_gfc_gain
 
 
 @dataclass(frozen=True)
@@ -280,8 +288,11 @@ __all__ = [
     "PairedCohort",
     "ParticipantContrast",
     "ProspectivePowerResult",
+    "bootstrap_gfc_gain",
     "bootstrap_lsg",
+    "paired_cohort_gfc_gain",
     "paired_cohort_lsg",
+    "paired_participant_gfc_gain",
     "paired_participant_lsg",
     "plan_prospective_power",
 ]

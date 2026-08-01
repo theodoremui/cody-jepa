@@ -60,7 +60,7 @@ def compute_shortcut_features(
     if not 0.0 <= foreground_threshold <= 1.0:
         raise ValueError("foreground_threshold must lie in [0, 1]")
 
-    centroids: list[float] = []
+    centroids: list[float | None] = []
     foreground_areas: list[float] = []
     expected_shape: tuple[int, int] | None = None
     for frame_path in frame_paths:
@@ -76,21 +76,29 @@ def compute_shortcut_features(
                 f"{pixels.shape}, expected {expected_shape}"
             )
         foreground = pixels > foreground_threshold
-        if not np.any(foreground):
-            raise ValueError(f"silhouette contains no foreground pixels: {frame_path}")
         _, columns = np.nonzero(foreground)
         width = pixels.shape[1]
         centroid = (
-            float(np.mean(columns, dtype=np.float64)) / float(width - 1)
-            if width > 1
-            else 0.0
+            (
+                float(np.mean(columns, dtype=np.float64)) / float(width - 1)
+                if width > 1
+                else 0.0
+            )
+            if columns.size
+            else None
         )
         centroids.append(centroid)
         foreground_areas.append(float(np.mean(foreground, dtype=np.float64)))
 
     areas = np.asarray(foreground_areas, dtype=np.float64)
     q25, median, q75 = np.quantile(areas, (0.25, 0.5, 0.75), method="linear")
-    signed_drift = centroids[-1] - centroids[0]
+    valid_centroids = [value for value in centroids if value is not None]
+    if not valid_centroids:
+        raise ValueError("silhouette recording contains no foreground pixels")
+    # Segmentation occasionally emits an empty boundary frame. Preserve that
+    # frame in the area and duration controls, but measure displacement across
+    # the first and last frames for which a silhouette is actually observed.
+    signed_drift = valid_centroids[-1] - valid_centroids[0]
     frame_count = len(frame_paths)
     return {
         "shortcut_log_frame_count": math.log(frame_count),

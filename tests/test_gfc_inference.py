@@ -5,8 +5,11 @@ import numpy as np
 
 from cody_jepa.gfc import CANONICAL_CELLS, Recording, evaluate_participant
 from cody_jepa.gfc_inference import (
+    bootstrap_gfc_gain,
     bootstrap_lsg,
+    paired_cohort_gfc_gain,
     paired_cohort_lsg,
+    paired_participant_gfc_gain,
     paired_participant_lsg,
     plan_prospective_power,
 )
@@ -61,10 +64,15 @@ def scores(subject_id, representation, *, split="development", seed=7):
 
 
 class PairingTest(unittest.TestCase):
+    def test_initial_release_names_remain_compatible_aliases(self):
+        self.assertIs(paired_participant_lsg, paired_participant_gfc_gain)
+        self.assertIs(paired_cohort_lsg, paired_cohort_gfc_gain)
+        self.assertIs(bootstrap_lsg, bootstrap_gfc_gain)
+
     def test_identical_scientific_queries_are_required(self):
         learned = scores("P1", "learned")
         shortcut = scores("P1", "shortcut")
-        contrast = paired_participant_lsg(learned, shortcut)
+        contrast = paired_participant_gfc_gain(learned, shortcut)
         self.assertEqual(contrast.learned_top1, 1.0)
         self.assertAlmostEqual(contrast.shortcut_top1, 1.0 / 6.0)
         self.assertAlmostEqual(contrast.difference, 5.0 / 6.0)
@@ -72,19 +80,19 @@ class PairingTest(unittest.TestCase):
         changed = replace(shortcut.queries[0], split="confirmation")
         mismatched = replace(shortcut, queries=(changed, *shortcut.queries[1:]))
         with self.assertRaisesRegex(ValueError, "scientific query keys differ"):
-            paired_participant_lsg(learned, mismatched)
+            paired_participant_gfc_gain(learned, mismatched)
 
     def test_query_order_does_not_change_pairing(self):
         learned = scores("P1", "learned")
         shortcut = scores("P1", "shortcut")
         reordered = replace(shortcut, queries=tuple(reversed(shortcut.queries)))
-        result = paired_participant_lsg(learned, reordered)
+        result = paired_participant_gfc_gain(learned, reordered)
         self.assertAlmostEqual(result.difference, 5.0 / 6.0)
 
     def test_participants_are_averaged_before_cohort_inference(self):
         learned = [scores("P1", "learned"), scores("P2", "learned")]
         shortcut = [scores("P1", "shortcut"), scores("P2", "shortcut")]
-        cohort = paired_cohort_lsg(learned, shortcut)
+        cohort = paired_cohort_gfc_gain(learned, shortcut)
         self.assertEqual(len(cohort.participants), 2)
         self.assertAlmostEqual(cohort.mean_difference, 5.0 / 6.0)
 
@@ -93,9 +101,9 @@ class InferenceTest(unittest.TestCase):
     def test_bootstrap_is_deterministic_for_fixed_seed(self):
         learned = [scores(f"P{index}", "learned") for index in range(1, 4)]
         shortcut = [scores(f"P{index}", "shortcut") for index in range(1, 4)]
-        cohort = paired_cohort_lsg(learned, shortcut)
-        first = bootstrap_lsg(cohort, resamples=2_000, seed=123)
-        second = bootstrap_lsg(cohort, resamples=2_000, seed=123)
+        cohort = paired_cohort_gfc_gain(learned, shortcut)
+        first = bootstrap_gfc_gain(cohort, resamples=2_000, seed=123)
+        second = bootstrap_gfc_gain(cohort, resamples=2_000, seed=123)
         self.assertEqual(first, second)
         self.assertEqual(first.participant_count, 3)
         self.assertTrue(first.positive_supported)
@@ -103,7 +111,7 @@ class InferenceTest(unittest.TestCase):
     def test_power_calculation_is_optional_and_requires_variation(self):
         learned = [scores("P1", "learned"), scores("P2", "learned")]
         shortcut = [scores("P1", "shortcut"), scores("P2", "shortcut")]
-        constant = paired_cohort_lsg(learned, shortcut)
+        constant = paired_cohort_gfc_gain(learned, shortcut)
         with self.assertRaisesRegex(ValueError, "variation"):
             plan_prospective_power(constant)
         varied = replace(
@@ -207,8 +215,8 @@ class SyntheticEndToEndTest(unittest.TestCase):
                     representation="shortcut",
                 )
             )
-        cohort = paired_cohort_lsg(learned_scores, shortcut_scores)
-        summary = bootstrap_lsg(cohort, resamples=1_000, seed=11).to_dict()
+        cohort = paired_cohort_gfc_gain(learned_scores, shortcut_scores)
+        summary = bootstrap_gfc_gain(cohort, resamples=1_000, seed=11).to_dict()
         self.assertEqual(summary["participant_count"], 2)
         self.assertGreater(summary["point_estimate"], 0.0)
 

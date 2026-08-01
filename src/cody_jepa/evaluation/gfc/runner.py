@@ -15,13 +15,14 @@ import pandas as pd
 from .core import (
     CANONICAL_CELLS,
     Cell,
+    GFC_PROTOCOL,
     Recording,
     aggregate_windows,
     evaluate_cohort,
 )
 from .inference import (
-    bootstrap_lsg,
-    paired_cohort_lsg,
+    bootstrap_gfc_gain,
+    paired_cohort_gfc_gain,
     plan_prospective_power,
 )
 from .normalization import (
@@ -31,6 +32,7 @@ from .normalization import (
     fit_raw_normalizer,
 )
 from ...config.gfc import load_gfc_config
+from ..features import read_feature_table
 
 
 @dataclass(frozen=True)
@@ -341,6 +343,7 @@ def _write_summary_files(summary: dict[str, Any], directory: Path) -> None:
     pd.DataFrame(
         [
             {
+                "protocol": summary["protocol"],
                 "split": summary["split"],
                 "normalization": summary["normalization"],
                 "model_label": summary["model_label"],
@@ -429,7 +432,12 @@ def run_gfc(
         output_dir, aggregate_output_dir
     )
     config = load_gfc_config(config_path)
-    table = pd.read_csv(features)
+    if features.suffix.casefold() == ".npz":
+        table, _ = read_feature_table(features)
+    else:
+        # The GFC runner intentionally accepts its narrower documented CSV
+        # contract in addition to the full feature-export table contract.
+        table = pd.read_csv(features)
     all_rows, learned_columns = _recording_rows(table, config)
     split_map = dict(config["split_map"])
     unknown_splits = sorted(
@@ -558,8 +566,8 @@ def run_gfc(
         item.to_dict() for item in shortcut.exclusions
     ]:
         raise RuntimeError("learned and shortcut paths produced different exclusions")
-    paired = paired_cohort_lsg(learned.participants, shortcut.participants)
-    interval = bootstrap_lsg(
+    paired = paired_cohort_gfc_gain(learned.participants, shortcut.participants)
+    interval = bootstrap_gfc_gain(
         paired,
         resamples=int(config["bootstrap"]["resamples"]),
         seed=seed,
@@ -603,6 +611,7 @@ def run_gfc(
             }
         )
     summary: dict[str, Any] = {
+        "protocol": GFC_PROTOCOL,
         "split": split,
         "normalization": analysis_name,
         "model_label": model_label,

@@ -19,6 +19,7 @@ import numpy as np
 SPEEDS = ("UGS", "FGS")
 CLOTHING = ("WoJ", "WJ")
 DIRECTIONS = ("R2L", "L2R")
+GFC_PROTOCOL = "legacy_donor_excluded_v1"
 EXPECTED_WINDOWS = 3
 EXPECTED_CELLS = 8
 EXPECTED_QUERIES = 24
@@ -665,6 +666,7 @@ __all__ = [
     "EXPECTED_GALLERY_SIZE",
     "EXPECTED_QUERIES",
     "EXPECTED_WINDOWS",
+    "GFC_PROTOCOL",
     "SPEEDS",
     "TIE_ABS_TOLERANCE",
     "Cell",
