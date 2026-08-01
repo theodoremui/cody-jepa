@@ -1,0 +1,60 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1400" height="700" viewBox="0 0 1400 700" role="img" aria-labelledby="title desc">
+  <title id="title">Fixed-exposure scaling with four nested data pools</title>
+  <desc id="desc">Four increasingly large unique-data pools all supply the same 8.192 million training examples. Small pools repeat sequences more often. Five independently seeded nested pool orders produce twenty runs.</desc>
+  <style>
+    .title { font: 700 30px system-ui, sans-serif; fill: #172033; }
+    .heading { font: 700 19px system-ui, sans-serif; fill: #172033; }
+    .body { font: 400 16px system-ui, sans-serif; fill: #334155; }
+    .small { font: 400 14px system-ui, sans-serif; fill: #526075; }
+    .pool { fill: #eaf2ff; stroke: #648db8; stroke-width: 2; }
+    .budget { fill: #eaf7ef; stroke: #4f8d68; stroke-width: 2; }
+    .line { stroke: #7b8798; stroke-width: 2; }
+  </style>
+  <rect width="1400" height="700" fill="#ffffff"/>
+  <text x="700" y="48" text-anchor="middle" class="title">More unique sequences, not more training examples</text>
+  <text x="700" y="80" text-anchor="middle" class="body">Every rung sees the same exposure budget; only the variety of source sequences changes.</text>
+
+  <text x="95" y="138" class="heading">Unique-data pool</text>
+  <line x1="95" y1="162" x2="1305" y2="162" class="line"/>
+
+  <g transform="translate(95 195)">
+    <rect width="230" height="120" rx="14" class="pool"/>
+    <text x="115" y="38" text-anchor="middle" class="heading">Small</text>
+    <text x="115" y="70" text-anchor="middle" class="body">2,500 sequences</text>
+    <text x="115" y="98" text-anchor="middle" class="small">≈3,277 repeats each</text>
+  </g>
+  <g transform="translate(415 195)">
+    <rect width="230" height="120" rx="14" class="pool"/>
+    <text x="115" y="38" text-anchor="middle" class="heading">Medium</text>
+    <text x="115" y="70" text-anchor="middle" class="body">25,000 sequences</text>
+    <text x="115" y="98" text-anchor="middle" class="small">≈328 repeats each</text>
+  </g>
+  <g transform="translate(735 195)">
+    <rect width="230" height="120" rx="14" class="pool"/>
+    <text x="115" y="38" text-anchor="middle" class="heading">Large</text>
+    <text x="115" y="70" text-anchor="middle" class="body">250,000 sequences</text>
+    <text x="115" y="98" text-anchor="middle" class="small">≈33 repeats each</text>
+  </g>
+  <g transform="translate(1055 195)">
+    <rect width="230" height="120" rx="14" class="pool"/>
+    <text x="115" y="38" text-anchor="middle" class="heading">Full</text>
+    <text x="115" y="70" text-anchor="middle" class="body">≈1.01M sequences</text>
+    <text x="115" y="98" text-anchor="middle" class="small">≈8 repeats each</text>
+  </g>
+
+  <text x="95" y="370" class="heading">Training exposure per run</text>
+  <g transform="translate(95 395)">
+    <rect width="1190" height="76" rx="14" class="budget"/>
+    <text x="595" y="32" text-anchor="middle" class="heading">8,192,000 sampled examples</text>
+    <text x="595" y="57" text-anchor="middle" class="small">128,000 optimizer updates at effective batch size 64</text>
+  </g>
+
+  <g transform="translate(95 520)">
+    <rect width="1190" height="105" rx="16" fill="#fff4e8" stroke="#c98248" stroke-width="2"/>
+    <text x="595" y="35" text-anchor="middle" class="heading">Why five ladders?</text>
+    <text x="595" y="65" text-anchor="middle" class="body">Each seed creates a new nested pool order and a new optimization run at all four rungs.</text>
+    <text x="595" y="90" text-anchor="middle" class="small">5 ladders × 4 rungs = 20 runs; the primary uncertainty is variation across the five ladder contrasts.</text>
+  </g>
+
+  <text x="700" y="670" text-anchor="middle" class="small">A repeated sequence gets a new temporal window and mask, but it is still the same unique source sequence.</text>
+</svg>

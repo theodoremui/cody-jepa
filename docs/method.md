@@ -1,143 +1,372 @@
-# Method
+# Method guide
 
-## Research question
+This document turns the proposal into an executable evaluation recipe. For dataset
+roles and preprocessing, see [data.md](data.md). For motivation and reviewer-facing
+claims, see [proposal.md](proposal.md). For the evidence available so far, see
+[results.md](results.md).
 
-CoDy-JEPA asks whether a video representation contains factor structure that can be recombined to recover an observed target. Grounded Factorial Completion (GFC) tests this directly instead of treating prediction loss, representation breadth, or a linear probe as a complete measure of representation quality.
+## 1. Start with one narrow question
 
-Health&Gait supplies three binary instructed factors for each participant:
+> With architecture and training exposure held fixed, does increasing the number of
+> unique unlabelled walking sequences change how well speed, clothing, and direction
+> can be linearly read out and recombined?
 
-- speed: usual (`UGS`) or fast (`FGS`);
-- clothing: without a jacket (`WoJ`) or with a jacket (`WJ`);
-- direction: right to left (`R2L`) or left to right (`L2R`).
+The study varies unique-data diversity, not model size or training examples. It tests
+one six-layer JEPA-style silhouette-video encoder family on two named datasets. It does
+not test unsupervised factor discovery, causal disentanglement, a universal scaling law,
+clinical utility, or transfer to arbitrary video.
 
-A participant with one valid recording in every combination has eight cells. The factor meanings are experimental conditions; `UGS` and `FGS` are not substitutes for instrumented cadence or velocity.
+The primary evaluator is **GFC-v2**, or *gait factor composition, version 2*. It asks
+whether factor information taken from two recordings can identify a third recording
+with the intended combination of factors.
 
-## Recording features
+![GFC-v2 converts a recording to factor blocks, composes a query from two donors, searches all eight cells, and compares the full and small data rungs.](images/gfc-method-flow.svg)
 
-Models produce window-level features. The Health&Gait configuration expects three deterministic windows per recording. Their elementwise arithmetic mean is computed in `float64` before adapters, normalization, query construction, or scoring. Windows are correlated views of one direction clip and never become independent gallery items.
+## 2. Train the scaling ladder without changing the budget
 
-The baseline disables horizontal flipping during self-supervised training because left-to-right versus right-to-left is an evaluated factor. Spatial crops remain clip-consistent. Any future flip augmentation must be treated as an explicit ablation rather than an unrecorded default.
+Every primary run uses the same:
 
-Every window-level input row must identify the participant, recording, source video, direction clip, split, speed, clothing, and direction. Each recording must contribute three rows. Every row must also contain finite `feature_0` through `feature_D` values and the finite shortcut columns named in `configs/eval/gfc_healthgait.json`.
+- six-layer, 384-dimensional, single-stream JEPA-style ViT;
+- 16 silhouette frames at $112\times112$ pixels;
+- masking policy, optimizer, augmentations, effective batch size, learning-rate
+  schedule, exponential-moving-average schedule, and final pooling; and
+- training exposure of $C=8{,}192{,}000$ examples, or 128,000 updates at effective
+  batch size 64.
 
-## Query and gallery construction
+Horizontal flipping is disabled because direction is an evaluated factor.
 
-Every one of a participant's eight cells becomes a target. For target
+A *Vision Transformer* (ViT) represents the video as tokens and uses attention to mix
+information among them. The *JEPA-style* objective predicts hidden target features from
+visible context rather than reconstructing every output pixel. The exponential-moving-
+average (EMA) schedule updates the target encoder smoothly from the training encoder.
+*Effective batch size* means the total number of examples contributing to one optimizer
+update after combining devices and any gradient-accumulation steps.
 
-$$
-x_{s,p,c,d},
-$$
+Each of five replicate seeds defines nested GaitLU pools near 2.5k, 25k, 250k, and all
+eligible sequences. This gives 20 primary runs. Within a ladder, the same replicate seed
+drives optimization at every rung. Adding a rung adds source groups rather than
+replacing the earlier data.
 
-the condition donor is the same participant, clothing, and direction at the opposite instructed speed:
+![Four nested unique-data pools are compared at a fixed training exposure in each of five ladders.](images/scaling-ladders.svg)
 
-$$
-x^{\mathrm{cond}}=x_{s,\bar p,c,d}.
-$$
+A prespecified throughput gate may reduce **all** runs to 4,096,000 examples before any
+Health&Gait outcome is opened. Exposure cannot differ by rung. The final-step checkpoint
+is primary; a downstream result may not select a favorable epoch. Because pool sampling
+and optimization share one seed, the five ladders estimate their combined variability,
+not two separate variance components.
 
-The gait donors are the three cells at the target speed with a different clothing-direction pair:
+## 3. Convert each recording into one frozen vector
 
-$$
-x^{\mathrm{gait}}_j=x_{s,p,c',d'},
-\qquad (c',d')\ne(c,d).
-$$
+For a Health&Gait direction recording:
 
-The condition block from the first donor and gait block from the second form the mixed query. The target supplies no query features. Eight targets times three gait donors gives 24 queries per complete participant.
+1. Select three distinct, deterministic 16-frame windows.
+2. Pass each window through the frozen encoder.
+3. Average the three output vectors element by element in float64.
 
-The gallery begins with all eight cells and removes both donor recordings. It therefore contains the target and five distractors. Removing both donors is essential: each donor supplied half of the query and would otherwise receive a built-in similarity advantage.
+The result is one *recording representation*: a numerical summary of that clip. The
+three windows are repeated views of one recording, not independent samples. A complete
+participant contributes exactly eight recording vectors, one for each speed × clothing
+× direction cell.
 
-The primary analysis is complete-case. A missing cell excludes that participant because the two donors and six gallery items exhaust all eight cells. Duplicate cell assignments are errors. The evaluator never shrinks the gallery or imputes a recording.
+## 4. Align the representation with three labelled factor heads
 
-## Learned and shortcut paths
+Raw encoder coordinates have no agreed meaning. Therefore, for each frozen encoder, fit
+three separate linear *ridge heads* on the 76 complete development participants:
 
-For a single-block encoder, two closed-form ridge adapters map the complete recording feature vector to:
+- a two-score head for usual versus fast speed;
+- a two-score head for without versus with jacket; and
+- a two-score head for right-to-left versus left-to-right direction.
 
-- a four-dimensional condition block with targets `WoJ`, `WJ`, `R2L`, and `L2R`;
-- a two-dimensional gait block with targets `UGS` and `FGS`.
+A ridge head is a linear map with a penalty that discourages unnecessarily large
+coefficients. Input standardization centers and scales coordinates using development
+rows only. The intercept is not penalized; the coefficient penalty is $\alpha=1$.
+Population-statistic normalization uses the full fitted population convention, and
+post-map normalization puts each two-score block on a comparable scale before cosine
+distance is computed. All arithmetic is float64. These choices are frozen; values
+$\alpha=0.1$ and $10$ are sensitivity checks only.
 
-Inputs are population-standardized using development-training participants only. Both fits use squared-error one-hot targets, an unpenalized intercept, coefficient-only L2 regularization, and `alpha = 1`. Model weights remain fixed during this evaluation.
+For example, a recording vector with hundreds of unnamed coordinates becomes three
+two-number blocks:
 
-The shortcut path uses declared acquisition cues as its condition and gait blocks directly; it does not pass them through the learned-feature ridge adapters. It otherwise uses the same participants, train-only normalization, queries, galleries, distance, and scoring rules:
+```text
+speed block      [usual score, fast score]       = [0.10, 0.90]
+clothing block   [no-jacket score, jacket score] = [0.82, 0.18]
+direction block  [R2L score, L2R score]           = [0.25, 0.75]
+```
 
-- condition side: signed and absolute endpoint horizontal-centroid displacement plus foreground-area summaries;
-- gait side: log frame count and duration.
+These scores suggest “fast, no jacket, left-to-right.” Labels are used to learn this
+alignment, so a strong GFC-v2 result means **supervised linear factor recoverability and
+recombination**. It does not mean the encoder discovered named factors without labels.
 
-The primary contrast is the participant-level learned top-1 score minus the participant-level shortcut top-1 score on identical queries.
+### Match the acquisition-cue baseline
 
-## Normalization and sensitivity analyses
+Run the nine acquisition cues from [data.md](data.md) through the same three-head
+pipeline: same development participants, labels, output widths, ridge penalty,
+normalization, and tie rule. The learned and cue paths then differ in their inputs, not
+in label access or readout capacity.
 
-All normalization is fit on development-training participants and applied unchanged to evaluation participants. Condition and gait blocks are handled separately.
+Cue top-1 is an absolute shortcut diagnostic. Because the cue vector is identical at
+every data rung, subtracting it at both ends does not define a new scale effect. The
+primary scale contrast therefore uses learned GFC-v2 top-1 directly.
 
-The primary analysis, `raw_retain_all`, population-standardizes every learned adapter output and direct shortcut coordinate, then L2-normalizes each block. It does not discard a coordinate.
+## 5. Compose a query from two session-safe donors
 
-Two sensitivity analyses test whether the result depends on that choice:
+Represent a target condition as $x=(s,c,d)\in\{0,1\}^3$, where the entries denote
+speed, clothing, and direction. Choose the *focal factor* $a$ to be speed or clothing.
+Direction is never focal because the opposite-direction clip at fixed speed and
+clothing comes from the same physical back-and-forth walk.
 
-- `raw_effective_rank` retains the highest-variance raw coordinates, using the rounded entropy effective rank as the retained width;
-- `pca_effective_rank` uses a training-only full SVD and retains the same effective-rank width in principal-component space.
+Construct two complementary donor cells. Donor $u$ keeps the target's focal value and
+flips the other two values:
 
-For eigenvalues $\lambda_i$, define $p_i=\lambda_i/\sum_j\lambda_j$. Entropy effective rank is
+$$u_a=x_a,\qquad u_j=1-x_j\quad(j\ne a).$$
 
-$$
-r_{\mathrm{eff}}=\exp\left(-\sum_i p_i\log p_i\right).
-$$
+Donor $v$ flips the focal value and keeps the other two values:
 
-The retained width is at least one and uses nearest-integer half-up rounding. Population standard deviations and block norms have a `1e-12` floor. Nonfinite inputs are errors. A zero block remains zero and has cosine similarity zero with any block.
+$$v_a=1-x_a,\qquad v_j=x_j\quad(j\ne a).$$
 
-Sensitivity analyses are reported alongside the primary analysis; they are not used to select the more favorable result.
+The query copies the focal factor block from $u$ and the other two blocks from $v$. The
+target contributes no feature values to its own query.
 
-## Distance, ranking, and ties
+### Concrete example
 
-Condition and gait blocks receive equal weight:
+Suppose the target is **fast, jacket, left-to-right**, or $x=(1,1,1)$, and speed is
+focal. Then:
 
-$$
-d(q,g)=\tfrac12\left[1-\cos(q_{\mathrm{cond}},g_{\mathrm{cond}})\right]
-+\tfrac12\left[1-\cos(q_{\mathrm{gait}},g_{\mathrm{gait}})\right].
-$$
+- $u=(1,0,0)$ is fast, no jacket, right-to-left;
+- $v=(0,1,1)$ is usual, jacket, left-to-right; and
+- the composed query takes speed from $u$, plus clothing and direction from $v$.
 
-Aggregation, normalization, dot products, and score accumulation use `float64`. Distances differ only when their absolute difference exceeds `1e-12`; relative tolerance is zero.
+The intended answer is therefore fast + jacket + left-to-right, even though neither
+donor has that complete combination.
 
-If $a$ gallery items are strictly closer than the target and the target belongs to a tie of size $t$, its average occupied rank is
+![A GFC-v2 query takes one factor block from one donor and two blocks from the complementary donor without copying the target.](images/gfc-query.svg)
 
-$$
-r=a+\frac{t+1}{2}.
-$$
+Both donors must have `source_video_id` different from the target's source video. If
+either check fails, evaluation stops. This is *session-safe*: the query cannot exploit
+another clip cut from the target's physical walk. Each of eight targets is queried once
+with speed focal and once with clothing focal, giving 16 queries per participant.
 
-The reciprocal-rank score is $1/r$. Top-1 credit is $1/t$ when $a=0$, otherwise zero. Donor attraction separately compares the target with the excluded gait donor and awards 1, 0, or one-half for target closer, donor closer, or a tie.
+## 6. Search the full eight-cell gallery
 
-The six-item gallery has analytical top-1 chance $1/6$. Uniform tie-free ranks have expected MRR $49/120$. Constant blocks form a six-way tie and produce top-1 $1/6$, MRR $2/7$, and donor attraction $1/2$. Constant ties are not randomly broken.
+For each query, compare its three blocks with every one of the participant's eight
+recordings, including both donors. A *gallery* is simply this set of candidate answers.
 
-## Aggregation and inference
+For block $k$, cosine similarity measures the angle between the query and gallery
+vectors. Cosine distance is one minus that similarity. The three blocks receive equal
+weight:
 
-Metrics are averaged over 24 queries within each participant and then across participants with equal participant weight. Windows and queries are not independent inference units.
+$$d(q,g)=\frac{1}{3}\sum_{k\in\{s,c,d\}}\left[1-\cos(q_k,g_k)\right].$$
 
-Learned and shortcut results must contain identical participant, target-cell, gait-donor-cell, split, and gallery definitions. The participant-level differences are resampled with all paired queries kept together. The configured analysis uses 10,000 participant bootstrap draws, seed `20260728`, and a 95% percentile interval.
+The closest gallery item is the predicted recording. Retaining donors is important:
+returning to a donor is a meaningful composition failure. Removing donors would delete
+specific wrong answers and give some partial solutions free credit.
 
-The prospective power calculation uses a meaningful effect of one additional successful query per participant, $1/24$, a two-sided `alpha = 0.05`, and a minimum target power of 0.80. It is a planning calculation, not a model result or a substitute for the participant bootstrap.
+### Score top-1, rank, and ties deterministically
 
-## Scientific safeguards
+*Top-1* asks whether the target is the closest item. *Mean reciprocal rank* (MRR) gives
+partial credit when the target appears lower in the ordered gallery.
 
-The focused tests cover the behavior that can change the scientific interpretation:
+All distances use float64. Values within the frozen absolute tolerance are tied. If
+$a$ items are strictly closer than the target and the target is in a tie of size $t$,
+its average rank is
 
-- eight cells generate 24 queries and six-item galleries;
-- both donors are absent from every gallery;
-- missing and duplicate cells follow the stated policy;
-- exact-factor features retrieve every target;
-- constant blocks reproduce the declared tied null;
-- fractional top-1, MRR, and donor attraction handle ties correctly;
-- windows are aggregated before fitted transformations;
-- adapters and normalizers receive development-training rows only;
-- adding held-out rows cannot alter a training fit;
-- learned and shortcut paths use identical query keys;
-- query scores are averaged within participant before inference;
-- a fixed bootstrap seed gives repeatable numerical output.
+$$r=a+\frac{t+1}{2}.$$
 
-## Interpretation
+MRR credit is $1/r$. Top-1 credit is $1/t$ when $a=0$, and zero otherwise. For example,
+if the target ties with one other item for first place, it receives top-1 credit $1/2$
+and rank $1.5$. Ties are never broken randomly.
 
-A positive learned-over-shortcut interval would show completion information beyond the declared shortcut set. It would not establish causal factors, eliminate every possible shortcut, prove identity invariance, or demonstrate clinical value. The present repository contains no empirical GFC estimate yet.
+### Use the exact oracle spectrum as a ruler
+
+An *oracle* is a controlled solver that recovers a known subset of factors perfectly.
+If it knows $m$ of three binary factors, it ties among $2^{3-m}$ cells:
+
+| Factors recovered exactly | Tied cells | Expected top-1 |
+|---|---:|---:|
+| None | 8 | $1/8=12.50\%$ |
+| Any one | 4 | $1/4=25.00\%$ |
+| Any two | 2 | $1/2=50.00\%$ |
+| All three | 1 | $1=100.00\%$ |
+
+![The exact full-gallery oracle spectrum rises from chance at one eighth to perfect recovery as more factors are known.](images/oracle-spectrum.svg)
+
+These values are unit tests and interpretation anchors. A general enumerator must
+reproduce them and must also pass brute-force tests for designs with two through five
+binary factors.
+
+For historical continuity only, a secondary analysis removes both donors. Its spectrum
+is distorted: no-factor top-1 is $1/6$, one-factor top-1 is $1/3$, and two-factor values
+depend on the focal factor. This donor-excluded result never replaces the full-gallery
+primary result.
+
+## 7. Check whether GFC-v2 is merely classification
+
+GFC-v2 uses supervised factor heads, so two matched controls ask whether ordinary factor
+classification explains the result:
+
+1. **Hard completion:** take the highest-scoring label from each copied block, form the
+   three-label tuple, and retrieve that gallery cell.
+2. **Soft completion:** fit one temperature on development participants, multiply the
+   three factor-label probabilities for each gallery cell, and use the same tie rule.
+
+Interpret the controls before making a geometry claim:
+
+- If GFC-v2, the controls, and the single-factor probes move together, conclude only
+  that the three factors are jointly linearly recoverable.
+- If probes are high but GFC-v2 is poor, simultaneous block alignment or donor
+  composition has failed.
+- Claim additional factor-block geometry only if GFC-v2 differs reproducibly from both
+  controls across ladders.
+
+## 8. Aggregate the primary and diagnostic outcomes
+
+For participant $i$, average fractional top-1 credit across all 16 queries. Participants,
+not windows or queries, are the human-data analysis units.
+
+Also report:
+
+- learned and acquisition-cue MRR;
+- cue excess, $\Delta_i^{\mathrm{cue}}=\mathrm{top1}^{\mathrm{learned}}_i-
+  \mathrm{top1}^{\mathrm{cue}}_i$;
+- balanced accuracy of each factor head;
+- attraction to each donor;
+- speed-focal and clothing-focal results;
+- full-gallery and donor-excluded results; and
+- ridge-penalty sensitivities.
+
+Normalized headroom may show where a score lies between an oracle level and 100%, but
+it is not information, does not prove an omitted factor is absent, and cannot replace
+raw accuracy.
+
+Balanced accuracy is the mean of the per-label recalls. It therefore gives the two
+values of a factor equal importance even if their recording counts differ.
+
+## 9. Run two secondary capability tests
+
+### 9.1 Normalized context reliance
+
+Use the same 10,000 held-out GaitLU sequences for every rung. Keep the masked target,
+target positions, mask, and predictor positional inputs fixed, and replace only the
+visible context. The primary substitute comes from a different sequence in the nearest
+decile under the fixed geometry descriptor in [data.md](data.md).
+
+For sequence $i$:
+
+$$R_i^{\mathrm{near}}=\frac{L_i^{\mathrm{near\ substitute}}-L_i^{\mathrm{true}}}
+{\max(L_i^{\mathrm{true}},10^{-8})}.$$
+
+Report this ratio, both losses, their raw paired difference, the full distribution, and
+a sequence-level paired-bootstrap interval.
+
+![The context intervention keeps the prediction target fixed while replacing only visible context.](images/context-intervention.svg)
+
+Secondary substitutions use a non-overlapping segment from the same source when
+available, a fixed temporal permutation, a far geometry-matched sequence, and blank
+context. Blank context is an out-of-distribution stress test. None of these substitutions
+is a causal decomposition of semantic content.
+
+### 9.2 Cross-condition identity capability
+
+For each outcome participant, average the usual-speed, no-jacket recordings from both
+directions to make an enrollment vector. Use the other speed and clothing conditions as
+probes, and retrieve identities by cosine distance among all outcome participants.
+Report participant-weighted rank-1 and MRR.
+
+This is a surveillance-relevant capability test. Do not release identity-capable
+checkpoints, participant embeddings, subgroup rankings, or nearest-neighbor examples.
+
+## 10. Estimate the scale effect over five ladders
+
+Within each ladder, compute the participant-averaged difference between the full and
+2.5k rungs in learned GFC-v2 top-1. The primary estimate is the mean of these five
+ladder-level contrasts.
+
+Report:
+
+- a $t$ interval over the five ladder contrasts;
+- every replicate-specific four-rung curve;
+- participant-bootstrap intervals within each replicate; and
+- a crossed bootstrap as a sensitivity analysis.
+
+Participant resampling cannot replace the five trained-model replicates. There is one
+primary test. Probe, identity, context, effective-rank, focal-factor, and intermediate-
+rung analyses are secondary. A *bootstrap* repeatedly samples observed units with
+replacement to show how an estimate changes under resampling; each participant's 16
+queries stay together. Use Holm correction, a stepwise multiple-testing adjustment,
+within related secondary families.
+
+One of 16 queries corresponds to 6.25 percentage points, so set
+$\delta=6.25$ points before viewing outcomes:
+
+| Result | Decision rule |
+|---|---|
+| Meaningful positive | 95% interval is above zero and estimate is at least $\delta$ |
+| Positive but small | 95% interval is above zero and estimate is below $\delta$ |
+| Equivalent to flat at this resolution | 90% interval lies inside $[-\delta,+\delta]$ |
+| Inconclusive | Neither superiority nor equivalence is established |
+
+Failure to reject zero is not evidence of a flat curve. Four observed data rungs also
+do not justify fitting or claiming a universal power law.
+
+## 11. Freeze first, then open outcomes
+
+Before any outcome aggregate is viewed, freeze in a timestamped commit:
+
+- participant roles and exclusions;
+- GaitLU pools and training exposure;
+- all 20 checkpoints and reference checkpoints;
+- GFC-v2, the oracle enumerator, and both completion controls;
+- factor heads, cue heads, normalizers, and temperature;
+- context and identity protocols;
+- statistical code, effect thresholds, and figure templates.
+
+The currently checked-in GFC files come from a legacy 24-query, donor-excluded protocol
+with historical cohort roles and comparator-specific normalization. They are useful for
+motivation and audit only. An output may be called a revised-study result only when its
+metadata explicitly record:
+
+```text
+protocol=gfc_v2
+gallery=retain_all_8
+queries_per_participant=16
+factor_heads=three_matched_ridge_heads
+cohort_roles=<checksum of frozen prospective role map>
+```
+
+## 12. Required evaluator checks
+
+Before scoring real outcomes, verify that:
+
+- complete participants have exactly eight unique factor cells;
+- donors and targets are selected from manifest fields, including `source_video_id`;
+- target features never enter their own query;
+- both donors remain in every primary gallery;
+- every primary query has eight candidates and every participant has 16 queries;
+- exact, partial, constant, nuisance-only, donor-attraction, hard-control, and
+  soft-control cases reproduce their declared behavior;
+- learned and cue paths use identical fitting capacity and query keys;
+- only development rows fit heads, normalizers, and temperature;
+- adding outcome rows cannot change any development fit;
+- queries are averaged within participant before statistical analysis; and
+- every primary encoder reaches the same frozen exposure or follows the prespecified
+  systems-failure rule.
+
+## 13. State only the claim the experiment supports
+
+The strongest permitted conclusion is specific to this encoder family and these
+datasets: increasing unique GaitLU data changes, does not materially change, or leaves
+unresolved the supervised linear recoverability and recombination of three Health&Gait
+factors.
+
+The experiment cannot establish causal gait variables, intrinsic unsupervised
+disentanglement, clinical usefulness, identity safety, or general transfer to other
+populations and capture settings.
 
 ## References
 
+- Andreas, J. (2019). [Measuring Compositionality in Representation Learning](https://openreview.net/forum?id=HJz05o0qK7). ICLR.
 - Eastwood, C., and Williams, C. K. I. (2018). [A Framework for the Quantitative Evaluation of Disentangled Representations](https://openreview.net/forum?id=By-7dz-AZ). ICLR.
-- Gondal, M. W., et al. (2019). [On the Transfer of Inductive Bias from Simulation to the Real World: A New Disentanglement Dataset](https://proceedings.neurips.cc/paper/2019/hash/d97d404b6119214e4a7018391195240a-Abstract.html). NeurIPS.
-- Gretton, A., Bousquet, O., Smola, A., and Schölkopf, B. (2005). [Measuring Statistical Dependence with Hilbert-Schmidt Norms](https://doi.org/10.1007/11564089_7). ALT.
+- Fan, C., Hou, S., Huang, Y., and Yu, S. (2022). [Learning Gait Representation from Massive Unlabelled Walking Videos: A Benchmark](https://arxiv.org/abs/2206.13964).
 - Hu, Q., Szabó, A., Portenier, T., Favaro, P., and Zwicker, M. (2018). [Disentangling Factors of Variation by Mixing Them](https://openaccess.thecvf.com/content_cvpr_2018/html/Hu_Disentangling_Factors_of_CVPR_2018_paper.html). CVPR.
 - Zafra-Palma, J., et al. (2025). [Health & Gait: A Dataset for Gait-Based Analysis](https://www.nature.com/articles/s41597-024-04327-4). Scientific Data.

@@ -1,0 +1,78 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1400" height="650" viewBox="0 0 1400 650" role="img" aria-labelledby="title desc">
+  <title id="title">End-to-end GFC-v2 method flow</title>
+  <desc id="desc">Three recording windows are averaged, three development-fitted factor heads create speed, clothing, and direction blocks, two source-safe donors form a query, all eight gallery cells are ranked, sixteen queries are averaged per participant, and full-minus-small contrasts are compared across five training ladders.</desc>
+  <defs>
+    <marker id="arrow" markerWidth="10" markerHeight="10" refX="9" refY="5" orient="auto"><path d="M0,0 L10,5 L0,10 Z" fill="#56657a"/></marker>
+    <style>
+      .title { font: 700 30px system-ui, sans-serif; fill: #172033; }
+      .heading { font: 700 17px system-ui, sans-serif; fill: #172033; }
+      .body { font: 400 15px system-ui, sans-serif; fill: #334155; }
+      .small { font: 400 13px system-ui, sans-serif; fill: #526075; }
+      .card { fill: #f8fafc; stroke: #9aa8ba; stroke-width: 2; }
+      .head { fill: #eaf2ff; stroke: #648db8; stroke-width: 2; }
+      .score { fill: #eaf7ef; stroke: #4f8d68; stroke-width: 2; }
+      .decision { fill: #fff4e8; stroke: #c98248; stroke-width: 2; }
+      .arrow { fill: none; stroke: #56657a; stroke-width: 3; marker-end: url(#arrow); }
+    </style>
+  </defs>
+  <rect width="1400" height="650" fill="#ffffff"/>
+  <text x="700" y="48" text-anchor="middle" class="title">GFC-v2 turns frozen vectors into one run-level scale contrast</text>
+  <text x="700" y="80" text-anchor="middle" class="body">Every arrow marks a boundary where fitting, grouping, or averaging must be controlled.</text>
+
+  <g transform="translate(35 165)">
+    <rect width="200" height="180" rx="15" class="card"/>
+    <text x="100" y="38" text-anchor="middle" class="heading">Recording vector</text>
+    <text x="100" y="78" text-anchor="middle" class="body">3 windows</text>
+    <text x="100" y="106" text-anchor="middle" class="body">averaged once</text>
+    <text x="100" y="145" text-anchor="middle" class="small">encoder stays frozen</text>
+  </g>
+  <path d="M235 255 H280" class="arrow"/>
+
+  <g transform="translate(280 125)">
+    <rect width="225" height="260" rx="15" class="head"/>
+    <text x="112.5" y="38" text-anchor="middle" class="heading">Three ridge heads</text>
+    <text x="112.5" y="82" text-anchor="middle" class="body">speed block</text>
+    <text x="112.5" y="118" text-anchor="middle" class="body">clothing block</text>
+    <text x="112.5" y="154" text-anchor="middle" class="body">direction block</text>
+    <text x="112.5" y="201" text-anchor="middle" class="small">fit on development only</text>
+    <text x="112.5" y="226" text-anchor="middle" class="small">same capacity for shortcuts</text>
+  </g>
+  <path d="M505 255 H550" class="arrow"/>
+
+  <g transform="translate(550 145)">
+    <rect width="220" height="220" rx="15" class="card"/>
+    <text x="110" y="38" text-anchor="middle" class="heading">Compose a query</text>
+    <text x="110" y="82" text-anchor="middle" class="body">2 complementary donors</text>
+    <text x="110" y="116" text-anchor="middle" class="body">target contributes nothing</text>
+    <text x="110" y="150" text-anchor="middle" class="body">source IDs must differ</text>
+    <text x="110" y="192" text-anchor="middle" class="small">speed or clothing is focal</text>
+  </g>
+  <path d="M770 255 H815" class="arrow"/>
+
+  <g transform="translate(815 145)">
+    <rect width="210" height="220" rx="15" class="score"/>
+    <text x="105" y="38" text-anchor="middle" class="heading">Rank all 8 cells</text>
+    <text x="105" y="82" text-anchor="middle" class="body">3 cosine block distances</text>
+    <text x="105" y="116" text-anchor="middle" class="body">equal weight</text>
+    <text x="105" y="150" text-anchor="middle" class="body">fractional ties</text>
+    <text x="105" y="192" text-anchor="middle" class="small">donors remain candidates</text>
+  </g>
+  <path d="M1025 255 H1070" class="arrow"/>
+
+  <g transform="translate(1070 145)">
+    <rect width="210" height="220" rx="15" class="card"/>
+    <text x="105" y="38" text-anchor="middle" class="heading">Average within person</text>
+    <text x="105" y="82" text-anchor="middle" class="body">8 targets × 2 focal factors</text>
+    <text x="105" y="116" text-anchor="middle" class="body">= 16 queries</text>
+    <text x="105" y="158" text-anchor="middle" class="small">one participant score</text>
+  </g>
+  <path d="M1280 255 H1330 V455 H1185" class="arrow"/>
+
+  <g transform="translate(350 445)">
+    <rect width="835" height="115" rx="16" class="decision"/>
+    <text x="417.5" y="38" text-anchor="middle" class="heading">Compare unique-data scale across trained models</text>
+    <text x="417.5" y="70" text-anchor="middle" class="body">full − small within each nested ladder</text>
+    <text x="417.5" y="96" text-anchor="middle" class="small">five ladder contrasts provide the primary run-level uncertainty</text>
+  </g>
+  <text x="700" y="615" text-anchor="middle" class="small">Participants measure person-to-person variation; the five ladders measure trained-model variation.</text>
+</svg>

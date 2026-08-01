@@ -1,10 +1,10 @@
 # CoDy-JEPA
 
-CoDy-JEPA is a research codebase for asking whether video representations preserve factors that can be recombined correctly. Its main evaluation is **Grounded Factorial Completion (GFC)**: two non-target recordings supply complementary representation blocks, and their mixed query must retrieve the real recording with the requested factor combination.
+CoDy-JEPA is a research codebase for asking whether video representations preserve factors that can be recombined correctly. Its main evaluation family is **Grounded Factorial Completion (GFC)**: two non-target recordings supply complementary representation blocks, and their mixed query must retrieve the real recording with the requested factor combination.
 
-On Health&Gait, the factors are instructed speed, jacket condition, and walking direction. A complete participant has eight observed cells and contributes 24 GFC queries. Both donor recordings are removed from each gallery, leaving the target and five distractors. The primary comparison is the participant-level difference between learned-feature GFC and a shortcut baseline built from duration, frame count, image-plane motion, and foreground area.
+The maintained Health&Gait implementation and checked-in preliminary results use the legacy GFC protocol: a complete participant has eight observed cells and contributes 24 queries, both donors are removed from each gallery, and learned features are compared with duration, frame-count, image-plane-motion, and foreground-area shortcuts. The prospectively specified GFC-v2 study instead keeps the full eight-cell gallery and uses 16 session-safe queries; it has not yet produced outcome results.
 
-The repository currently contains model-training code and aggregate Phase 0/1 diagnostic results. It does **not** yet contain an empirical GFC result, a learned-over-shortcut estimate, an external gait-measurement result, or a cross-dataset result.
+The repository contains model-training code, aggregate Phase 0/1 diagnostics, and development-split GFC results for three selected checkpoints. It does **not** yet contain a confirmation-split GFC result, an external gait-measurement result, or a cross-dataset result.
 
 ## Setup
 
@@ -45,7 +45,8 @@ Health&Gait is not redistributed. After obtaining access from the dataset provid
 uv run python scripts/build_healthgait_manifest.py --fps 30
 ```
 
-The example uses 30 frames per second. Confirm the rate for the local release and pass that value explicitly because duration is one of the shortcut controls.
+The acquisition is nominally 30 Hz. Verify the actual frame rate for the local release
+and pass it explicitly because duration is one of the shortcut controls.
 
 Train the single-stream baseline, export recording features, and evaluate the diagnostic probes:
 
@@ -65,7 +66,20 @@ uv run python scripts/eval_probes.py \
   --output-dir outputs/training-baseline/probes
 ```
 
-Run GFC from the exported window-level feature table. The runner averages its three rows per recording before fitting or scoring; required factor, split, learned-feature, and shortcut columns are described in [the method](docs/method.md):
+Run GFC from the exported window-level feature table. The runner averages its three rows per recording before fitting or scoring; required factor, split, learned-feature, and shortcut columns are described in [the method](docs/method.md).
+
+If you have a legacy deterministic NPZ export, upgrade it to the validated GFC feature
+boundary without changing its float32 feature values:
+
+```bash
+uv run cody-jepa-prepare-gfc-features \
+  --legacy-features outputs/training-baseline/legacy-features.npz \
+  --manifest data/healthgait/manifests/gfc_manifest.csv \
+  --output outputs/training-baseline/features.npz
+```
+
+The upgrade requires exactly three distinct window rows per recording and records only
+input basenames and SHA-256 digests in its provenance metadata.
 
 ```bash
 uv run python scripts/run_gfc.py \
@@ -114,10 +128,12 @@ Detailed participant and optional query outputs stay under ignored `outputs/`; o
 - [Method](docs/method.md): GFC construction, controls, normalization, scoring, and inference.
 - [Data](docs/data.md): Health&Gait access, layout, splits, privacy, and preprocessing boundaries.
 - [Results](docs/results.md): current aggregate evidence and the claims it does and does not support.
+- [Paper draft](docs/paper.md): concise manuscript skeleton for the revised ICLR 2027 study.
+- [Research proposal](docs/proposal.md): accessible motivation, study design, preliminary evidence, and proposed confirmation work.
 - [Result files](results/README.md): compact inputs to the paper-result generator.
 
 ## Data and claim boundaries
 
-Keep raw frames, archives, participant tables, checkpoints, and participant-level feature exports outside Git. Publish only aggregate, non-identifying results. All fitted transformations use training participants only; windows are aggregated to recordings before scoring; donors are excluded from galleries; and participants receive equal weight in cohort inference.
+Keep raw frames, archives, participant tables, checkpoints, and participant-level feature exports outside Git. Publish only aggregate, non-identifying results. In the checked-in legacy analysis, all fitted transformations use training participants only, windows are aggregated to recordings before scoring, donors are excluded from galleries, and participants receive equal weight in cohort inference. The revised full-gallery protocol is documented separately and remains prospective.
 
 Current results are single-seed diagnostics on one Health&Gait split. They motivate GFC because prediction loss, representation breadth, context sensitivity, and probe scores prefer different checkpoints. They do not establish semantic factorization, causal gait structure, clinical validity, or transfer beyond Health&Gait.
