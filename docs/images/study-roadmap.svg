@@ -1,0 +1,84 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1400" height="650" viewBox="0 0 1400 650" role="img" aria-labelledby="title desc">
+  <title id="title">Roadmap of the revised data-scaling study</title>
+  <desc id="desc">The study trains encoders on four nested GaitLU data pools at equal exposure, freezes each encoder, fits evaluation heads on the Health and Gait development cohort, measures recombination, context reliance, and identity on locked data, then applies prespecified decision rules.</desc>
+  <defs>
+    <marker id="arrow" markerWidth="10" markerHeight="10" refX="9" refY="5" orient="auto">
+      <path d="M0,0 L10,5 L0,10 Z" fill="#56657a"/>
+    </marker>
+    <style>
+      .title { font: 700 30px system-ui, sans-serif; fill: #172033; }
+      .heading { font: 700 19px system-ui, sans-serif; fill: #172033; }
+      .body { font: 400 16px system-ui, sans-serif; fill: #334155; }
+      .small { font: 400 14px system-ui, sans-serif; fill: #526075; }
+      .card { fill: #f8fafc; stroke: #9aa8ba; stroke-width: 2; }
+      .train { fill: #eaf2ff; stroke: #648db8; stroke-width: 2; }
+      .eval { fill: #eaf7ef; stroke: #4f8d68; stroke-width: 2; }
+      .decision { fill: #fff4e8; stroke: #c98248; stroke-width: 2; }
+      .arrow { fill: none; stroke: #56657a; stroke-width: 3; marker-end: url(#arrow); }
+    </style>
+  </defs>
+
+  <rect width="1400" height="650" fill="#ffffff"/>
+  <text x="700" y="48" text-anchor="middle" class="title">The study is one controlled chain of evidence</text>
+  <text x="700" y="78" text-anchor="middle" class="body">Each step answers a different question; none can be skipped without changing the claim.</text>
+
+  <g transform="translate(45 130)">
+    <rect width="285" height="205" rx="16" class="train"/>
+    <text x="142.5" y="38" text-anchor="middle" class="heading">1. Change unique data</text>
+    <text x="142.5" y="77" text-anchor="middle" class="body">Train the same encoder on</text>
+    <text x="142.5" y="103" text-anchor="middle" class="body">2.5k · 25k · 250k · full</text>
+    <text x="142.5" y="137" text-anchor="middle" class="body">Keep examples seen fixed</text>
+    <text x="142.5" y="170" text-anchor="middle" class="small">5 nested ladders = 20 runs</text>
+  </g>
+
+  <path d="M330 232 H390" class="arrow"/>
+
+  <g transform="translate(390 130)">
+    <rect width="285" height="205" rx="16" class="card"/>
+    <text x="142.5" y="38" text-anchor="middle" class="heading">2. Freeze each encoder</text>
+    <text x="142.5" y="77" text-anchor="middle" class="body">No Health&amp;Gait outcome</text>
+    <text x="142.5" y="103" text-anchor="middle" class="body">selects a checkpoint</text>
+    <text x="142.5" y="137" text-anchor="middle" class="body">Fit factor heads only on</text>
+    <text x="142.5" y="163" text-anchor="middle" class="body">76 development participants</text>
+  </g>
+
+  <path d="M675 232 H735" class="arrow"/>
+
+  <g transform="translate(735 130)">
+    <rect width="285" height="205" rx="16" class="eval"/>
+    <text x="142.5" y="38" text-anchor="middle" class="heading">3. Measure three abilities</text>
+    <text x="142.5" y="78" text-anchor="middle" class="body">Factor recombination</text>
+    <text x="142.5" y="108" text-anchor="middle" class="body">Context reliance</text>
+    <text x="142.5" y="138" text-anchor="middle" class="body">Cross-condition identity</text>
+    <text x="142.5" y="174" text-anchor="middle" class="small">Locked cohort: 308 complete</text>
+  </g>
+
+  <path d="M1020 232 H1080" class="arrow"/>
+
+  <g transform="translate(1080 130)">
+    <rect width="275" height="205" rx="16" class="decision"/>
+    <text x="137.5" y="38" text-anchor="middle" class="heading">4. Apply frozen rules</text>
+    <text x="137.5" y="78" text-anchor="middle" class="body">Meaningful positive</text>
+    <text x="137.5" y="108" text-anchor="middle" class="body">Equivalent to flat</text>
+    <text x="137.5" y="138" text-anchor="middle" class="body">or inconclusive</text>
+    <text x="137.5" y="174" text-anchor="middle" class="small">No story chosen after results</text>
+  </g>
+
+  <g transform="translate(100 405)">
+    <rect width="1200" height="155" rx="18" fill="#f8fafc" stroke="#c2ccd8" stroke-width="2"/>
+    <text x="600" y="35" text-anchor="middle" class="heading">The three data roles never overlap</text>
+    <rect x="55" y="58" width="315" height="62" rx="12" class="train"/>
+    <text x="212.5" y="84" text-anchor="middle" class="body">GaitLU-1M</text>
+    <text x="212.5" y="106" text-anchor="middle" class="small">encoder training + context holdout</text>
+    <rect x="442" y="58" width="315" height="62" rx="12" class="card"/>
+    <text x="599.5" y="84" text-anchor="middle" class="body">Health&amp;Gait development</text>
+    <text x="599.5" y="106" text-anchor="middle" class="small">fit heads and validate code</text>
+    <rect x="830" y="58" width="315" height="62" rx="12" class="eval"/>
+    <text x="987.5" y="84" text-anchor="middle" class="body">Health&amp;Gait outcome</text>
+    <text x="987.5" y="106" text-anchor="middle" class="small">open once after the freeze</text>
+    <path d="M370 89 H430" class="arrow"/>
+    <path d="M757 89 H818" class="arrow"/>
+  </g>
+
+  <text x="700" y="615" text-anchor="middle" class="small">The final claim is about this architecture, this corpus, and this evaluation protocol—not all video models.</text>
+</svg>

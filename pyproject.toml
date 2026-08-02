@@ -23,6 +23,7 @@ cody-jepa-export-features = "cody_jepa.cli.export_features:main"
 cody-jepa-eval-probes = "cody_jepa.cli.eval_probes:main"
 cody-jepa-run-gfc = "cody_jepa.cli.run_gfc:main"
 cody-jepa-build-manifest = "cody_jepa.cli.build_manifest:main"
+cody-jepa-prepare-gfc-features = "cody_jepa.cli.prepare_gfc_features:main"
 cody-jepa-make-results = "cody_jepa.cli.make_results:main"
 cody-jepa-export-histories = "cody_jepa.cli.export_histories:main"
 

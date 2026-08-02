@@ -108,6 +108,17 @@ class ResearchPipelineSmokeTest(unittest.TestCase):
             self.assertEqual(summary["evaluation"]["excluded_participant_count"], 0)
             self.assertGreater(summary["learned"]["top1"], summary["shortcut"]["top1"])
 
+            npz_features = root / "features.npz"
+            write_feature_table(table, npz_features)
+            npz_summary = run_gfc(
+                npz_features,
+                PROJECT_ROOT / "configs" / "eval" / "gfc_healthgait.json",
+                "development",
+                root / "gfc-npz",
+                model_label="synthetic-factor-pattern-encoder",
+            )
+            self.assertEqual(npz_summary, summary)
+
 
 if __name__ == "__main__":
     unittest.main()

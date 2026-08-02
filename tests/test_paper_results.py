@@ -19,6 +19,7 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 
 def gfc_summary(normalization, model_label="synthetic-model"):
     return {
+        "protocol": "legacy_donor_excluded_v1",
         "split": "development",
         "normalization": normalization,
         "model_label": model_label,
@@ -62,6 +63,15 @@ class PaperResultTest(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, "both sensitivities"):
                 make_paper_results(results, generated)
 
+            without_protocol = gfc_summary("raw_retain_all")
+            without_protocol.pop("protocol")
+            (first / "summary.json").write_text(json.dumps(without_protocol))
+            with self.assertRaisesRegex(ValueError, "must declare protocol"):
+                make_paper_results(results, generated)
+            (first / "summary.json").write_text(
+                json.dumps(gfc_summary("raw_retain_all"))
+            )
+
             for normalization in GFC_NORMALIZATIONS - {"raw_retain_all"}:
                 target = results / f"gfc-{normalization}"
                 target.mkdir()
@@ -76,8 +86,8 @@ class PaperResultTest(unittest.TestCase):
                 make_paper_results(results, generated)
             incompatible_path.write_text(json.dumps(gfc_summary("raw_effective_rank")))
             paths = make_paper_results(results, generated)
-            self.assertIn(generated / "gfc_table.csv", paths)
-            self.assertTrue((generated / "gfc_comparison.png").is_file())
+            self.assertIn(generated / "legacy_gfc_table.csv", paths)
+            self.assertTrue((generated / "legacy_gfc_comparison.png").is_file())
 
             for normalization in GFC_NORMALIZATIONS:
                 target = results / f"gfc-second-{normalization}"
@@ -85,19 +95,42 @@ class PaperResultTest(unittest.TestCase):
                 (target / "summary.json").write_text(
                     json.dumps(gfc_summary(normalization, "second-model"))
                 )
+                confirmation = gfc_summary(normalization)
+                confirmation["split"] = "confirmation"
+                confirmation_target = results / f"gfc-confirmation-{normalization}"
+                confirmation_target.mkdir()
+                (confirmation_target / "summary.json").write_text(
+                    json.dumps(confirmation)
+                )
             make_paper_results(results, generated)
-            table = pd.read_csv(generated / "gfc_table.csv")
-            self.assertEqual(len(table), 6)
+            table = pd.read_csv(generated / "legacy_gfc_table.csv")
+            self.assertEqual(len(table), 9)
             self.assertEqual(
-                set(table["model_label"]),
-                {"synthetic-model", "second-model"},
+                list(
+                    zip(
+                        table["model_label"],
+                        table["split"],
+                        table["normalization"],
+                    )
+                ),
+                [
+                    ("second-model", "development", "raw_retain_all"),
+                    ("second-model", "development", "raw_effective_rank"),
+                    ("second-model", "development", "pca_effective_rank"),
+                    ("synthetic-model", "confirmation", "raw_retain_all"),
+                    ("synthetic-model", "confirmation", "raw_effective_rank"),
+                    ("synthetic-model", "confirmation", "pca_effective_rank"),
+                    ("synthetic-model", "development", "raw_retain_all"),
+                    ("synthetic-model", "development", "raw_effective_rank"),
+                    ("synthetic-model", "development", "pca_effective_rank"),
+                ],
             )
 
             for path in results.glob("gfc-*"):
                 shutil.rmtree(path)
             make_paper_results(results, generated)
-            self.assertFalse((generated / "gfc_table.csv").exists())
-            self.assertFalse((generated / "gfc_comparison.png").exists())
+            self.assertFalse((generated / "legacy_gfc_table.csv").exists())
+            self.assertFalse((generated / "legacy_gfc_comparison.png").exists())
 
     def test_context_figure_labels_cover_every_compact_result_value(self):
         value = json.loads((PROJECT_ROOT / "results" / "context_diagnosis.json").read_text())

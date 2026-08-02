@@ -1,55 +1,230 @@
-# Results
+# Results and evidence trajectory
 
-## Current evidence boundary
+## Status at a glance
 
-The checked-in aggregate results answer a narrow preliminary question: do existing single-stream checkpoints receive the same ranking from prediction loss, representation diagnostics, context-use diagnostics, and linear probes? They do not.
+The revised GaitLU scaling experiment has **not yet produced results**. Current checked-in
+artifacts come from earlier Health&Gait-only, seed-0 experiments and a legacy GFC
+protocol. They justify the revised question and expose design failures; they do not
+answer whether unique-data scale improves GFC-v2.
 
-No empirical Grounded Factorial Completion result has been run from the compact pipeline yet. The repository therefore makes no claim that learned features beat shortcuts, recover instrumented gait structure, or transfer to another dataset.
+| Stage | Data and protocol | What exists | Evidentiary role |
+|---|---|---|---|
+| Phase 0 | Health&Gait encoder, one seed | Training, pooling, context, identity, and speed diagnostics | Feasibility and anomaly discovery |
+| Phase 1 | Health&Gait encoder sweep, one seed | Diagnostic comparison across checkpoints | Shows standard metrics disagree |
+| Legacy GFC | 24 queries, two donors deleted, 308 complete fit / 76 complete evaluate participants | Development scores for three checkpoints | Preliminary result and protocol self-audit |
+| Revised ICLR study | GaitLU-only encoders, GFC-v2, 20 runs, locked 318-person outcome cohort (308 complete) | No outcome results yet | Planned prospectively locked scaling audit |
 
-## Phase 0 baseline
+The terms *primary*, *development*, and *confirmation* in historical compact files refer
+to their original analyses. They must not be carried into the revised protocol without
+the version and cohort qualifiers below.
 
-The seed-0 baseline used 2,506 training sequences from 318 participants and 624 validation sequences from 80 disjoint participants. Three deterministic windows per sequence produced 7,518 training feature rows and 1,872 validation rows.
+## Stage 1: Phase 0 feasibility and conflicting diagnostics
 
-At the epoch-80 best-loss checkpoint, the subject-balanced validation loss was `0.387394`, pooled effective rank was `10.452` out of 384, and the wrong-context gap was `0.000154`. Closed-set identity accuracy was `9.25%`, held-out identity retrieval was `2.45%`, and instructed-speed balanced accuracy was `92.57%`.
+The seed-0 baseline used 2,506 Health&Gait training sequences from 318 participants and
+624 validation sequences from 80 participant-disjoint participants. Three deterministic
+windows per sequence yielded 7,518 training feature rows and 1,872 validation rows.
+These are correlated window rows, not inferential sample sizes.
 
-The endpoint checkpoint at epoch 100 had nearly the same validation loss and representation breadth. These values establish feasibility for training and feature extraction, not semantic factorization.
+At the epoch-80 best-loss checkpoint:
 
-The compact source is `results/phase0_summary.json`; the generator writes the active table to [phase0_table.csv](../results/generated/phase0_table.csv).
+- subject-balanced validation loss was `0.387394`;
+- pooled effective rank was `10.452` of 384;
+- wrong-context excess loss was about `0.000154`;
+- closed-set identity accuracy was `9.25%`;
+- held-out identity retrieval was `2.45%`; and
+- instructed-speed balanced accuracy was `92.57%`.
 
-## Phase 1 checkpoint comparison
+The epoch-100 endpoint had similar validation loss and pooled breadth. These results
+showed that the trainer and feature export worked and that speed was linearly
+recoverable. They did not demonstrate factorization or meaningful use of context.
 
-The Phase 1 sweep changes learning rate, target-encoder momentum, mask difficulty, predictor depth, and pooled clip-variance regularization. All reported rows use seed 0 and the same subject split.
+The compact source is `results/phase0_summary.json`; the active table is
+[phase0_table.csv](../results/generated/phase0_table.csv).
 
-Different measurements favor different checkpoints:
+## Stage 2: Phase 1 checkpoint disagreement
 
-- `a03-ema0.995` has the lowest selected-checkpoint validation loss among Stage A rows (`0.3818`) but only `1.35%` effective-rank ratio and a near-zero context gap.
-- `a05-mask-heavy` has the best Stage A closed-set identity accuracy (`10.74%`).
-- `a04-mask-light` has the best Stage A instructed-speed balanced accuracy (`93.75%`).
-- `a07-clip-var` increases the effective-rank ratio to `6.57%` and held-out retrieval to `4.04%`, while instructed-speed balanced accuracy falls to `89.26%`.
-- `b02-mask-light-clip-var` reaches the broadest pooled representation (`19.58%` effective-rank ratio), largest wrong-context gap (`0.1136`), and best held-out retrieval (`4.84%`) across all reported rows, but its instructed-speed balanced accuracy is `88.41%`.
-- `b01-mask-light` has the lowest selected-checkpoint validation loss among Stage B rows (`0.3823`) and retains `92.52%` instructed-speed balanced accuracy, but its effective-rank ratio is only `2.83%`.
+The Phase 1 sweep varied learning rate, target momentum, mask difficulty, predictor
+depth, and pooled clip-variance regularization, while retaining seed 0 and the same
+participant split. Different diagnostics selected different checkpoints:
 
-These disagreements motivate an observed completion task with an explicit shortcut comparator. They do not show that GFC will prefer a scientifically better checkpoint.
+- `a03-ema0.995` had the lowest selected Stage A validation loss (`0.3818`) but only
+  `1.35%` effective-rank ratio and a near-zero context gap;
+- `a05-mask-heavy` had the strongest Stage A closed-set identity accuracy (`10.74%`);
+- `a04-mask-light` had the strongest Stage A speed balanced accuracy (`93.75%`);
+- `a07-clip-var` increased effective-rank ratio to `6.57%` and held-out retrieval to
+  `4.04%`, while speed balanced accuracy fell to `89.26%`;
+- `b02-mask-light-clip-var` produced the broadest pooled representation (`19.58%`),
+  largest wrong-context gap (`0.1136`), and highest held-out retrieval (`4.84%`), but
+  speed balanced accuracy was `88.41%`; and
+- `b01-mask-light` had the lowest selected Stage B validation loss (`0.3823`) and
+  `92.52%` speed balanced accuracy, but only `2.83%` effective-rank ratio.
 
-The compact row-level source is `results/phase1_summary.csv`. The active outputs are [phase1_table.csv](../results/generated/phase1_table.csv) and the diagnostic comparison below.
+This rank disagreement motivated a real-target completion test. It did not identify
+which checkpoint had scientifically better factor structure.
+
+Source: `results/phase1_summary.csv`. Generated outputs:
+[phase1_table.csv](../results/generated/phase1_table.csv) and the figure below.
 
 ![Phase 1 validation loss and effective-rank ratio](../results/generated/phase1_diagnostics.png)
 
-## Context and pooling diagnosis
+## Stage 3: context and pooling diagnosis
 
-The context diagnosis separates token-level diversity from recording-level diversity. The combined context-token representation has effective rank `381.58` out of 384, while the pooled online representation has effective rank `10.44`. Token diversity therefore did not guarantee a broad pooled recording representation.
+Token-level diversity did not survive recording pooling. Context tokens had effective
+rank `381.58` of 384, whereas the pooled online recording representation had effective
+rank `10.44`. A broad token representation therefore did not guarantee a broad pooled
+representation.
 
-Replacing context with another participant's clip increased loss by only about `0.000156` on average. Same-participant replacement produced a similar gap (`0.000161`), and temporal shuffling produced a smaller one (`0.0000475`). This does not support a claim that the predictor isolated identity or motion.
+Replacing visible context with another participant's clip increased loss by only about
+`0.000156`; same-participant replacement produced `0.000161`, and temporal shuffling
+produced `0.0000475`. Only `9.62%` of masked target tokens were foreground under the
+diagnostic threshold. The foreground-only gap (`0.0000467`) was smaller than the
+background-only gap (`0.0001679`).
 
-Only `9.62%` of masked target tokens were foreground under the diagnostic threshold. The foreground-only gap (`0.0000467`) was smaller than the background-only gap (`0.0001679`). This motivates controls for acquisition and framing cues; it does not prove that any particular shortcut predicts a factor.
+These values motivated the revised normalized, geometry-matched intervention. They do
+not show that every JEPA ignores context, isolate identity, or prove that a particular
+acquisition shortcut causes prediction.
 
-The compact source is `results/context_diagnosis.json`.
+Source: `results/context_diagnosis.json`.
 
 ![Context substitution gaps and token-versus-pooled breadth](../results/generated/context_diagnosis.png)
 
-## Regenerating tables and figures
+## Stage 4: legacy GFC development results
 
-The paper-result generator reads the compact files directly:
+### Historical protocol
+
+The checked-in GFC summaries used the old protocol, not GFC-v2:
+
+- 308 complete participants from the historical training group fitted adapters and
+  normalizers;
+- 76 complete participants from the historical validation group were evaluated;
+- every participant contributed 24 queries;
+- a fixed condition donor and one of three gait donors supplied two blocks;
+- both donors were removed, leaving a six-cell gallery; and
+- the shortcut path did not have the revised, fully matched three-head capacity.
+
+The table is retained because it is the quantitative evidence that triggered the
+redesign.
+
+| Checkpoint | Legacy normalization | Learned top-1 | Shortcut top-1 | Legacy gain | 95% participant bootstrap |
+|---|---|---:|---:|---:|---:|
+| A00 baseline | `raw_retain_all` | 69.79% | 65.46% | +4.33 pp | [+0.27, +8.22] pp |
+| A00 baseline | `raw_effective_rank` | 61.07% | 61.25% | -0.19 pp | [-2.20, +1.76] pp |
+| A00 baseline | `pca_effective_rank` | 69.68% | 61.25% | +8.43 pp | [+4.78, +12.18] pp |
+| B01 mask-light | `raw_retain_all` | 63.76% | 65.46% | -1.70 pp | [-5.98, +2.47] pp |
+| B01 mask-light | `raw_effective_rank` | 59.57% | 61.25% | -1.68 pp | [-3.92, +0.55] pp |
+| B01 mask-light | `pca_effective_rank` | 63.76% | 61.25% | +2.51 pp | [-2.00, +6.97] pp |
+| B02 mask-light + clip variance | `raw_retain_all` | 57.51% | 65.46% | -7.95 pp | [-12.17, -3.78] pp |
+| B02 mask-light + clip variance | `raw_effective_rank` | 56.63% | 61.25% | -4.62 pp | [-6.82, -2.51] pp |
+| B02 mask-light + clip variance | `pca_effective_rank` | 57.51% | 61.25% | -3.74 pp | [-7.73, +0.20] pp |
+
+Under that analysis, A00 exceeded the declared shortcut path, B01 did not separate from
+it, and B02 underperformed it. Diagnostic breadth and held-out identity retrieval
+therefore did not predict legacy GFC performance across these three selected
+checkpoints. This is a descriptive rank inversion over three models, not a population
+estimate of how often standard diagnostics fail.
+
+Source: `results/gfc-*/summary.json`. Generated output:
+[legacy_gfc_table.csv](../results/generated/legacy_gfc_table.csv) and the explicitly legacy figure
+below.
+
+![Legacy development GFC comparison](../results/generated/legacy_gfc_comparison.png)
+
+## Why the legacy positive result is not confirmatory
+
+Adversarial self-audit identified five material limitations.
+
+### Candidate deletion distorted the null
+
+Deleting the two donors removed particular incorrect candidates. Under the original
+rule, a speed-and-direction solver that ignored clothing scored $2/3$, while a
+clothing-and-direction solver that ignored speed scored $1$. Uniform chance was $1/6$.
+The gallery therefore made some missing factors cheaper than others and made speed free
+in one two-factor case.
+
+### The shortcut nearly reached the relevant oracle
+
+The A00 shortcut scored 65.46%, near the 66.67% clothing-blind partial oracle of the
+legacy gallery. Learned A00 scored 69.79%. The 4.33-point learned-minus-shortcut contrast
+was about one of 24 queries per participant and cannot be described as recovering a
+large fraction of information.
+
+### One donor rule could reuse the target's physical walk
+
+For one third of legacy queries, an opposite-direction donor could be the other half of
+the target's back-and-forth source video. Recording-level target abstinence therefore
+did not guarantee session-level independence.
+
+### Development data influenced checkpoint and method choices
+
+The same 80-person group informed checkpoint comparison and legacy GFC evaluation. The
+76 complete participants yielded estimated power around `0.52` for an effect of one
+additional successful query, with a rough planning estimate of 144 complete participants
+for `0.80` power. The positive interval did not make the analysis independent or well
+powered for model-level scaling claims.
+
+### Comparator-specific dimension reduction changed the answer
+
+The effective-rank sensitivities compressed learned and shortcut blocks differently.
+They were useful diagnostics of fragility but were not comparator-neutral alternatives
+to the declared primary analysis.
+
+Together, these findings mean the legacy table is evidence for revising the instrument,
+not evidence that data scale improves compositional representation.
+
+## Stage 5: revised prospective study
+
+The revised experiment replaces every material legacy choice:
+
+| Legacy issue | Revised design |
+|---|---|
+| Health&Gait-trained encoders | Encoders train only on nested GaitLU pools |
+| One seed and selected checkpoints | Five replicated four-rung ladders, 20 primary runs |
+| 24 queries with fixed block roles | 16 session-safe queries with speed or clothing focal |
+| Donors removed | All eight cells retained in the primary gallery |
+| Non-uniform partial-factor ceilings | Exact symmetric spectrum: $1/8$, $1/4$, $1/2$, $1$ |
+| Comparator capacity mismatch | Identical three-head ridge fitting and normalization |
+| Same-source donor possible | Both donors must differ from target `source_video_id` |
+| 80-person development evaluation | 80-person adapter development; locked 318-person outcome cohort |
+| Raw context loss gap | Normalized paired near-substitute ratio on common GaitLU holdout |
+| Competing identity metrics | One frozen cross-condition rank-1/MRR protocol |
+| Classification explanation untested | Hard and soft independent-factor completion controls |
+
+No file currently contains a GFC-v2 outcome for a GaitLU scale rung. In particular, the
+numbers `69.79%`, `65.46%`, and `+4.33 pp` must never appear in a figure or abstract as
+results of the revised study.
+
+## Planned result table and decision trajectory
+
+The first unblinded table will show all four rungs for each of five replicates, plus the
+mean and run-level interval. At minimum it reports learned GFC-v2 top-1, shortcut top-1,
+hard and soft completion controls, factor probes, near-context ratio, effective rank,
+identity rank-1/MRR, training health, and throughput.
+
+The primary estimand is full-minus-small learned GFC-v2 top-1. One of 16 queries defines
+$\delta=6.25$ percentage points:
+
+- **meaningful positive:** 95% interval above zero and estimate at least $\delta$;
+- **positive but small:** interval above zero and estimate below $\delta$;
+- **equivalent to flat at this resolution:** 90% interval entirely within
+  $[-\delta,+\delta]$; or
+- **inconclusive:** neither criterion is met.
+
+Interpretation then follows the controls:
+
+- if GFC-v2 and clothing-sensitive measures improve together, scale supports the
+  protocol's factor-recombination outcome;
+- if GFC-v2 is equivalent to flat while identity improves, the result is an
+  identity–composition dissociation for this system;
+- if hard/soft factor completion explains GFC-v2, restrict the claim to joint linear
+  factor recoverability;
+- if replicate curves disagree or uncertainty spans different readings, report an
+  inconclusive result; and
+- if the frozen protocol or full data rung fails, do not retrofit the legacy result into
+  an ICLR scaling claim.
+
+## Regenerating existing preliminary artifacts
+
+The current generator reads compact historical files directly:
 
 ```bash
 uv run python scripts/make_paper_results.py \
@@ -57,27 +232,26 @@ uv run python scripts/make_paper_results.py \
   --output-dir results/generated
 ```
 
-It does not consume notebooks or prose reports as data sources.
+It does not consume notebooks or prose as data sources. Revised-study generators must
+write protocol version, gallery policy, query count, cohort-role checksum, rung size,
+pool seed, optimization seed, exposure, and analysis-freeze commit into every compact
+result file so legacy and GFC-v2 outputs cannot be silently combined.
 
-## What can be claimed now
+## Claims currently permitted
 
-Current aggregate evidence supports these statements:
+Current evidence supports only that:
 
-- the baseline model trains and exports usable features on the recorded split;
-- token-level and pooled representation breadth can disagree substantially;
-- context sensitivity, representation breadth, validation loss, and probes select different checkpoints;
-- existing results are insufficient to infer compositional factor structure.
+- the historical model and feature pipeline ran on Health&Gait;
+- token-level diversity, pooled breadth, loss, context gaps, probes, and identity can
+  rank a small set of checkpoints differently;
+- the legacy GFC result was sensitive to protocol and comparator choices; and
+- those failures motivate the revised full-gallery, session-safe scaling audit.
 
-Current evidence does not support these statements:
+Current evidence does **not** support that:
 
-- learned GFC beats the shortcut baseline;
-- a positive completion score reflects instrumented gait rather than acquisition cues;
-- one checkpoint is universally best;
-- CoDy-JEPA has clinical value or causal factor separation;
-- findings transfer beyond the present Health&Gait setup.
-
-## Limitations
-
-All Phase 0/1 training and probe rows use one seed. Validation windows share recordings and participants, so their row count is not the inferential sample size. Probe performance measures recoverability, not causality or disentanglement. The Health&Gait factorial design has no repeated recording within a cell, and its instrumented measurements are not synchronized with each video pass.
-
-Future empirical GFC results must report complete-case participant counts, exclusions, participant-level uncertainty, learned and shortcut scores on identical queries, and both configured normalization sensitivities.
+- more GaitLU data improves GFC-v2, context reliance, or identity;
+- GFC-v2 exceeds its independent-factor controls;
+- the 318-person outcome cohort (308 complete) confirms the preliminary result;
+- any representation is causally disentangled;
+- the findings generalize beyond one silhouette architecture and controlled dataset; or
+- the system has clinical value or is safe for identity-sensitive deployment.

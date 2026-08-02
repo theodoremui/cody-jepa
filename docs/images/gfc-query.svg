@@ -1,0 +1,96 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1400" height="780" viewBox="0 0 1400 780" role="img" aria-labelledby="title desc">
+  <title id="title">A concrete Grounded Factorial Completion query</title>
+  <desc id="desc">Two session-independent donor recordings supply complementary factor blocks. Their mixed query must retrieve a fast, jacket, left-to-right target from all eight recordings. Both donors remain in the primary gallery.</desc>
+  <defs>
+    <style>
+      .title { font: 700 30px system-ui, sans-serif; fill: #172033; }
+      .heading { font: 700 21px system-ui, sans-serif; fill: #172033; }
+      .body { font: 400 17px system-ui, sans-serif; fill: #334155; }
+      .small { font: 400 14px system-ui, sans-serif; fill: #526075; }
+      .card { fill: #f8fafc; stroke: #aeb8c8; stroke-width: 2; rx: 15; }
+      .condition { fill: #eaf2ff; stroke: #6d91b8; }
+      .gait { fill: #fff0e5; stroke: #d58a62; }
+      .target { fill: #e9f7ef; stroke: #3d8b64; stroke-width: 4; }
+      .removed { fill: #eef6ff; stroke: #35618d; stroke-width: 2; }
+      .arrow { stroke: #526075; stroke-width: 3; fill: none; marker-end: url(#head); }
+    </style>
+    <marker id="head" markerWidth="9" markerHeight="9" refX="8" refY="4.5" orient="auto">
+      <path d="M0,0 L9,4.5 L0,9 Z" fill="#526075"/>
+    </marker>
+  </defs>
+
+  <rect width="1400" height="780" fill="#ffffff"/>
+  <text x="700" y="48" text-anchor="middle" class="title">Example: retrieve fast + jacket + left-to-right</text>
+  <text x="700" y="80" text-anchor="middle" class="body">The target recording contributes no features to its own query.</text>
+
+  <text x="200" y="130" text-anchor="middle" class="heading">1. Choose two donors</text>
+  <g transform="translate(55 160)">
+    <rect width="290" height="155" class="card condition"/>
+    <text x="145" y="32" text-anchor="middle" class="heading">Focal donor</text>
+    <text x="145" y="66" text-anchor="middle" class="body">Fast · No jacket · Right-to-left</text>
+    <text x="145" y="101" text-anchor="middle" class="body">supplies fast speed</text>
+    <text x="145" y="132" text-anchor="middle" class="small">same speed, flips clothing and direction</text>
+  </g>
+  <g transform="translate(55 390)">
+    <rect width="290" height="155" class="card gait"/>
+    <text x="145" y="32" text-anchor="middle" class="heading">Complementary donor</text>
+    <text x="145" y="66" text-anchor="middle" class="body">Usual · Jacket · Left-to-right</text>
+    <text x="145" y="101" text-anchor="middle" class="body">supplies jacket + direction</text>
+    <text x="145" y="132" text-anchor="middle" class="small">flips speed, matches clothing and direction</text>
+  </g>
+
+  <path d="M345 237 C420 237 420 305 485 320" class="arrow"/>
+  <path d="M345 467 C420 467 420 390 485 370" class="arrow"/>
+
+  <text x="610" y="130" text-anchor="middle" class="heading">2. Mix feature blocks</text>
+  <g transform="translate(485 240)">
+    <rect width="250" height="230" class="card"/>
+    <rect x="25" y="35" width="200" height="62" class="condition" rx="10"/>
+    <text x="125" y="62" text-anchor="middle" class="body">Fast</text>
+    <text x="125" y="84" text-anchor="middle" class="small">focal speed block</text>
+    <text x="125" y="123" text-anchor="middle" class="heading">+</text>
+    <rect x="25" y="140" width="200" height="62" class="gait" rx="10"/>
+    <text x="125" y="167" text-anchor="middle" class="body">Jacket + left-to-right</text>
+    <text x="125" y="189" text-anchor="middle" class="small">clothing + direction blocks</text>
+  </g>
+  <text x="610" y="500" text-anchor="middle" class="body">mixed query</text>
+
+  <path d="M735 355 H830" class="arrow"/>
+  <text x="785" y="337" text-anchor="middle" class="small">rank by distance</text>
+
+  <text x="1100" y="130" text-anchor="middle" class="heading">3. Search all eight recordings</text>
+  <g transform="translate(835 160)">
+    <rect x="0" y="0" width="250" height="85" class="card"/>
+    <text x="125" y="35" text-anchor="middle" class="body">Usual · No jacket · R2L</text>
+    <text x="125" y="61" text-anchor="middle" class="small">distractor</text>
+    <rect x="270" y="0" width="250" height="85" class="card"/>
+    <text x="395" y="35" text-anchor="middle" class="body">Usual · No jacket · L2R</text>
+    <text x="395" y="61" text-anchor="middle" class="small">distractor</text>
+
+    <rect x="0" y="105" width="250" height="85" class="card"/>
+    <text x="125" y="140" text-anchor="middle" class="body">Usual · Jacket · R2L</text>
+    <text x="125" y="166" text-anchor="middle" class="small">distractor</text>
+    <rect x="270" y="105" width="250" height="85" class="card"/>
+    <text x="395" y="140" text-anchor="middle" class="body">Fast · No jacket · L2R</text>
+    <text x="395" y="166" text-anchor="middle" class="small">distractor</text>
+
+    <rect x="0" y="210" width="250" height="85" class="card"/>
+    <text x="125" y="245" text-anchor="middle" class="body">Fast · Jacket · R2L</text>
+    <text x="125" y="271" text-anchor="middle" class="small">distractor</text>
+    <rect x="270" y="210" width="250" height="85" class="target" rx="15"/>
+    <text x="395" y="244" text-anchor="middle" class="heading">Fast · Jacket · L2R</text>
+    <text x="395" y="271" text-anchor="middle" class="body">correct target</text>
+  </g>
+
+  <text x="1100" y="505" text-anchor="middle" class="body">Top-1 success means the green target ranks first.</text>
+
+  <g transform="translate(365 590)">
+    <rect x="0" y="0" width="300" height="105" class="removed" rx="14"/>
+    <text x="150" y="38" text-anchor="middle" class="body">Fast · No jacket · R2L</text>
+    <text x="150" y="68" text-anchor="middle" class="small">focal donor remains a candidate</text>
+    <rect x="370" y="0" width="300" height="105" class="removed" rx="14"/>
+    <text x="520" y="38" text-anchor="middle" class="body">Usual · Jacket · L2R</text>
+    <text x="520" y="68" text-anchor="middle" class="small">complementary donor remains a candidate</text>
+  </g>
+  <text x="700" y="735" text-anchor="middle" class="body">Donor retention exposes attraction failures and keeps the null spectrum symmetric.</text>
+</svg>
