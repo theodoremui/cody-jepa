@@ -79,7 +79,7 @@ uv run cody-jepa-prepare-gfc-features \
 ```
 
 The upgrade requires exactly three distinct window rows per recording and records only
-input basenames and SHA-256 digests in its provenance metadata.
+input basenames in its provenance metadata.
 
 ```bash
 uv run python scripts/run_gfc.py \

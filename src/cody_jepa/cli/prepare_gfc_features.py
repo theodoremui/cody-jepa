@@ -5,7 +5,6 @@ from __future__ import annotations
 
 import argparse
 import csv
-import hashlib
 import json
 from pathlib import Path
 
@@ -16,14 +15,6 @@ from cody_jepa.evaluation.features import METADATA_COLUMNS, write_feature_table
 
 
 JOIN_COLUMNS = ("subject_id", "gait_system", "trial", "split")
-
-
-def _sha256(path: Path) -> str:
-    digest = hashlib.sha256()
-    with path.open("rb") as handle:
-        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
-            digest.update(chunk)
-    return digest.hexdigest()
 
 
 def parse_args() -> argparse.Namespace:
@@ -102,9 +93,7 @@ def main() -> None:
         args.output,
         {
             "legacy_features": args.legacy_features.name,
-            "legacy_features_sha256": _sha256(args.legacy_features),
             "gfc_manifest": args.manifest.name,
-            "gfc_manifest_sha256": _sha256(args.manifest),
             "upgrade_method": (
                 "exact subject/gait_system/trial/split join; feature values unchanged"
             ),

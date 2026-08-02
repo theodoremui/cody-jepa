@@ -106,8 +106,6 @@ class PrepareGFCFeaturesTest(unittest.TestCase):
             self.assertIn("exact subject/gait_system/trial/split join", metadata["upgrade_method"])
             self.assertEqual(metadata["legacy_features"], "legacy.npz")
             self.assertEqual(metadata["gfc_manifest"], "manifest.csv")
-            self.assertEqual(len(metadata["legacy_features_sha256"]), 64)
-            self.assertEqual(len(metadata["gfc_manifest_sha256"]), 64)
             self.assertNotIn(str(root), json.dumps(metadata))
 
     def test_rejects_legacy_rows_without_a_manifest_match(self):
