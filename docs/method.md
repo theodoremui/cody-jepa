@@ -111,7 +111,7 @@ primary scale contrast therefore uses learned GFC-v2 top-1 directly.
 
 ## 5. Compose a query from two session-safe donors
 
-Represent a target condition as $x=(s,c,d)\in\{0,1\}^3$, where the entries denote
+Represent a target condition as $x=(s,c,d)\in\lbrace0,1\rbrace^3$, where the entries denote
 speed, clothing, and direction. Choose the *focal factor* $a$ to be speed or clothing.
 Direction is never focal because the opposite-direction clip at fixed speed and
 clothing comes from the same physical back-and-forth walk.
@@ -119,11 +119,15 @@ clothing comes from the same physical back-and-forth walk.
 Construct two complementary donor cells. Donor $u$ keeps the target's focal value and
 flips the other two values:
 
-$$u_a=x_a,\qquad u_j=1-x_j\quad(j\ne a).$$
+$$
+u_a=x_a,\qquad u_j=1-x_j\quad(j\ne a).
+$$
 
 Donor $v$ flips the focal value and keeps the other two values:
 
-$$v_a=1-x_a,\qquad v_j=x_j\quad(j\ne a).$$
+$$
+v_a=1-x_a,\qquad v_j=x_j\quad(j\ne a).
+$$
 
 The query copies the focal factor block from $u$ and the other two blocks from $v$. The
 target contributes no feature values to its own query.
@@ -156,7 +160,9 @@ For block $k$, cosine similarity measures the angle between the query and galler
 vectors. Cosine distance is one minus that similarity. The three blocks receive equal
 weight:
 
-$$d(q,g)=\frac{1}{3}\sum_{k\in\{s,c,d\}}\left[1-\cos(q_k,g_k)\right].$$
+$$
+d(q,g)=\frac{1}{3}\sum_{k\in\lbrace s,c,d\rbrace}\left[1-\cos(q_k,g_k)\right].
+$$
 
 The closest gallery item is the predicted recording. Retaining donors is important:
 returning to a donor is a meaningful composition failure. Removing donors would delete
@@ -164,18 +170,40 @@ specific wrong answers and give some partial solutions free credit.
 
 ### Score top-1, rank, and ties deterministically
 
-*Top-1* asks whether the target is the closest item. *Mean reciprocal rank* (MRR) gives
-partial credit when the target appears lower in the ordered gallery.
+Lower distance means a better match. Sort the eight gallery recordings from smallest
+to largest distance, then locate the correct target recording in that ordering. The
+protocol reports two scores:
 
-All distances use float64. Values within the frozen absolute tolerance are tied. If
-$a$ items are strictly closer than the target and the target is in a tie of size $t$,
-its average rank is
+- **Top-1** asks whether the target is the closest gallery item. A unique first-place
+  target receives 1 and a target below first place receives 0.
+- **Reciprocal rank** also rewards near misses. A target at rank $r$ receives $1/r$;
+  for example, rank 2 receives $1/2$ and rank 4 receives $1/4$. **Mean reciprocal rank
+  (MRR)** is the average of this value across queries.
 
-$$r=a+\frac{t+1}{2}.$$
+Numerically indistinguishable distances must not be ordered arbitrarily. All distances
+are computed in float64, and values within the prespecified absolute tolerance count as
+a tie. Suppose $a$ gallery items are definitely closer than the target, while $t$ items,
+including the target, share the next $t$ rank positions. The target is assigned the
+average of those occupied positions:
 
-MRR credit is $1/r$. Top-1 credit is $1/t$ when $a=0$, and zero otherwise. For example,
-if the target ties with one other item for first place, it receives top-1 credit $1/2$
-and rank $1.5$. Ties are never broken randomly.
+$$
+r=a+\frac{t+1}{2}.
+$$
+
+The reciprocal-rank credit is then $1/r$. Top-1 uses a separate rule: if the tie is for
+first place ($a=0$), the target receives fractional credit $1/t$; otherwise it receives
+zero top-1 credit.
+
+| Situation | Positions occupied | Average rank $r$ | Top-1 credit | Reciprocal-rank credit |
+|---|---:|---:|---:|---:|
+| Target is uniquely closest | 1 | 1 | 1 | 1 |
+| Target and one other item tie for first | 1–2 | 1.5 | $1/2$ | $1/1.5=2/3$ |
+| One item is closer; target ties with two others | 2–4 | 3 | 0 | $1/3$ |
+| Target is uniquely fourth | 4 | 4 | 0 | $1/4$ |
+
+Fractional scoring represents the uncertainty already present in the distances. Ties
+are never resolved randomly or by gallery order, so repeated evaluation of the same
+distances always produces the same result.
 
 ### Use the exact oracle spectrum as a ruler
 
@@ -184,10 +212,10 @@ If it knows $m$ of three binary factors, it ties among $2^{3-m}$ cells:
 
 | Factors recovered exactly | Tied cells | Expected top-1 |
 |---|---:|---:|
-| None | 8 | $1/8=12.50\%$ |
-| Any one | 4 | $1/4=25.00\%$ |
-| Any two | 2 | $1/2=50.00\%$ |
-| All three | 1 | $1=100.00\%$ |
+| None | 8 | $1/8=12.50$% |
+| Any one | 4 | $1/4=25.00$% |
+| Any two | 2 | $1/2=50.00$% |
+| All three | 1 | $1=100.00$% |
 
 ![The exact full-gallery oracle spectrum rises from chance at one eighth to perfect recovery as more factors are known.](images/oracle-spectrum.svg)
 
@@ -227,8 +255,7 @@ not windows or queries, are the human-data analysis units.
 Also report:
 
 - learned and acquisition-cue MRR;
-- cue excess, $\Delta_i^{\mathrm{cue}}=\mathrm{top1}^{\mathrm{learned}}_i-
-  \mathrm{top1}^{\mathrm{cue}}_i$;
+- cue excess, $\Delta_i^{\mathrm{cue}}=\mathrm{top1}^{\mathrm{learned}}_i-\mathrm{top1}^{\mathrm{cue}}_i$;
 - balanced accuracy of each factor head;
 - attraction to each donor;
 - speed-focal and clothing-focal results;
@@ -253,8 +280,11 @@ decile under the fixed geometry descriptor in [data.md](data.md).
 
 For sequence $i$:
 
-$$R_i^{\mathrm{near}}=\frac{L_i^{\mathrm{near\ substitute}}-L_i^{\mathrm{true}}}
-{\max(L_i^{\mathrm{true}},10^{-8})}.$$
+$$
+R_i^{\mathrm{near}}=
+\frac{L_i^{\text{near substitute}}-L_i^{\mathrm{true}}}
+{\max(L_i^{\mathrm{true}},10^{-8})}.
+$$
 
 Report this ratio, both losses, their raw paired difference, the full distribution, and
 a sequence-level paired-bootstrap interval.

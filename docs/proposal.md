@@ -62,7 +62,9 @@ for the next section.
 A video encoder turns a sequence of frames into numbers. For example, a 16-frame
 silhouette clip might become a vector with 384 coordinates:
 
-$$z=(z_1,z_2,\ldots,z_{384}).$$
+$$
+z=(z_1,z_2,\ldots,z_{384}).
+$$
 
 The individual coordinates usually have no human-readable names. We call the whole
 vector a **representation** because downstream methods use it in place of the original
@@ -299,12 +301,12 @@ requirement in the next steps.
 
 The four nominal pool sizes are:
 
-| Rung | Unique sequences $U$ | Approximate exposures per sequence at $C=8.192$M |
+| Rung | Unique sequences $U$ | Approximate exposures per sequence at $C=8.192\text{ M}$ |
 |---|---:|---:|
 | Small | 2,500 | 3,277 |
 | Medium | 25,000 | 328 |
 | Large | 250,000 | 33 |
-| Full | $U_{\max}\approx1.01$M | about 8 |
+| Full | $U_{\max}\approx1.01\text{ M}$ | about 8 |
 
 The word **rung** simply means one level of the data ladder. **Exposure** means one
 sampled training example. A repeated source sequence can produce a new temporal window
@@ -312,7 +314,7 @@ and a new mask, but it is still not new unique data.
 
 ![Four data rungs with equal exposure](images/scaling-ladders.svg)
 
-For each replicate $r\in\{1,\ldots,5\}$, source groups receive a new seeded order. The
+For each replicate $r\in\lbrace1,\ldots,5\rbrace$, source groups receive a new seeded order. The
 four pools are nested prefixes of that order, so the medium pool contains the small
 pool, the large contains the medium, and the full pool contains them all. The same
 replicate seed also drives optimization at every rung.
@@ -327,7 +329,9 @@ pooling. Horizontal flipping remains disabled because direction is an evaluated 
 
 The primary exposure is:
 
-$$C=8{,}192{,}000\ \text{examples per run},$$
+$$
+C=8{,}192{,}000\text{ examples per run},
+$$
 
 which equals 128,000 optimizer updates at effective batch size 64. The final-step
 checkpoint is primary. We do not choose an epoch by looking at Health&Gait outcomes.
@@ -375,9 +379,13 @@ physical back-and-forth walk.
 
 The two donors are defined by a simple complement rule:
 
-$$u_a=x_a,\qquad u_j=1-x_j\quad(j\ne a),$$
+$$
+u_a=x_a,\qquad u_j=1-x_j\quad(j\ne a),
+$$
 
-$$v_a=1-x_a,\qquad v_j=x_j\quad(j\ne a).$$
+$$
+v_a=1-x_a,\qquad v_j=x_j\quad(j\ne a).
+$$
 
 In words:
 
@@ -415,7 +423,9 @@ The query-to-gallery distance is the equally weighted mean of the three cosine b
 distances. Cosine distance compares the direction of two vectors rather than their raw
 length; after normalization, identical vectors have cosine distance zero.
 
-$$d(q,g)=\frac{1}{3}\sum_{k\in\{s,c,d\}}\left[1-\cos\!\left(q_k,g_k\right)\right].$$
+$$
+d(q,g)=\frac{1}{3}\sum_{k\in\lbrace s,c,d\rbrace}\left[1-\cos\left(q_k,g_k\right)\right].
+$$
 
 An exact three-factor representation gives the target zero distance on every block and
 retrieves it uniquely.
@@ -429,7 +439,9 @@ $1/2$ top-1 credit. In general, a first-place tie of size $t$ receives $1/t$ cre
 If $a$ cells are strictly closer and the target lies in a tie of size $t$, its average
 rank is:
 
-$$r=a+\frac{t+1}{2}.$$
+$$
+r=a+\frac{t+1}{2}.
+$$
 
 Reciprocal-rank credit is $1/r$. **Mean reciprocal rank (MRR)** averages that credit
 across queries, so retrieving the target second gives $1/2$ credit and retrieving it
@@ -447,10 +459,10 @@ With all eight cells retained, the spectrum is symmetric:
 
 | Factors recovered exactly | Cells still tied | Expected top-1 |
 |---|---:|---:|
-| none | 8 | $1/8=12.50\%$ |
-| any one factor | 4 | $1/4=25.00\%$ |
-| any two factors | 2 | $1/2=50.00\%$ |
-| all three factors | 1 | $1=100.00\%$ |
+| none | 8 | $1/8=12.50$% |
+| any one factor | 4 | $1/4=25.00$% |
+| any two factors | 2 | $1/2=50.00$% |
+| all three factors | 1 | $1=100.00$% |
 
 ![Exact full-gallery oracle spectrum](images/oracle-spectrum.svg)
 
@@ -489,7 +501,10 @@ $\alpha$, normalizers, queries, gallery, and tie policy. Only the input features
 
 At each rung we report:
 
-$$\Delta_i^{\text{shortcut}}=\mathrm{top1}^{\text{learned}}_i-\mathrm{top1}^{\text{shortcut}}_i.$$
+$$
+\Delta_i^{\text{shortcut}}=
+\mathrm{top1}^{\text{learned}}_i-\mathrm{top1}^{\text{shortcut}}_i.
+$$
 
 This difference tells us whether learned features beat the declared cues in absolute
 performance. It is not the primary scaling statistic because the shortcut is identical
@@ -559,7 +574,11 @@ Only visible context changes.
 
 For sequence $i$:
 
-$$R_i^{\text{near}}=\frac{L_i^{\text{near-substitute}}-L_i^{\text{true}}}{\max\!\left(L_i^{\text{true}},10^{-8}\right)}.$$
+$$
+R_i^{\text{near}}=
+\frac{L_i^{\text{near-substitute}}-L_i^{\text{true}}}
+{\max\left(L_i^{\text{true}},10^{-8}\right)}.
+$$
 
 A positive value means the true context lowered loss. A value near zero means this
 intervention detected little dependence. A negative value requires inspection because
@@ -662,7 +681,9 @@ hypotheses are tested.
 Each participant has 16 GFC-v2 queries. One additional successful query changes that
 participant's score by 6.25 percentage points. We therefore define:
 
-$$\delta=6.25\ \text{percentage points}$$
+$$
+\delta=6.25\text{ percentage points}
+$$
 
 as the smallest effect that changes the average participant by one query.
 
@@ -754,7 +775,9 @@ complete.
 
 At the primary exposure, the 20 runs process:
 
-$$20\times8.192\,\mathrm{M}=163.84\,\text{M examples}.$$
+$$
+20\times8.192\text{ M}=163.84\text{ M examples}.
+$$
 
 The current trainer is single-device, so eight H100s run eight independent jobs rather
 than adding distributed training to the critical path. Historical small-data runs
@@ -769,8 +792,8 @@ checksums, and temporary artifacts. We budget 250 GB.
 
 The exposure tier is selected before outcome evaluation:
 
-- at least 60 examples/s/GPU: keep $C=8.192\,\mathrm{M}$;
-- 30–59 examples/s/GPU: use $C=4.096\,\mathrm{M}$ for every run;
+- at least 60 examples/s/GPU: keep $C=8.192\text{ M}$;
+- 30–59 examples/s/GPU: use $C=4.096\text{ M}$ for every run;
 - below 30 examples/s/GPU or insufficient storage: cancel the ICLR scaling claim.
 
 The measurement uses both a 25k end-to-end pilot and a short full-pool read-and-step
@@ -866,7 +889,7 @@ versions of the assumptions needed for the scientific interpretation.
 | The eligible GaitLU pool is smaller than expected | The claimed data range is false | Report actual sizes and drop unsupported range language |
 | Source metadata are unavailable | Near-duplicates may cross roles | Use exact deduplication, singleton groups, a sampled audit, and disclose the limitation |
 | Full-rung optimization is unhealthy | Data scale becomes confounded with training failure | Rerun only under the frozen systems-failure rule; otherwise report the failed run |
-| Ridge heads are unstable on 76 development participants | GFC-v2 may measure adapter noise | Check conditioning and fixed-$\alpha$ sensitivity before opening outcomes; stop if invariants fail |
+| Ridge heads are unstable on 76 development participants | GFC-v2 may measure adapter noise | Check conditioning and sensitivity at fixed $\alpha$ before opening outcomes; stop if invariants fail |
 | The five scale contrasts disagree | A mean curve hides model instability | Show all curves and classify the result as inconclusive unless the primary interval resolves it |
 | A reference checkpoint requires incompatible preprocessing | Its comparison would be misleading | Exclude the optional anchor and document why |
 | Outcome code changes after unblinding | Analysis may become outcome-adaptive | Preserve the frozen result, version the correction, and label it post-unblinding |

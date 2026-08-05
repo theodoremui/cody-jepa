@@ -153,7 +153,7 @@ separate variance components or support a universal power law.
 For each frozen recording representation, three separate ridge maps produce
 two-dimensional score blocks for speed, clothing, and direction. Only development
 participants fit standardization, coefficients, intercept, and normalization.
-$\alpha=1$ is primary; $\alpha\in\{0.1,10\}$ are fixed sensitivities. The labelled
+$\alpha=1$ is primary; $\alpha\in\lbrace0.1,10\rbrace$ are fixed sensitivities. The labelled
 alignment is explicit, so the method does not claim unsupervised factor discovery.
 
 The shortcut input contains log frame count, duration, signed and absolute endpoint
@@ -162,11 +162,15 @@ capacity, labels, fitting participants, output dimensions, and normalization.
 
 ### 5.2 Complementary donors
 
-For target $x=(s,c,d)$ and focal factor $a\in\{s,c\}$, define:
+For target $x=(s,c,d)$ and focal factor $a\in\lbrace s,c\rbrace$, define:
 
-$$u_a=x_a,\qquad u_j=1-x_j\quad(j\ne a),$$
+$$
+u_a=x_a,\qquad u_j=1-x_j\quad(j\ne a),
+$$
 
-$$v_a=1-x_a,\qquad v_j=x_j\quad(j\ne a).$$
+$$
+v_a=1-x_a,\qquad v_j=x_j\quad(j\ne a).
+$$
 
 The query takes focal block $a$ from $u$ and the other two blocks from $v$. The target
 contributes no features. Direction is not focal, and both donor `source_video_id` values
@@ -209,7 +213,11 @@ On the common GaitLU holdout, replace visible context with a different sequence 
 nearest decile under a fixed, non-learned geometry descriptor while retaining target
 features, positions, mask, and predictor inputs. The primary ratio is:
 
-$$R_i^{\text{near}}=\frac{L_i^{\text{near-substitute}}-L_i^{\text{true}}}{\max\!\left(L_i^{\text{true}},10^{-8}\right)}.$$
+$$
+R_i^{\text{near}}=
+\frac{L_i^{\text{near-substitute}}-L_i^{\text{true}}}
+{\max\left(L_i^{\text{true}},10^{-8}\right)}.
+$$
 
 Both losses, the raw gap, distribution, and paired interval are reported. Same-source
 segments, temporal shuffling, far substitutes, and blank context are secondary.

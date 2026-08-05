@@ -21,9 +21,12 @@ the version and cohort qualifiers below.
 ## Stage 1: Phase 0 feasibility and conflicting diagnostics
 
 The seed-0 baseline used 2,506 Health&Gait training sequences from 318 participants and
-624 validation sequences from 80 participant-disjoint participants. Three deterministic
-windows per sequence yielded 7,518 training feature rows and 1,872 validation rows.
-These are correlated window rows, not inferential sample sizes.
+624 validation sequences from 80 participant-disjoint participants. For feature export,
+each sequence supplied three contiguous 16-frame model inputs at the earliest, middle,
+and latest valid start positions, without random augmentation. Each window produced one
+pooled feature row, yielding 7,518 training rows and 1,872 validation rows. The three
+rows from a sequence are correlated views of the same recording, not three independent
+observations or inferential sample units.
 
 At the epoch-80 best-loss checkpoint:
 
@@ -74,11 +77,26 @@ rank `381.58` of 384, whereas the pooled online recording representation had eff
 rank `10.44`. A broad token representation therefore did not guarantee a broad pooled
 representation.
 
-Replacing visible context with another participant's clip increased loss by only about
-`0.000156`; same-participant replacement produced `0.000161`, and temporal shuffling
-produced `0.0000475`. Only `9.62%` of masked target tokens were foreground under the
-diagnostic threshold. The foreground-only gap (`0.0000467`) was smaller than the
-background-only gap (`0.0001679`).
+To test whether prediction depended on the visible context, the diagnostic kept the
+masked target fixed and changed only the context supplied to the model. It reports a
+*loss gap*: loss with the altered context minus loss with the correct context. A
+positive gap means that altering the context made prediction worse; a gap near zero
+means that the intervention had little effect.
+
+- Replacing the context with a clip from another participant increased loss by
+  `0.000156`.
+- Replacing it with a different clip from the same participant increased loss by
+  `0.000161`.
+- Shuffling the context in time increased loss by `0.0000475`.
+
+All three changes were small. The diagnostic also separated target tokens according to
+whether they covered the walking silhouette. A token was called foreground when its
+corresponding image content exceeded the fixed `0.05` pixel threshold; only `9.62%` of
+target tokens met that rule. Under cross-participant context replacement, the loss gap
+was `0.0000467` on foreground target tokens and `0.0001679` on background target tokens.
+The larger background response suggests that this intervention was more sensitive to
+background or acquisition differences than to the silhouette itself. It does not prove
+which cue caused the response.
 
 These values motivated the revised normalized, geometry-matched intervention. They do
 not show that every JEPA ignores context, isolate identity, or prove that a particular

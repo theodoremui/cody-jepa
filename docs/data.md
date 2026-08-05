@@ -83,7 +83,9 @@ experiment therefore trains $5\times4=20$ encoders.
 
 Every encoder sees the same number of training examples:
 
-$$C=8{,}192{,}000\ \text{examples per run}.$$
+$$
+C=8{,}192{,}000\text{ examples per run}.
+$$
 
 With effective batch size 64, this is 128,000 optimizer updates. A new temporal crop and
 mask can be sampled when a sequence is revisited, but the underlying sequence is still
