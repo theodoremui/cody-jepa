@@ -15,9 +15,6 @@ from matplotlib.patches import Patch
 import numpy as np
 import pandas as pd
 
-from cody_jepa.evaluation.gfc.core import GFC_PROTOCOL
-
-
 PHASE1_TABLE_COLUMNS = (
     "run_id",
     "stage",
@@ -30,6 +27,7 @@ PHASE1_TABLE_COLUMNS = (
     "held_out_retrieval_accuracy",
     "gait_balanced_accuracy",
 )
+LEGACY_GFC_PROTOCOL = "legacy_donor_excluded_v1"
 GFC_NORMALIZATIONS = {
     "raw_retain_all",
     "raw_effective_rank",
@@ -175,9 +173,10 @@ def _validate_gfc_summaries(summaries: list[tuple[str, dict]]) -> None:
         model_label = str(value.get("model_label", ""))
         split = str(value.get("split", ""))
         normalization = str(value.get("normalization", ""))
-        if protocol != GFC_PROTOCOL:
+        if protocol != LEGACY_GFC_PROTOCOL:
             raise ValueError(
-                f"GFC summary {label!r} must declare protocol {GFC_PROTOCOL!r}"
+                f"legacy GFC summary {label!r} must declare protocol "
+                f"{LEGACY_GFC_PROTOCOL!r}; v2 and mixed summaries cannot enter legacy tables"
             )
         if not model_label or not split or normalization not in GFC_NORMALIZATIONS:
             raise ValueError(

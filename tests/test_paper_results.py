@@ -9,6 +9,7 @@ import pandas as pd
 from scripts.make_paper_results import (
     CONTEXT_LABELS,
     GFC_NORMALIZATIONS,
+    LEGACY_GFC_PROTOCOL,
     RANK_LABELS,
     make_paper_results,
 )
@@ -19,7 +20,7 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 
 def gfc_summary(normalization, model_label="synthetic-model"):
     return {
-        "protocol": "legacy_donor_excluded_v1",
+        "protocol": LEGACY_GFC_PROTOCOL,
         "split": "development",
         "normalization": normalization,
         "model_label": model_label,
@@ -67,6 +68,11 @@ class PaperResultTest(unittest.TestCase):
             without_protocol.pop("protocol")
             (first / "summary.json").write_text(json.dumps(without_protocol))
             with self.assertRaisesRegex(ValueError, "must declare protocol"):
+                make_paper_results(results, generated)
+            v2_summary = gfc_summary("raw_retain_all")
+            v2_summary["protocol"] = "gfc_v2"
+            (first / "summary.json").write_text(json.dumps(v2_summary))
+            with self.assertRaisesRegex(ValueError, "v2 and mixed summaries"):
                 make_paper_results(results, generated)
             (first / "summary.json").write_text(
                 json.dumps(gfc_summary("raw_retain_all"))

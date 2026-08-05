@@ -330,8 +330,13 @@ def write_feature_table(table, output_path, metadata=None):
     return {"features": output_path, "metadata": _sidecar_path(output_path)}
 
 
-def read_feature_table(path):
-    """Read a CSV/NPZ feature table and its optional metadata sidecar."""
+def read_feature_table(path, *, validate=True):
+    """Read a CSV/NPZ feature table and its optional metadata sidecar.
+
+    Callers that must isolate a split before semantic validation may set
+    ``validate=False`` and validate the selected rows at their own boundary.
+    Structural NPZ checks are always enforced.
+    """
     path = Path(path)
     if path.suffix.casefold() == ".csv":
         table = pd.read_csv(
@@ -360,7 +365,8 @@ def read_feature_table(path):
             table = pd.concat([metadata_frame, feature_frame], axis=1)
     else:
         raise ValueError("feature input must end in .csv or .npz")
-    validate_feature_table(table)
+    if validate:
+        validate_feature_table(table)
     sidecar_path = _sidecar_path(path)
     metadata = json.loads(sidecar_path.read_text()) if sidecar_path.is_file() else {}
     return table, metadata

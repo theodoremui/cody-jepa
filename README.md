@@ -2,7 +2,7 @@
 
 CoDy-JEPA is a research codebase for asking whether video representations preserve factors that can be recombined correctly. Its main evaluation family is **Grounded Factorial Completion (GFC)**: two non-target recordings supply complementary representation blocks, and their mixed query must retrieve the real recording with the requested factor combination.
 
-The maintained Health&Gait implementation and checked-in preliminary results use the legacy GFC protocol: a complete participant has eight observed cells and contributes 24 queries, both donors are removed from each gallery, and learned features are compared with duration, frame-count, image-plane-motion, and foreground-area shortcuts. The prospectively specified GFC-v2 study instead keeps the full eight-cell gallery and uses 16 session-safe queries; it has not yet produced outcome results.
+The maintained Health&Gait evaluator implements GFC-v2: a complete participant has eight observed cells and contributes 16 session-safe queries, both donors remain in the full eight-cell gallery, and learned features are compared with matched ridge heads fitted from the same nine shortcut cues. The checked-in preliminary GFC results are unchanged historical artifacts from the legacy 24-query, donor-excluded protocol; they are not GFC-v2 outcomes.
 
 The repository contains model-training code, aggregate Phase 0/1 diagnostics, and development-split GFC results for three selected checkpoints. It does **not** yet contain a confirmation-split GFC result, an external gait-measurement result, or a cross-dataset result.
 
@@ -88,7 +88,7 @@ uv run python scripts/run_gfc.py \
   --model-label training-baseline-best-loss \
   --split development \
   --output-dir outputs/gfc-development \
-  --aggregate-output-dir results/gfc-development
+  --aggregate-output-dir outputs/gfc-v2-aggregates/development
 ```
 
 The command above runs the primary `raw_retain_all` analysis. Run the two declared sensitivities into separate directories:
@@ -101,7 +101,7 @@ uv run python scripts/run_gfc.py \
   --split development \
   --normalization raw_effective_rank \
   --output-dir outputs/gfc-development-raw-er \
-  --aggregate-output-dir results/gfc-development-raw-er
+  --aggregate-output-dir outputs/gfc-v2-aggregates/development-raw-er
 
 uv run python scripts/run_gfc.py \
   --features outputs/training-baseline/features.csv \
@@ -110,10 +110,10 @@ uv run python scripts/run_gfc.py \
   --split development \
   --normalization pca_effective_rank \
   --output-dir outputs/gfc-development-pca-er \
-  --aggregate-output-dir results/gfc-development-pca-er
+  --aggregate-output-dir outputs/gfc-v2-aggregates/development-pca-er
 ```
 
-Regenerate active aggregate tables and figures:
+Regenerate the checked-in diagnostic and explicitly legacy GFC tables and figures:
 
 ```bash
 uv run python scripts/make_paper_results.py \
@@ -121,7 +121,7 @@ uv run python scripts/make_paper_results.py \
   --output-dir results/generated
 ```
 
-Detailed participant and optional query outputs stay under ignored `outputs/`; only aggregate `summary.json` and `summary.csv` files are copied into `results/` for paper generation.
+Detailed participant, optional query, and current GFC-v2 aggregate outputs stay under ignored `outputs/`. The paper renderer accepts only the checked-in, protocol-tagged legacy GFC summaries for its legacy table; it intentionally rejects v2 or mixed-protocol inputs.
 
 ## Documentation
 
@@ -134,6 +134,6 @@ Detailed participant and optional query outputs stay under ignored `outputs/`; o
 
 ## Data and claim boundaries
 
-Keep raw frames, archives, participant tables, checkpoints, and participant-level feature exports outside Git. Publish only aggregate, non-identifying results. In the checked-in legacy analysis, all fitted transformations use training participants only, windows are aggregated to recordings before scoring, donors are excluded from galleries, and participants receive equal weight in cohort inference. The revised full-gallery protocol is documented separately and remains prospective.
+Keep raw frames, archives, participant tables, checkpoints, and participant-level feature exports outside Git. Publish only aggregate, non-identifying results. The maintained evaluator fits all factor heads and normalizers on training participants only, aggregates windows before scoring, retains both donors, verifies source independence, and weights participants equally. Checked-in legacy outcomes remain labeled as donor-excluded historical results; no GFC-v2 outcome is currently checked in.
 
 Current results are single-seed diagnostics on one Health&Gait split. They motivate GFC because prediction loss, representation breadth, context sensitivity, and probe scores prefer different checkpoints. They do not establish semantic factorization, causal gait structure, clinical validity, or transfer beyond Health&Gait.

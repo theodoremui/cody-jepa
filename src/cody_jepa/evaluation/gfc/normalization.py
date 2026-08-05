@@ -1,16 +1,11 @@
-"""Training-only normalization and linear adapters for GFC.
-
-All fit functions receive the training rows directly.  They do not inspect a
-split manifest or any held-out data.  Callers select the training rows first,
-then reuse the returned numerical fit for evaluation rows.
-"""
+"""Training-only normalization and linear adapters for GFC."""
 
 from __future__ import annotations
 
 from collections.abc import Sequence
 from dataclasses import dataclass, field
 import math
-from typing import Literal
+from typing import Literal, cast
 
 import numpy as np
 
@@ -24,7 +19,12 @@ EIGENVALUE_TIE_RTOL = 1e-12
 
 DimensionPolicy = Literal["retain_all", "effective_rank"]
 NormalizationMethod = Literal["raw", "pca"]
-AdapterKind = Literal["condition", "gait"]
+FactorName = Literal["speed", "clothing", "direction"]
+FACTOR_LABELS: dict[FactorName, tuple[str, str]] = {
+    "speed": SPEEDS,
+    "clothing": CLOTHING,
+    "direction": DIRECTIONS,
+}
 
 
 def _finite_matrix(value: Sequence[Sequence[float]] | np.ndarray, label: str) -> np.ndarray:
@@ -401,19 +401,20 @@ def fit_pca_normalizer(
     )
 
 
-def _adapter_targets(cells: Sequence[Cell], kind: AdapterKind) -> np.ndarray:
-    if kind == "condition":
-        targets = np.zeros((len(cells), 4), dtype=FLOAT_DTYPE)
-        for row, cell in enumerate(cells):
-            targets[row, CLOTHING.index(cell.clothing)] = 1.0
-            targets[row, 2 + DIRECTIONS.index(cell.direction)] = 1.0
-        return targets
-    if kind == "gait":
-        targets = np.zeros((len(cells), 2), dtype=FLOAT_DTYPE)
-        for row, cell in enumerate(cells):
-            targets[row, SPEEDS.index(cell.speed)] = 1.0
-        return targets
-    raise ValueError("kind must be 'condition' or 'gait'")
+def _factor_labels(factor_name: str) -> tuple[str, str]:
+    if not isinstance(factor_name, str) or factor_name not in FACTOR_LABELS:
+        raise ValueError(
+            "factor_name must be 'speed', 'clothing', or 'direction'"
+        )
+    return FACTOR_LABELS[cast(FactorName, factor_name)]
+
+
+def _adapter_targets(cells: Sequence[Cell], factor_name: FactorName) -> np.ndarray:
+    labels = _factor_labels(factor_name)
+    targets = np.zeros((len(cells), len(labels)), dtype=FLOAT_DTYPE)
+    for row, cell in enumerate(cells):
+        targets[row, labels.index(getattr(cell, factor_name))] = 1.0
+    return targets
 
 
 def _validate_training_grid(subject_ids: Sequence[str], cells: Sequence[Cell]) -> None:
@@ -436,7 +437,7 @@ def _validate_training_grid(subject_ids: Sequence[str], cells: Sequence[Cell]) -
 
 @dataclass(frozen=True)
 class RidgeAdapterFit:
-    kind: AdapterKind
+    factor_name: FactorName
     alpha: float
     fit_row_count: int
     input_dimension: int
@@ -449,11 +450,9 @@ class RidgeAdapterFit:
     scale_floor: float = SCALE_FLOOR
 
     def __post_init__(self) -> None:
-        expected_labels = (
-            ("WoJ", "WJ", "R2L", "L2R") if self.kind == "condition" else ("UGS", "FGS")
-        )
-        if self.kind not in ("condition", "gait") or self.target_labels != expected_labels:
-            raise ValueError("adapter kind and target labels are inconsistent")
+        expected_labels = _factor_labels(self.factor_name)
+        if self.target_labels != expected_labels:
+            raise ValueError("adapter factor_name and target labels are inconsistent")
         if not math.isfinite(self.alpha) or self.alpha <= 0.0:
             raise ValueError("ridge alpha must be finite and positive")
         if self.output_dimension != len(expected_labels) or self.input_dimension < 1:
@@ -489,12 +488,12 @@ class RidgeAdapterFit:
         return result
 
 
-def fit_ridge_adapter(
+def fit_factor_adapter(
     training_rows: Sequence[Sequence[float]] | np.ndarray,
     subject_ids: Sequence[str],
     cells: Sequence[Cell],
     *,
-    kind: AdapterKind,
+    factor_name: FactorName,
     alpha: float = 1.0,
     scale_floor: float = SCALE_FLOOR,
 ) -> RidgeAdapterFit:
@@ -508,7 +507,8 @@ def fit_ridge_adapter(
         raise ValueError("ridge alpha must be finite and positive")
     if not math.isfinite(scale_floor) or scale_floor <= 0.0:
         raise ValueError("scale_floor must be finite and positive")
-    targets = _adapter_targets(cell_values, kind)
+    labels = _factor_labels(factor_name)
+    targets = _adapter_targets(cell_values, factor_name)
     order = sorted(
         range(matrix.shape[0]),
         key=lambda index: (
@@ -538,9 +538,8 @@ def fit_ridge_adapter(
     regularized = gram + float(alpha) * np.eye(training.shape[1], dtype=FLOAT_DTYPE)
     coefficients = np.linalg.solve(regularized, right_hand_side)
     intercept = y_mean - x_mean @ coefficients
-    labels = ("WoJ", "WJ", "R2L", "L2R") if kind == "condition" else ("UGS", "FGS")
     return RidgeAdapterFit(
-        kind=kind,
+        factor_name=factor_name,
         alpha=float(alpha),
         fit_row_count=training.shape[0],
         input_dimension=training.shape[1],
@@ -554,37 +553,17 @@ def fit_ridge_adapter(
     )
 
 
-def fit_condition_adapter(
-    training_rows: Sequence[Sequence[float]] | np.ndarray,
-    subject_ids: Sequence[str],
-    cells: Sequence[Cell],
-    *,
-    alpha: float = 1.0,
-) -> RidgeAdapterFit:
-    return fit_ridge_adapter(training_rows, subject_ids, cells, kind="condition", alpha=alpha)
-
-
-def fit_gait_adapter(
-    training_rows: Sequence[Sequence[float]] | np.ndarray,
-    subject_ids: Sequence[str],
-    cells: Sequence[Cell],
-    *,
-    alpha: float = 1.0,
-) -> RidgeAdapterFit:
-    return fit_ridge_adapter(training_rows, subject_ids, cells, kind="gait", alpha=alpha)
-
-
 __all__ = [
+    "FACTOR_LABELS",
     "SCALE_FLOOR",
     "ZERO_NORM_EPSILON",
+    "FactorName",
     "NormalizationFit",
     "RidgeAdapterFit",
     "entropy_effective_rank",
-    "fit_condition_adapter",
-    "fit_gait_adapter",
+    "fit_factor_adapter",
     "fit_pca_normalizer",
     "fit_raw_normalizer",
-    "fit_ridge_adapter",
     "retained_dimension",
     "rowwise_l2_normalize",
 ]

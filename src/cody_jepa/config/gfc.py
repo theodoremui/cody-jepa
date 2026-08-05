@@ -6,7 +6,7 @@ import json
 
 import numpy as np
 
-from ..evaluation.gfc.core import CLOTHING, DIRECTIONS, SPEEDS
+from ..evaluation.gfc.oracle import compile_healthgait_gfc_v2_protocol
 
 
 def load_gfc_config(path: Path) -> dict[str, Any]:
@@ -48,6 +48,12 @@ def _require_finite_real(value: Any, label: str) -> float:
 def validate_gfc_config(config: dict[str, Any]) -> None:
     """Reject scientific settings the maintained evaluator would not honor."""
 
+    compiled = compile_healthgait_gfc_v2_protocol()
+    factor_names = list(compiled.design.factor_names)
+    factor_labels = {
+        factor.name: list(factor.values) for factor in compiled.design.factors
+    }
+
     _require_fields(
         config,
         {
@@ -58,8 +64,7 @@ def validate_gfc_config(config: dict[str, Any]) -> None:
             "factors",
             "recording_aggregation",
             "complete_case",
-            "query",
-            "gallery",
+            "protocol",
             "distance",
             "ties",
             "adapter",
@@ -87,13 +92,9 @@ def validate_gfc_config(config: dict[str, Any]) -> None:
         "split map",
     )
     factors = _require_fields(config["factors"], {"order", "values"}, "factors")
-    factor_values = _require_fields(
-        factors["values"], {"speed", "clothing", "direction"}, "factor values"
-    )
-    _require_equal(factors["order"], ["speed", "clothing", "direction"], "factor order")
-    _require_equal(factor_values["speed"], list(SPEEDS), "speed values")
-    _require_equal(factor_values["clothing"], list(CLOTHING), "clothing values")
-    _require_equal(factor_values["direction"], list(DIRECTIONS), "direction values")
+    factor_values = _require_fields(factors["values"], set(factor_names), "factor values")
+    _require_equal(factors["order"], factor_names, "factor order")
+    _require_equal(factor_values, factor_labels, "factor values")
     aggregation = _require_fields(
         config["recording_aggregation"],
         {"windows_per_recording", "method", "dtype"},
@@ -104,68 +105,43 @@ def validate_gfc_config(config: dict[str, Any]) -> None:
     _require_equal(aggregation["dtype"], "float64", "recording aggregation dtype")
     complete_case = _require_fields(
         config["complete_case"],
-        {"required_cells", "missing_cell", "duplicate_cell"},
+        {"missing_cell", "duplicate_cell"},
         "complete case",
     )
-    _require_equal(_require_integer(complete_case["required_cells"], "complete-cell count", minimum=1), 8, "complete-cell count")
     _require_equal(complete_case["missing_cell"], "exclude_participant", "missing-cell policy")
     _require_equal(complete_case["duplicate_cell"], "error", "duplicate-cell policy")
-    query = _require_fields(
-        config["query"],
+    protocol = _require_fields(
+        config["protocol"],
         {
-            "targets_per_participant",
-            "condition_donor",
-            "gait_donors",
-            "gait_donors_per_target",
-            "queries_per_participant",
+            "name",
+            "donor_rule",
+            "focal_factors",
+            "gallery_policy",
+            "require_target_source_independence",
         },
-        "query",
+        "protocol",
     )
-    _require_equal(_require_integer(query["targets_per_participant"], "target count", minimum=1), 8, "target count")
+    _require_equal(protocol["name"], compiled.name, "protocol name")
+    _require_equal(protocol["donor_rule"], compiled.donor_rule, "protocol donor rule")
     _require_equal(
-        query["condition_donor"],
-        "same_clothing_direction_opposite_speed",
-        "condition donor rule",
+        protocol["focal_factors"], list(compiled.focal_factors), "protocol focal factors"
     )
     _require_equal(
-        query["gait_donors"],
-        "same_speed_all_other_clothing_direction_pairs",
-        "gait donor rule",
+        protocol["gallery_policy"], compiled.gallery_policy, "protocol gallery policy"
     )
-    _require_equal(_require_integer(query["gait_donors_per_target"], "gait donor count", minimum=1), 3, "gait donor count")
-    _require_equal(_require_integer(query["queries_per_participant"], "query count", minimum=1), 24, "query count")
-    gallery = _require_fields(
-        config["gallery"],
-        {
-            "exclude_condition_donor",
-            "exclude_gait_donor",
-            "size",
-            "target_count",
-            "distractor_count",
-        },
-        "gallery",
-    )
-    _require_equal(gallery["exclude_condition_donor"], True, "condition donor exclusion")
-    _require_equal(gallery["exclude_gait_donor"], True, "gait donor exclusion")
-    _require_equal(_require_integer(gallery["size"], "gallery size", minimum=1), 6, "gallery size")
-    _require_equal(_require_integer(gallery["target_count"], "gallery target count", minimum=1), 1, "gallery target count")
-    _require_equal(_require_integer(gallery["distractor_count"], "gallery distractor count", minimum=1), 5, "gallery distractor count")
+    source_independence = protocol["require_target_source_independence"]
+    if not isinstance(source_independence, bool) or not source_independence:
+        raise ValueError(
+            "unsupported target source-independence requirement: expected true"
+        )
     distance = _require_fields(
         config["distance"],
-        {"metric", "condition_weight", "gait_weight", "dtype", "zero_norm_epsilon"},
+        {"metric", "factor_aggregation", "dtype", "zero_norm_epsilon"},
         "distance",
     )
     _require_equal(distance["metric"], "cosine", "distance metric")
+    _require_equal(distance["factor_aggregation"], "equal_mean", "factor aggregation")
     _require_equal(distance["dtype"], "float64", "distance dtype")
-    condition_weight = _require_finite_real(
-        distance["condition_weight"], "condition weight"
-    )
-    gait_weight = _require_finite_real(distance["gait_weight"], "gait weight")
-    _require_equal(
-        condition_weight + gait_weight,
-        1.0,
-        "distance-weight sum",
-    )
     if _require_finite_real(
         distance["zero_norm_epsilon"], "zero_norm_epsilon"
     ) <= 0.0:
@@ -193,19 +169,18 @@ def validate_gfc_config(config: dict[str, Any]) -> None:
             "alpha",
             "fit_split",
             "input_standardization",
-            "condition_labels",
-            "gait_labels",
-            "condition_output_dim",
-            "gait_output_dim",
+            "factor_names",
+            "factor_labels",
         },
         "adapter",
     )
     _require_equal(adapter["type"], "ridge", "adapter type")
     _require_equal(adapter["input_standardization"], "population", "adapter standardization")
-    _require_equal(adapter["condition_labels"], ["WoJ", "WJ", "R2L", "L2R"], "condition labels")
-    _require_equal(adapter["gait_labels"], ["UGS", "FGS"], "gait labels")
-    _require_equal(_require_integer(adapter["condition_output_dim"], "condition output width", minimum=1), 4, "condition output width")
-    _require_equal(_require_integer(adapter["gait_output_dim"], "gait output width", minimum=1), 2, "gait output width")
+    _require_equal(adapter["factor_names"], factor_names, "adapter factor names")
+    configured_labels = _require_fields(
+        adapter["factor_labels"], set(factor_names), "adapter factor labels"
+    )
+    _require_equal(configured_labels, factor_labels, "adapter factor labels")
     _require_equal(adapter["fit_split"], "development_train", "adapter fit split")
     if _require_finite_real(adapter["alpha"], "adapter alpha") <= 0.0:
         raise ValueError("adapter alpha and fit split must be valid")
@@ -241,15 +216,9 @@ def validate_gfc_config(config: dict[str, Any]) -> None:
     )
     if scale_floor <= 0.0 or block_l2_epsilon <= 0.0:
         raise ValueError("normalization numerical floors must be positive")
-    shortcut = _require_fields(
-        config["shortcut"], {"condition_columns", "gait_columns"}, "shortcut"
-    )
-    condition_columns = list(shortcut["condition_columns"])
-    gait_columns = list(shortcut["gait_columns"])
-    if not condition_columns or not gait_columns or set(condition_columns) & set(gait_columns):
-        raise ValueError("shortcut blocks must contain distinct named columns")
+    shortcut = _require_fields(config["shortcut"], {"columns"}, "shortcut")
     _require_equal(
-        condition_columns,
+        shortcut["columns"],
         [
             "shortcut_horizontal_centroid_drift_signed",
             "shortcut_horizontal_centroid_drift_absolute",
@@ -258,15 +227,21 @@ def validate_gfc_config(config: dict[str, Any]) -> None:
             "shortcut_foreground_area_q25",
             "shortcut_foreground_area_median",
             "shortcut_foreground_area_q75",
+            "shortcut_log_frame_count",
+            "shortcut_duration_seconds",
         ],
-        "condition shortcut columns",
+        "shortcut columns",
     )
     _require_equal(
-        gait_columns,
-        ["shortcut_log_frame_count", "shortcut_duration_seconds"],
-        "gait shortcut columns",
+        config["metrics"],
+        [
+            "top1",
+            "mean_reciprocal_rank",
+            "donor_u_attraction",
+            "donor_v_attraction",
+        ],
+        "metrics",
     )
-    _require_equal(config["metrics"], ["top1", "mean_reciprocal_rank", "donor_attraction"], "metrics")
     _require_equal(config["primary_metric"], "top1", "primary metric")
     _require_equal(config["primary_contrast"], "learned_minus_shortcut", "primary contrast")
     bootstrap = _require_fields(
@@ -301,7 +276,8 @@ def validate_gfc_config(config: dict[str, Any]) -> None:
     minimum_power = _require_finite_real(
         power["minimum_power"], "minimum power"
     )
-    if power_effect <= 0.0 or not 0.0 < power_alpha < 1.0:
+    _require_equal(power_effect, 1.0 / len(compiled.queries), "power effect")
+    if not 0.0 < power_alpha < 1.0:
         raise ValueError("power effect and alpha must be valid")
     if not 0.0 < minimum_power < 1.0:
         raise ValueError("minimum power must lie in (0, 1)")

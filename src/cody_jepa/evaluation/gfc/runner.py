@@ -15,6 +15,9 @@ import pandas as pd
 from .core import (
     CANONICAL_CELLS,
     Cell,
+    EXPECTED_GALLERY_SIZE,
+    EXPECTED_QUERIES,
+    FactorBlocks,
     GFC_PROTOCOL,
     Recording,
     aggregate_windows,
@@ -26,11 +29,11 @@ from .inference import (
     plan_prospective_power,
 )
 from .normalization import (
-    fit_condition_adapter,
-    fit_gait_adapter,
+    fit_factor_adapter,
     fit_pca_normalizer,
     fit_raw_normalizer,
 )
+from .oracle import compile_healthgait_gfc_v2_protocol
 from ...config.gfc import load_gfc_config
 from ..features import read_feature_table
 
@@ -45,8 +48,7 @@ class RecordingRow:
     cell: Cell
     window_ids: tuple[str, ...]
     learned: np.ndarray
-    shortcut_condition: np.ndarray
-    shortcut_gait: np.ndarray
+    shortcut: np.ndarray
 
 def _feature_columns(table: pd.DataFrame) -> list[str]:
     columns = [str(column) for column in table.columns if str(column).startswith("feature_")]
@@ -75,8 +77,7 @@ def _recording_rows(
     recording_column = str(config["recording_column"])
     split_column = str(config["split_column"])
     factor_columns = list(config["factors"]["order"])
-    shortcut_condition_columns = list(config["shortcut"]["condition_columns"])
-    shortcut_gait_columns = list(config["shortcut"]["gait_columns"])
+    shortcut_columns = list(config["shortcut"]["columns"])
     learned_columns = _feature_columns(table)
     required = {
         subject_column,
@@ -88,16 +89,14 @@ def _recording_rows(
         "source_video_id",
         "direction_clip_id",
         *factor_columns,
-        *shortcut_condition_columns,
-        *shortcut_gait_columns,
+        *shortcut_columns,
     }
     missing = sorted(required - set(table.columns))
     if missing:
         raise ValueError("feature table is missing columns: " + ", ".join(missing))
     numeric_columns = [
         *learned_columns,
-        *shortcut_condition_columns,
-        *shortcut_gait_columns,
+        *shortcut_columns,
         "window_start",
         "num_frames",
         "fps",
@@ -184,7 +183,6 @@ def _recording_rows(
         starts = pd.to_numeric(group["window_start"], errors="raise").astype(int)
         if starts.nunique() != expected_windows or (starts < 0).any():
             raise ValueError(f"recording {recording_id!r} has invalid window starts")
-        shortcut_columns = [*shortcut_condition_columns, *shortcut_gait_columns]
         shortcut_values = group[shortcut_columns].to_numpy(dtype=np.float64)
         if not np.allclose(shortcut_values, shortcut_values[0], rtol=0.0, atol=1e-12):
             raise ValueError(
@@ -208,15 +206,10 @@ def _recording_rows(
                     expected_count=expected_windows,
                     label="learned features",
                 ),
-                shortcut_condition=aggregate_windows(
-                    shortcut_values[:, : len(shortcut_condition_columns)],
+                shortcut=aggregate_windows(
+                    shortcut_values,
                     expected_count=expected_windows,
-                    label="condition shortcuts",
-                ),
-                shortcut_gait=aggregate_windows(
-                    shortcut_values[:, len(shortcut_condition_columns) :],
-                    expected_count=expected_windows,
-                    label="gait shortcuts",
+                    label="shortcut cues",
                 ),
             )
         )
@@ -285,18 +278,24 @@ def _normalizer_factory(name: str):
 
 
 def _make_recordings(
-    rows: list[RecordingRow], condition: np.ndarray, gait: np.ndarray
+    rows: list[RecordingRow], factor_values: dict[str, np.ndarray]
 ) -> list[Recording]:
-    if condition.shape[0] != len(rows) or gait.shape[0] != len(rows):
+    if set(factor_values) != {"speed", "clothing", "direction"}:
+        raise ValueError("transformed blocks must cover all three factors")
+    if any(values.shape[0] != len(rows) for values in factor_values.values()):
         raise ValueError("transformed block row counts do not match recording rows")
     return [
         Recording(
-            row.subject_id,
-            row.recording_id,
-            row.cell,
-            condition[index],
-            gait[index],
-            row.window_ids,
+            subject_id=row.subject_id,
+            recording_id=row.recording_id,
+            source_video_id=row.source_video_id,
+            cell=row.cell,
+            factor_blocks=FactorBlocks(
+                speed=factor_values["speed"][index],
+                clothing=factor_values["clothing"][index],
+                direction=factor_values["direction"][index],
+            ),
+            window_ids=row.window_ids,
         )
         for index, row in enumerate(rows)
     ]
@@ -314,7 +313,7 @@ def _public_query(value: dict[str, Any], participant_label: str) -> dict[str, An
 
     result = dict(value)
     result["subject_id"] = participant_label
-    for role in ("target", "condition_donor", "gait_donor"):
+    for role in ("target", "donor_u", "donor_v"):
         item = dict(result[role])
         cell = item["cell"]
         item["recording_id"] = (
@@ -344,6 +343,12 @@ def _write_summary_files(summary: dict[str, Any], directory: Path) -> None:
         [
             {
                 "protocol": summary["protocol"],
+                "gallery": summary["gallery"],
+                "queries_per_participant": summary["queries_per_participant"],
+                "factor_heads": summary["factor_heads"],
+                "source_independence_verified": summary[
+                    "source_independence_verified"
+                ],
                 "split": summary["split"],
                 "normalization": summary["normalization"],
                 "model_label": summary["model_label"],
@@ -433,21 +438,15 @@ def run_gfc(
     )
     config = load_gfc_config(config_path)
     if features.suffix.casefold() == ".npz":
-        table, _ = read_feature_table(features)
+        # The runner validates its training + requested evaluation rows below.
+        # Loading without whole-archive semantic validation prevents a known,
+        # unused held-out split from influencing the requested analysis.
+        table, _ = read_feature_table(features, validate=False)
     else:
         # The GFC runner intentionally accepts its narrower documented CSV
         # contract in addition to the full feature-export table contract.
         table = pd.read_csv(features)
-    all_rows, learned_columns = _recording_rows(table, config)
     split_map = dict(config["split_map"])
-    unknown_splits = sorted(
-        {row.split for row in all_rows} - set(split_map.values())
-    )
-    if unknown_splits:
-        raise ValueError(
-            "feature table contains unsupported split labels: "
-            + ", ".join(repr(value) for value in unknown_splits)
-        )
     evaluable_splits = ("development", "confirmation")
     if split not in evaluable_splits:
         raise ValueError(f"split must be one of {list(evaluable_splits)}")
@@ -457,6 +456,25 @@ def run_gfc(
         raise ValueError("adapter and normalization fit splits must be identical")
     training_label = str(split_map[adapter_fit_split])
     evaluation_label = str(split_map[split])
+    split_column = str(config["split_column"])
+    if split_column not in table.columns:
+        raise ValueError(f"feature table is missing columns: {split_column}")
+    raw_splits = table[split_column].astype(str)
+    unknown_splits = sorted(
+        set(raw_splits) - set(split_map.values())
+    )
+    if unknown_splits:
+        raise ValueError(
+            "feature table contains unsupported split labels: "
+            + ", ".join(repr(value) for value in unknown_splits)
+        )
+    # Validate scientific row invariants only for training and the requested
+    # evaluation split. A malformed, known held-out split must not influence a
+    # development run (and vice versa).
+    relevant_table = table.loc[
+        raw_splits.isin({training_label, evaluation_label})
+    ].copy()
+    all_rows, learned_columns = _recording_rows(relevant_table, config)
     training_rows, training_exclusions = _complete_training_rows(
         [row for row in all_rows if row.split == training_label]
     )
@@ -473,13 +491,22 @@ def run_gfc(
         )
 
     train_learned = np.stack([row.learned for row in training_rows])
+    train_shortcut = np.stack([row.shortcut for row in training_rows])
     train_subjects = [row.subject_id for row in training_rows]
     train_cells = [row.cell for row in training_rows]
     alpha = float(config["adapter"]["alpha"])
-    condition_adapter = fit_condition_adapter(
-        train_learned, train_subjects, train_cells, alpha=alpha
-    )
-    gait_adapter = fit_gait_adapter(train_learned, train_subjects, train_cells, alpha=alpha)
+    factor_names = tuple(compile_healthgait_gfc_v2_protocol().design.factor_names)
+    adapters = {
+        f"{representation}_{factor}": fit_factor_adapter(
+            train_learned if representation == "learned" else train_shortcut,
+            train_subjects,
+            train_cells,
+            factor_name=factor,
+            alpha=alpha,
+        )
+        for representation in ("learned", "shortcut")
+        for factor in factor_names
+    }
 
     analysis_name = normalization or str(config["normalization"]["primary"])
     allowed_analyses = {
@@ -492,73 +519,52 @@ def run_gfc(
     scale_floor = float(config["normalization"]["scale_floor"])
     block_epsilon = float(config["normalization"]["block_l2_epsilon"])
 
-    train_learned_condition = condition_adapter.transform(train_learned)
-    train_learned_gait = gait_adapter.transform(train_learned)
-    train_shortcut_condition = np.stack(
-        [row.shortcut_condition for row in training_rows]
-    )
-    train_shortcut_gait = np.stack([row.shortcut_gait for row in training_rows])
-    normalizers = {
-        "learned_condition": fit_normalizer(
-            train_learned_condition,
-            dimension_policy=dimension_policy,
-            scale_floor=scale_floor,
-            zero_norm_epsilon=block_epsilon,
-        ),
-        "learned_gait": fit_normalizer(
-            train_learned_gait,
-            dimension_policy=dimension_policy,
-            scale_floor=scale_floor,
-            zero_norm_epsilon=block_epsilon,
-        ),
-        "shortcut_condition": fit_normalizer(
-            train_shortcut_condition,
-            dimension_policy=dimension_policy,
-            scale_floor=scale_floor,
-            zero_norm_epsilon=block_epsilon,
-        ),
-        "shortcut_gait": fit_normalizer(
-            train_shortcut_gait,
-            dimension_policy=dimension_policy,
-            scale_floor=scale_floor,
-            zero_norm_epsilon=block_epsilon,
-        ),
-    }
+    training_inputs = {"learned": train_learned, "shortcut": train_shortcut}
+    normalizers = {}
+    for representation in ("learned", "shortcut"):
+        for factor in factor_names:
+            name = f"{representation}_{factor}"
+            normalizers[name] = fit_normalizer(
+                adapters[name].transform(training_inputs[representation]),
+                dimension_policy=dimension_policy,
+                scale_floor=scale_floor,
+                zero_norm_epsilon=block_epsilon,
+            )
 
     evaluation_learned = np.stack([row.learned for row in evaluation_rows])
-    learned_condition = normalizers["learned_condition"].transform(
-        condition_adapter.transform(evaluation_learned)
-    )
-    learned_gait = normalizers["learned_gait"].transform(
-        gait_adapter.transform(evaluation_learned)
-    )
-    shortcut_condition = normalizers["shortcut_condition"].transform(
-        np.stack([row.shortcut_condition for row in evaluation_rows])
-    )
-    shortcut_gait = normalizers["shortcut_gait"].transform(
-        np.stack([row.shortcut_gait for row in evaluation_rows])
-    )
+    evaluation_shortcut = np.stack([row.shortcut for row in evaluation_rows])
+    evaluation_inputs = {
+        "learned": evaluation_learned,
+        "shortcut": evaluation_shortcut,
+    }
+    transformed = {
+        representation: {
+            factor: normalizers[f"{representation}_{factor}"].transform(
+                adapters[f"{representation}_{factor}"].transform(
+                    evaluation_inputs[representation]
+                )
+            )
+            for factor in factor_names
+        }
+        for representation in ("learned", "shortcut")
+    }
 
     seed = int(config["bootstrap"]["seed"])
     distance = config["distance"]
     tie_tolerance = float(config["ties"]["absolute_tolerance"])
     learned = evaluate_cohort(
-        _make_recordings(evaluation_rows, learned_condition, learned_gait),
+        _make_recordings(evaluation_rows, transformed["learned"]),
         split=split,
         seed=seed,
         representation="learned",
-        condition_weight=float(distance["condition_weight"]),
-        gait_weight=float(distance["gait_weight"]),
         tie_tolerance=tie_tolerance,
         zero_norm_epsilon=float(distance["zero_norm_epsilon"]),
     )
     shortcut = evaluate_cohort(
-        _make_recordings(evaluation_rows, shortcut_condition, shortcut_gait),
+        _make_recordings(evaluation_rows, transformed["shortcut"]),
         split=split,
         seed=seed,
         representation="shortcut",
-        condition_weight=float(distance["condition_weight"]),
-        gait_weight=float(distance["gait_weight"]),
         tie_tolerance=tie_tolerance,
         zero_norm_epsilon=float(distance["zero_norm_epsilon"]),
     )
@@ -602,16 +608,26 @@ def run_gfc(
                 "learned_minus_shortcut": contrast.difference,
                 "learned_mrr": learned_by_subject[contrast.subject_id].mrr,
                 "shortcut_mrr": shortcut_by_subject[contrast.subject_id].mrr,
-                "learned_donor_attraction": learned_by_subject[
+                "learned_donor_u_attraction": learned_by_subject[
                     contrast.subject_id
-                ].donor_attraction,
-                "shortcut_donor_attraction": shortcut_by_subject[
+                ].donor_u_attraction,
+                "learned_donor_v_attraction": learned_by_subject[
                     contrast.subject_id
-                ].donor_attraction,
+                ].donor_v_attraction,
+                "shortcut_donor_u_attraction": shortcut_by_subject[
+                    contrast.subject_id
+                ].donor_u_attraction,
+                "shortcut_donor_v_attraction": shortcut_by_subject[
+                    contrast.subject_id
+                ].donor_v_attraction,
             }
         )
     summary: dict[str, Any] = {
         "protocol": GFC_PROTOCOL,
+        "gallery": f"retain_all_{EXPECTED_GALLERY_SIZE}",
+        "queries_per_participant": EXPECTED_QUERIES,
+        "factor_heads": "three_matched_ridge_heads",
+        "source_independence_verified": True,
         "split": split,
         "normalization": analysis_name,
         "model_label": model_label,
@@ -624,8 +640,7 @@ def run_gfc(
                 "factors",
                 "recording_aggregation",
                 "complete_case",
-                "query",
-                "gallery",
+                "protocol",
                 "distance",
                 "ties",
                 "adapter",
@@ -651,14 +666,25 @@ def run_gfc(
         "learned": {
             "top1": learned.top1,
             "mrr": learned.mrr,
-            "donor_attraction": learned.donor_attraction,
+            "donor_u_attraction": learned.donor_u_attraction,
+            "donor_v_attraction": learned.donor_v_attraction,
         },
         "shortcut": {
             "top1": shortcut.top1,
             "mrr": shortcut.mrr,
-            "donor_attraction": shortcut.donor_attraction,
+            "donor_u_attraction": shortcut.donor_u_attraction,
+            "donor_v_attraction": shortcut.donor_v_attraction,
         },
         "learned_minus_shortcut": interval.to_dict(),
+        "adapter_diagnostics": {
+            name: {
+                "factor_name": fit.factor_name,
+                "fit_row_count": fit.fit_row_count,
+                "input_dimension": fit.input_dimension,
+                "output_dimension": fit.output_dimension,
+            }
+            for name, fit in adapters.items()
+        },
         "normalizer_diagnostics": {
             name: fit.diagnostics() for name, fit in normalizers.items()
         },

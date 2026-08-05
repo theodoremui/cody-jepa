@@ -1,18 +1,4 @@
-"""Exact symbolic oracle spectra for factorial retrieval protocols.
-
-The oracle in this module is deliberately independent of learned features and the
-floating-point GFC scorer.  A protocol compiler constructs queries from factorial
-cells and donor roles; the enumerator then asks what score a solver that recovers a
-declared subset of factors exactly must receive.
-
-This separation makes protocol geometry executable.  In particular, it exposes how
-gallery filtering changes partial-factor ceilings without treating those ceilings as
-empirical results about a representation.  The current compiler intentionally supports
-the binary complementary donor rule, the retain-all and exclude-donors galleries, and
-the fractional-top-1/average-rank tie rule required by GFC-v2.  Exhaustive coverage is
-tested for designs with two through five binary factors; larger designs have
-exponentially more cells, queries, and recovered-factor subsets.
-"""
+"""Exact symbolic oracle spectra for factorial retrieval protocols."""
 
 from __future__ import annotations
 

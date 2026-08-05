@@ -34,28 +34,22 @@
     "dtype": "float64"
   },
   "complete_case": {
-    "required_cells": 8,
     "missing_cell": "exclude_participant",
     "duplicate_cell": "error"
   },
-  "query": {
-    "targets_per_participant": 8,
-    "condition_donor": "same_clothing_direction_opposite_speed",
-    "gait_donors": "same_speed_all_other_clothing_direction_pairs",
-    "gait_donors_per_target": 3,
-    "queries_per_participant": 24
-  },
-  "gallery": {
-    "exclude_condition_donor": true,
-    "exclude_gait_donor": true,
-    "size": 6,
-    "target_count": 1,
-    "distractor_count": 5
+  "protocol": {
+    "name": "gfc_v2",
+    "donor_rule": "binary_complementary_two_donor",
+    "focal_factors": [
+      "speed",
+      "clothing"
+    ],
+    "gallery_policy": "retain_all",
+    "require_target_source_independence": true
   },
   "distance": {
     "metric": "cosine",
-    "condition_weight": 0.5,
-    "gait_weight": 0.5,
+    "factor_aggregation": "equal_mean",
     "dtype": "float64",
     "zero_norm_epsilon": 1e-12
   },
@@ -70,18 +64,25 @@
     "alpha": 1.0,
     "fit_split": "development_train",
     "input_standardization": "population",
-    "condition_labels": [
-      "WoJ",
-      "WJ",
-      "R2L",
-      "L2R"
+    "factor_names": [
+      "speed",
+      "clothing",
+      "direction"
     ],
-    "gait_labels": [
-      "UGS",
-      "FGS"
-    ],
-    "condition_output_dim": 4,
-    "gait_output_dim": 2
+    "factor_labels": {
+      "speed": [
+        "UGS",
+        "FGS"
+      ],
+      "clothing": [
+        "WoJ",
+        "WJ"
+      ],
+      "direction": [
+        "R2L",
+        "L2R"
+      ]
+    }
   },
   "normalization": {
     "fit_split": "development_train",
@@ -97,16 +98,14 @@
     "pca_solver": "full_svd"
   },
   "shortcut": {
-    "condition_columns": [
+    "columns": [
       "shortcut_horizontal_centroid_drift_signed",
       "shortcut_horizontal_centroid_drift_absolute",
       "shortcut_foreground_area_mean",
       "shortcut_foreground_area_std",
       "shortcut_foreground_area_q25",
       "shortcut_foreground_area_median",
-      "shortcut_foreground_area_q75"
-    ],
-    "gait_columns": [
+      "shortcut_foreground_area_q75",
       "shortcut_log_frame_count",
       "shortcut_duration_seconds"
     ]
@@ -114,7 +113,8 @@
   "metrics": [
     "top1",
     "mean_reciprocal_rank",
-    "donor_attraction"
+    "donor_u_attraction",
+    "donor_v_attraction"
   ],
   "primary_metric": "top1",
   "primary_contrast": "learned_minus_shortcut",
@@ -126,7 +126,7 @@
     "interval": "percentile"
   },
   "power": {
-    "effect": 0.041666666666666664,
+    "effect": 0.0625,
     "alpha": 0.05,
     "minimum_power": 0.8,
     "alternative": "two_sided",

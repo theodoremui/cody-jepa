@@ -1,29 +1,27 @@
-"""Grounded Factorial Completion for the Health&Gait 2 x 2 x 2 design.
-
-The evaluator consumes one pair of recording-level representation blocks per
-factorial cell.  Window aggregation, donor exclusion, deterministic tie
-handling, and participant weighting are scientific parts of the method.
-"""
+"""Grounded Factorial Completion v2 for the Health&Gait 2 x 2 x 2 design."""
 
 from __future__ import annotations
 
 from collections import defaultdict
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
-import itertools
 import math
 
 import numpy as np
 
+from .oracle import compile_healthgait_gfc_v2_protocol
 
-SPEEDS = ("UGS", "FGS")
-CLOTHING = ("WoJ", "WJ")
-DIRECTIONS = ("R2L", "L2R")
-GFC_PROTOCOL = "legacy_donor_excluded_v1"
+
+_COMPILED_PROTOCOL = compile_healthgait_gfc_v2_protocol()
+_FACTOR_NAMES = _COMPILED_PROTOCOL.design.factor_names
+SPEEDS = _COMPILED_PROTOCOL.design.factors[0].values
+CLOTHING = _COMPILED_PROTOCOL.design.factors[1].values
+DIRECTIONS = _COMPILED_PROTOCOL.design.factors[2].values
+GFC_PROTOCOL = _COMPILED_PROTOCOL.name
 EXPECTED_WINDOWS = 3
-EXPECTED_CELLS = 8
-EXPECTED_QUERIES = 24
-EXPECTED_GALLERY_SIZE = 6
+EXPECTED_CELLS = len(_COMPILED_PROTOCOL.design.cells)
+EXPECTED_QUERIES = len(_COMPILED_PROTOCOL.queries)
+EXPECTED_GALLERY_SIZE = len(_COMPILED_PROTOCOL.queries[0].gallery)
 TIE_ABS_TOLERANCE = 1e-12
 ZERO_NORM_EPSILON = 1e-12
 SCORING_DTYPE = np.dtype(np.float64)
@@ -71,10 +69,7 @@ class Cell:
         }
 
 
-CANONICAL_CELLS = tuple(
-    Cell(speed, clothing, direction)
-    for speed, clothing, direction in itertools.product(SPEEDS, CLOTHING, DIRECTIONS)
-)
+CANONICAL_CELLS = tuple(Cell(*values) for values in _COMPILED_PROTOCOL.design.cells)
 
 
 def _finite_vector(value: Sequence[float] | np.ndarray, label: str) -> np.ndarray:
@@ -113,25 +108,44 @@ def aggregate_windows(
 
 
 @dataclass(frozen=True)
+class FactorBlocks:
+    """Three immutable recording-level vectors, one for each design factor."""
+
+    speed: np.ndarray = field(repr=False, compare=False)
+    clothing: np.ndarray = field(repr=False, compare=False)
+    direction: np.ndarray = field(repr=False, compare=False)
+
+    def __post_init__(self) -> None:
+        for name in _FACTOR_NAMES:
+            object.__setattr__(self, name, _finite_vector(getattr(self, name), f"{name}_block"))
+
+    def for_factor(self, factor_name: str) -> np.ndarray:
+        if factor_name not in _FACTOR_NAMES:
+            raise ValueError(f"unknown factor {factor_name!r}")
+        return getattr(self, factor_name)
+
+
+@dataclass(frozen=True)
 class Recording:
-    """One recording-level condition block and gait block."""
+    """One recording with source lineage and three matched factor blocks."""
 
     subject_id: str
     recording_id: str
+    source_video_id: str
     cell: Cell
-    condition_block: np.ndarray = field(repr=False, compare=False)
-    gait_block: np.ndarray = field(repr=False, compare=False)
+    factor_blocks: FactorBlocks
     window_ids: tuple[str, ...]
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "subject_id", _nonempty_text(self.subject_id, "subject_id"))
         object.__setattr__(self, "recording_id", _nonempty_text(self.recording_id, "recording_id"))
+        object.__setattr__(
+            self, "source_video_id", _nonempty_text(self.source_video_id, "source_video_id")
+        )
         if not isinstance(self.cell, Cell):
             raise TypeError("cell must be a Cell")
-        object.__setattr__(
-            self, "condition_block", _finite_vector(self.condition_block, "condition_block")
-        )
-        object.__setattr__(self, "gait_block", _finite_vector(self.gait_block, "gait_block"))
+        if not isinstance(self.factor_blocks, FactorBlocks):
+            raise TypeError("factor_blocks must be FactorBlocks")
         ids = tuple(_nonempty_text(item, "window_id") for item in self.window_ids)
         if len(ids) != EXPECTED_WINDOWS:
             raise ValueError(f"recording requires exactly {EXPECTED_WINDOWS} source windows")
@@ -145,20 +159,27 @@ class Recording:
         *,
         subject_id: str,
         recording_id: str,
+        source_video_id: str,
         cell: Cell,
-        condition_windows: Sequence[Sequence[float] | np.ndarray],
-        gait_windows: Sequence[Sequence[float] | np.ndarray],
+        speed_windows: Sequence[Sequence[float] | np.ndarray],
+        clothing_windows: Sequence[Sequence[float] | np.ndarray],
+        direction_windows: Sequence[Sequence[float] | np.ndarray],
         window_ids: Sequence[str],
     ) -> "Recording":
         ids = tuple(window_ids)
-        if len(condition_windows) != len(gait_windows) or len(ids) != len(condition_windows):
-            raise ValueError("condition, gait, and window identifiers must have equal counts")
+        counts = {len(ids), len(speed_windows), len(clothing_windows), len(direction_windows)}
+        if len(counts) != 1:
+            raise ValueError("factor windows and window identifiers must have equal counts")
         return cls(
             subject_id=subject_id,
             recording_id=recording_id,
+            source_video_id=source_video_id,
             cell=cell,
-            condition_block=aggregate_windows(condition_windows, label="condition"),
-            gait_block=aggregate_windows(gait_windows, label="gait"),
+            factor_blocks=FactorBlocks(
+                speed=aggregate_windows(speed_windows, label="speed"),
+                clothing=aggregate_windows(clothing_windows, label="clothing"),
+                direction=aggregate_windows(direction_windows, label="direction"),
+            ),
             window_ids=ids,
         )
 
@@ -166,19 +187,19 @@ class Recording:
 @dataclass(frozen=True)
 class Query:
     query_index: int
+    protocol: str
     subject_id: str
     target_id: str
     target_cell: Cell
-    condition_donor_id: str
-    condition_donor_cell: Cell
-    gait_donor_id: str
-    gait_donor_cell: Cell
+    focal_factor: str
+    donor_u_id: str
+    donor_u_cell: Cell
+    donor_v_id: str
+    donor_v_cell: Cell
+    factor_sources: tuple[str, ...]
     gallery_ids: tuple[str, ...]
     gallery_cells: tuple[Cell, ...]
-
-
-def _opposite_speed(speed: str) -> str:
-    return SPEEDS[1 - SPEEDS.index(speed)]
+    source_independence_verified: bool
 
 
 def _recording_index(recordings: Sequence[Recording]) -> dict[Cell, Recording]:
@@ -197,10 +218,10 @@ def _recording_index(recordings: Sequence[Recording]) -> dict[Cell, Recording]:
         if recording.cell in index:
             raise ValueError(f"duplicate factorial cell {recording.cell.key!r}")
         index[recording.cell] = recording
-    if len({item.condition_block.size for item in recordings}) != 1:
-        raise ValueError("condition block width must be constant within a participant")
-    if len({item.gait_block.size for item in recordings}) != 1:
-        raise ValueError("gait block width must be constant within a participant")
+    for factor_name in _FACTOR_NAMES:
+        widths = {item.factor_blocks.for_factor(factor_name).size for item in recordings}
+        if len(widths) != 1:
+            raise ValueError(f"{factor_name} block width must be constant within a participant")
     return index
 
 
@@ -210,7 +231,7 @@ def missing_cells(recordings: Sequence[Recording]) -> tuple[Cell, ...]:
 
 
 def build_queries(recordings: Sequence[Recording]) -> tuple[Query, ...]:
-    """Build 24 canonical queries, removing both donors from each gallery."""
+    """Materialize the oracle-defined GFC-v2 queries for one participant."""
 
     index = _recording_index(recordings)
     absent = tuple(cell for cell in CANONICAL_CELLS if cell not in index)
@@ -219,47 +240,43 @@ def build_queries(recordings: Sequence[Recording]) -> tuple[Query, ...]:
             "fixed GFC requires all eight cells; missing cells: "
             + (", ".join(cell.key for cell in absent) or "none")
         )
-    subject_id = next(iter(index.values())).subject_id
     queries: list[Query] = []
-    for target_cell in CANONICAL_CELLS:
+    for compiled in _COMPILED_PROTOCOL.queries:
+        target_cell = Cell(*compiled.target)
+        donor_u_cell, donor_v_cell = (Cell(*cell) for cell in compiled.donors)
         target = index[target_cell]
-        condition_cell = Cell(
-            _opposite_speed(target_cell.speed), target_cell.clothing, target_cell.direction
+        donor_u = index[donor_u_cell]
+        donor_v = index[donor_v_cell]
+        if donor_u.source_video_id == target.source_video_id:
+            raise ValueError("donor_u shares source_video_id with target")
+        if donor_v.source_video_id == target.source_video_id:
+            raise ValueError("donor_v shares source_video_id with target")
+        gallery_cells = tuple(Cell(*cell) for cell in compiled.gallery)
+        gallery_recordings = tuple(index[cell] for cell in gallery_cells)
+        factor_sources = tuple(
+            "donor_u" if source_index == 0 else "donor_v"
+            for source_index in compiled.factor_sources
         )
-        condition_donor = index[condition_cell]
-        gait_cells = tuple(
-            cell
-            for cell in CANONICAL_CELLS
-            if cell.speed == target_cell.speed
-            and (cell.clothing, cell.direction) != (target_cell.clothing, target_cell.direction)
+        queries.append(
+            Query(
+                query_index=compiled.query_index,
+                protocol=_COMPILED_PROTOCOL.name,
+                subject_id=target.subject_id,
+                target_id=target.recording_id,
+                target_cell=target_cell,
+                focal_factor=compiled.focal_factor,
+                donor_u_id=donor_u.recording_id,
+                donor_u_cell=donor_u_cell,
+                donor_v_id=donor_v.recording_id,
+                donor_v_cell=donor_v_cell,
+                factor_sources=factor_sources,
+                gallery_ids=tuple(item.recording_id for item in gallery_recordings),
+                gallery_cells=gallery_cells,
+                source_independence_verified=True,
+            )
         )
-        for gait_cell in gait_cells:
-            gait_donor = index[gait_cell]
-            donor_ids = {condition_donor.recording_id, gait_donor.recording_id}
-            gallery_recordings = tuple(
-                index[cell] for cell in CANONICAL_CELLS if index[cell].recording_id not in donor_ids
-            )
-            if (
-                len(gallery_recordings) != EXPECTED_GALLERY_SIZE
-                or target.recording_id not in {item.recording_id for item in gallery_recordings}
-            ):
-                raise RuntimeError("constructed gallery violates donor exclusion")
-            queries.append(
-                Query(
-                    query_index=len(queries),
-                    subject_id=subject_id,
-                    target_id=target.recording_id,
-                    target_cell=target_cell,
-                    condition_donor_id=condition_donor.recording_id,
-                    condition_donor_cell=condition_cell,
-                    gait_donor_id=gait_donor.recording_id,
-                    gait_donor_cell=gait_cell,
-                    gallery_ids=tuple(item.recording_id for item in gallery_recordings),
-                    gallery_cells=tuple(item.cell for item in gallery_recordings),
-                )
-            )
     if len(queries) != EXPECTED_QUERIES:
-        raise RuntimeError("factor design did not produce 24 queries")
+        raise RuntimeError("compiled factor design produced an unexpected query count")
     return tuple(queries)
 
 
@@ -298,38 +315,25 @@ def cosine_distance(
     return 1.0 - min(1.0, max(-1.0, similarity))
 
 
-def _validate_weights(condition_weight: float, gait_weight: float) -> tuple[float, float]:
-    condition = float(condition_weight)
-    gait = float(gait_weight)
-    if not math.isfinite(condition) or not math.isfinite(gait) or condition < 0 or gait < 0:
-        raise ValueError("distance weights must be finite and nonnegative")
-    if not math.isclose(condition + gait, 1.0, rel_tol=0.0, abs_tol=1e-12):
-        raise ValueError("distance weights must sum to one")
-    return condition, gait
-
-
 def mixed_distance(
-    query_condition: np.ndarray,
-    query_gait: np.ndarray,
+    query_blocks: FactorBlocks,
     gallery_recording: Recording,
     *,
-    condition_weight: float = 0.5,
-    gait_weight: float = 0.5,
     zero_norm_epsilon: float = ZERO_NORM_EPSILON,
-) -> tuple[float, float, float]:
-    condition_weight, gait_weight = _validate_weights(condition_weight, gait_weight)
-    condition = cosine_distance(
-        query_condition,
-        gallery_recording.condition_block,
-        zero_norm_epsilon=zero_norm_epsilon,
+) -> tuple[float, float, float, float]:
+    """Return per-factor cosine distances and their equal arithmetic mean."""
+
+    if not isinstance(query_blocks, FactorBlocks):
+        raise TypeError("query_blocks must be FactorBlocks")
+    distances = tuple(
+        cosine_distance(
+            query_blocks.for_factor(factor_name),
+            gallery_recording.factor_blocks.for_factor(factor_name),
+            zero_norm_epsilon=zero_norm_epsilon,
+        )
+        for factor_name in _FACTOR_NAMES
     )
-    gait = cosine_distance(
-        query_gait,
-        gallery_recording.gait_block,
-        zero_norm_epsilon=zero_norm_epsilon,
-    )
-    combined = float(condition_weight * condition + gait_weight * gait)
-    return condition, gait, combined
+    return (*distances, float(np.mean(distances, dtype=SCORING_DTYPE)))
 
 
 @dataclass(frozen=True)
@@ -373,16 +377,18 @@ def rank_target(
 class DistanceEntry:
     recording_id: str
     cell: Cell
-    condition_distance: float
-    gait_distance: float
+    speed_distance: float
+    clothing_distance: float
+    direction_distance: float
     combined_distance: float
 
     def to_dict(self, target_id: str) -> dict[str, object]:
         return {
             "recording_id": self.recording_id,
             "cell": self.cell.to_dict(),
-            "condition_distance": self.condition_distance,
-            "gait_distance": self.gait_distance,
+            "speed_distance": self.speed_distance,
+            "clothing_distance": self.clothing_distance,
+            "direction_distance": self.direction_distance,
             "combined_distance": self.combined_distance,
             "is_target": self.recording_id == target_id,
         }
@@ -398,7 +404,8 @@ class QueryResult:
     query: Query
     distances: tuple[DistanceEntry, ...]
     rank: RankScores
-    donor_attraction: float
+    donor_u_attraction: float
+    donor_v_attraction: float
 
     @property
     def top1(self) -> float:
@@ -413,14 +420,18 @@ class QueryResult:
         return (
             self.split,
             self.seed,
+            self.query.protocol,
             self.query.subject_id,
             self.query.target_id,
             self.query.target_cell,
-            self.query.condition_donor_id,
-            self.query.condition_donor_cell,
-            self.query.gait_donor_id,
-            self.query.gait_donor_cell,
+            self.query.focal_factor,
+            self.query.donor_u_id,
+            self.query.donor_u_cell,
+            self.query.donor_v_id,
+            self.query.donor_v_cell,
+            self.query.factor_sources,
             tuple(zip(self.query.gallery_ids, self.query.gallery_cells)),
+            self.query.source_independence_verified,
         )
 
     def to_dict(self) -> dict[str, object]:
@@ -428,25 +439,54 @@ class QueryResult:
             "split": self.split,
             "seed": self.seed,
             "representation": self.representation,
+            "protocol": self.query.protocol,
             "subject_id": self.query.subject_id,
             "query_index": self.query.query_index,
+            "focal_factor": self.query.focal_factor,
             "target": {"recording_id": self.query.target_id, "cell": self.query.target_cell.to_dict()},
-            "condition_donor": {
-                "recording_id": self.query.condition_donor_id,
-                "cell": self.query.condition_donor_cell.to_dict(),
+            "donor_u": {
+                "recording_id": self.query.donor_u_id,
+                "cell": self.query.donor_u_cell.to_dict(),
             },
-            "gait_donor": {
-                "recording_id": self.query.gait_donor_id,
-                "cell": self.query.gait_donor_cell.to_dict(),
+            "donor_v": {
+                "recording_id": self.query.donor_v_id,
+                "cell": self.query.donor_v_cell.to_dict(),
             },
+            "factor_sources": dict(zip(_FACTOR_NAMES, self.query.factor_sources)),
+            "source_independence_verified": self.query.source_independence_verified,
             "gallery": [item.to_dict(self.query.target_id) for item in self.distances],
             "strictly_closer_count": self.rank.strictly_closer_count,
             "tie_size": self.rank.tie_size,
             "average_rank": self.rank.average_rank,
             "top1": self.top1,
             "reciprocal_rank": self.reciprocal_rank,
-            "donor_attraction": self.donor_attraction,
+            "donor_u_attraction": self.donor_u_attraction,
+            "donor_v_attraction": self.donor_v_attraction,
         }
+
+
+def _compose_query_blocks(query: Query, donor_u: Recording, donor_v: Recording) -> FactorBlocks:
+    donors = {"donor_u": donor_u, "donor_v": donor_v}
+    if len(query.factor_sources) != len(_FACTOR_NAMES):
+        raise ValueError("query must declare one donor source per factor")
+    if any(role not in donors for role in query.factor_sources):
+        raise ValueError("query contains an unknown factor-source role")
+    blocks = {
+        factor_name: donors[role].factor_blocks.for_factor(factor_name)
+        for factor_name, role in zip(_FACTOR_NAMES, query.factor_sources)
+    }
+    return FactorBlocks(**blocks)
+
+
+def _donor_attraction(
+    target_distance: float,
+    donor_distance: float,
+    *,
+    tolerance: float,
+) -> float:
+    if abs(target_distance - donor_distance) <= tolerance:
+        return 0.5
+    return float(donor_distance < target_distance - tolerance)
 
 
 def evaluate_query(
@@ -456,8 +496,6 @@ def evaluate_query(
     split: str,
     seed: int,
     representation: str,
-    condition_weight: float = 0.5,
-    gait_weight: float = 0.5,
     tie_tolerance: float = TIE_ABS_TOLERANCE,
     zero_norm_epsilon: float = ZERO_NORM_EPSILON,
 ) -> QueryResult:
@@ -470,45 +508,53 @@ def evaluate_query(
     canonical = build_queries(tuple(recordings_by_id.values()))
     if not 0 <= query.query_index < len(canonical) or query != canonical[query.query_index]:
         raise ValueError("query does not match the canonical factor construction")
-    if query.condition_donor_id in query.gallery_ids or query.gait_donor_id in query.gallery_ids:
-        raise ValueError("both donors must be excluded from the gallery")
-    condition_donor = recordings_by_id[query.condition_donor_id]
-    gait_donor = recordings_by_id[query.gait_donor_id]
+    if tuple(query.gallery_ids) != tuple(item.recording_id for item in recordings_by_id.values()):
+        # Input mapping order is not scientific, so validate set and canonical cell order below.
+        if set(query.gallery_ids) != set(recordings_by_id):
+            raise ValueError("retain-all gallery must contain every participant recording")
+    target = recordings_by_id[query.target_id]
+    donor_u = recordings_by_id[query.donor_u_id]
+    donor_v = recordings_by_id[query.donor_v_id]
+    if donor_u.source_video_id == target.source_video_id:
+        raise ValueError("donor_u shares source_video_id with target")
+    if donor_v.source_video_id == target.source_video_id:
+        raise ValueError("donor_v shares source_video_id with target")
+    query_blocks = _compose_query_blocks(query, donor_u, donor_v)
     entries: list[DistanceEntry] = []
     for identifier, cell in zip(query.gallery_ids, query.gallery_cells):
         recording = recordings_by_id[identifier]
         if recording.cell != cell:
             raise ValueError("gallery factor identity differs from the query")
-        condition, gait, combined = mixed_distance(
-            condition_donor.condition_block,
-            gait_donor.gait_block,
+        speed, clothing, direction, combined = mixed_distance(
+            query_blocks,
             recording,
-            condition_weight=condition_weight,
-            gait_weight=gait_weight,
             zero_norm_epsilon=zero_norm_epsilon,
         )
-        entries.append(DistanceEntry(identifier, cell, condition, gait, combined))
+        entries.append(DistanceEntry(identifier, cell, speed, clothing, direction, combined))
     rank = rank_target(
         {entry.recording_id: entry.combined_distance for entry in entries},
         query.target_id,
         tolerance=tie_tolerance,
     )
-    _, _, donor_distance = mixed_distance(
-        condition_donor.condition_block,
-        gait_donor.gait_block,
-        gait_donor,
-        condition_weight=condition_weight,
-        gait_weight=gait_weight,
-        zero_norm_epsilon=zero_norm_epsilon,
-    )
     target_distance = next(
         entry.combined_distance for entry in entries if entry.recording_id == query.target_id
     )
-    if abs(target_distance - donor_distance) <= tie_tolerance:
-        attraction = 0.5
-    else:
-        attraction = float(target_distance < donor_distance - tie_tolerance)
-    return QueryResult(split, seed, representation, query, tuple(entries), rank, attraction)
+    donor_u_distance = next(
+        entry.combined_distance for entry in entries if entry.recording_id == query.donor_u_id
+    )
+    donor_v_distance = next(
+        entry.combined_distance for entry in entries if entry.recording_id == query.donor_v_id
+    )
+    return QueryResult(
+        split,
+        seed,
+        representation,
+        query,
+        tuple(entries),
+        rank,
+        _donor_attraction(target_distance, donor_u_distance, tolerance=tie_tolerance),
+        _donor_attraction(target_distance, donor_v_distance, tolerance=tie_tolerance),
+    )
 
 
 @dataclass(frozen=True)
@@ -518,7 +564,8 @@ class ParticipantScores:
     queries: tuple[QueryResult, ...]
     top1: float
     mrr: float
-    donor_attraction: float
+    donor_u_attraction: float
+    donor_v_attraction: float
 
     def to_dict(self, *, include_queries: bool = False) -> dict[str, object]:
         result: dict[str, object] = {
@@ -527,7 +574,8 @@ class ParticipantScores:
             "query_count": len(self.queries),
             "top1": self.top1,
             "mrr": self.mrr,
-            "donor_attraction": self.donor_attraction,
+            "donor_u_attraction": self.donor_u_attraction,
+            "donor_v_attraction": self.donor_v_attraction,
         }
         if include_queries:
             result["queries"] = [query.to_dict() for query in self.queries]
@@ -540,8 +588,6 @@ def evaluate_participant(
     split: str = "development",
     seed: int = 0,
     representation: str = "learned",
-    condition_weight: float = 0.5,
-    gait_weight: float = 0.5,
     tie_tolerance: float = TIE_ABS_TOLERANCE,
     zero_norm_epsilon: float = ZERO_NORM_EPSILON,
 ) -> ParticipantScores:
@@ -554,8 +600,6 @@ def evaluate_participant(
             split=split,
             seed=seed,
             representation=representation,
-            condition_weight=condition_weight,
-            gait_weight=gait_weight,
             tie_tolerance=tie_tolerance,
             zero_norm_epsilon=zero_norm_epsilon,
         )
@@ -567,8 +611,11 @@ def evaluate_participant(
         queries=results,
         top1=float(np.mean([item.top1 for item in results], dtype=SCORING_DTYPE)),
         mrr=float(np.mean([item.reciprocal_rank for item in results], dtype=SCORING_DTYPE)),
-        donor_attraction=float(
-            np.mean([item.donor_attraction for item in results], dtype=SCORING_DTYPE)
+        donor_u_attraction=float(
+            np.mean([item.donor_u_attraction for item in results], dtype=SCORING_DTYPE)
+        ),
+        donor_v_attraction=float(
+            np.mean([item.donor_v_attraction for item in results], dtype=SCORING_DTYPE)
         ),
     )
 
@@ -593,7 +640,8 @@ class CohortScores:
     exclusions: tuple[ParticipantExclusion, ...]
     top1: float | None
     mrr: float | None
-    donor_attraction: float | None
+    donor_u_attraction: float | None
+    donor_v_attraction: float | None
 
 
 def evaluate_cohort(
@@ -602,8 +650,6 @@ def evaluate_cohort(
     split: str = "development",
     seed: int = 0,
     representation: str = "learned",
-    condition_weight: float = 0.5,
-    gait_weight: float = 0.5,
     tie_tolerance: float = TIE_ABS_TOLERANCE,
     zero_norm_epsilon: float = ZERO_NORM_EPSILON,
 ) -> CohortScores:
@@ -639,21 +685,22 @@ def evaluate_cohort(
                 split=split,
                 seed=seed,
                 representation=representation,
-                condition_weight=condition_weight,
-                gait_weight=gait_weight,
                 tie_tolerance=tie_tolerance,
                 zero_norm_epsilon=zero_norm_epsilon,
             )
         )
     if not participants:
-        return CohortScores((), tuple(exclusions), None, None, None)
+        return CohortScores((), tuple(exclusions), None, None, None, None)
     return CohortScores(
         tuple(participants),
         tuple(exclusions),
         float(np.mean([item.top1 for item in participants], dtype=SCORING_DTYPE)),
         float(np.mean([item.mrr for item in participants], dtype=SCORING_DTYPE)),
         float(
-            np.mean([item.donor_attraction for item in participants], dtype=SCORING_DTYPE)
+            np.mean([item.donor_u_attraction for item in participants], dtype=SCORING_DTYPE)
+        ),
+        float(
+            np.mean([item.donor_v_attraction for item in participants], dtype=SCORING_DTYPE)
         ),
     )
 
@@ -672,6 +719,7 @@ __all__ = [
     "Cell",
     "CohortScores",
     "DistanceEntry",
+    "FactorBlocks",
     "ParticipantExclusion",
     "ParticipantScores",
     "Query",

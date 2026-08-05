@@ -51,7 +51,9 @@ def _validated_query_map(
     if result.representation != expected_representation:
         raise ValueError(f"participant result is not the {expected_representation!r} path")
     if len(result.queries) != EXPECTED_QUERIES:
-        raise ValueError("participant result must contain exactly 24 queries")
+        raise ValueError(
+            f"participant result must contain exactly {EXPECTED_QUERIES} queries"
+        )
     if any(item.representation != expected_representation for item in result.queries):
         raise ValueError("query representation labels are inconsistent")
     if any(item.query.subject_id != result.subject_id for item in result.queries):
@@ -235,7 +237,7 @@ class ProspectivePowerResult:
 def plan_prospective_power(
     cohort: PairedCohort,
     *,
-    minimum_effect: float = 1.0 / 24.0,
+    minimum_effect: float = 1.0 / 16.0,
     alpha: float = 0.05,
     target_power: float = 0.80,
 ) -> ProspectivePowerResult:

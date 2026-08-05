@@ -3,7 +3,7 @@ from dataclasses import replace
 
 import numpy as np
 
-from cody_jepa.gfc import CANONICAL_CELLS, Recording, evaluate_participant
+from cody_jepa.gfc import CANONICAL_CELLS, FactorBlocks, Recording, evaluate_participant
 from cody_jepa.gfc_inference import (
     bootstrap_gfc_gain,
     bootstrap_lsg,
@@ -13,11 +13,7 @@ from cody_jepa.gfc_inference import (
     paired_participant_lsg,
     plan_prospective_power,
 )
-from cody_jepa.gfc_normalization import (
-    fit_condition_adapter,
-    fit_gait_adapter,
-    fit_raw_normalizer,
-)
+from cody_jepa.gfc_normalization import fit_factor_adapter, fit_raw_normalizer
 
 
 def _one_hot(index, width):
@@ -30,24 +26,22 @@ def recordings(subject_id, representation):
     result = []
     for cell in CANONICAL_CELLS:
         if representation == "learned":
-            condition = _one_hot(
-                2 * ("WoJ", "WJ").index(cell.clothing)
-                + ("R2L", "L2R").index(cell.direction),
-                4,
+            blocks = FactorBlocks(
+                speed=_one_hot(("UGS", "FGS").index(cell.speed), 2),
+                clothing=_one_hot(("WoJ", "WJ").index(cell.clothing), 2),
+                direction=_one_hot(("R2L", "L2R").index(cell.direction), 2),
             )
-            gait = _one_hot(("UGS", "FGS").index(cell.speed), 2)
         elif representation == "shortcut":
-            condition = np.zeros(4)
-            gait = np.zeros(2)
+            blocks = FactorBlocks(np.zeros(2), np.zeros(2), np.zeros(2))
         else:
             raise ValueError(representation)
         result.append(
-            Recording.from_windows(
+            Recording(
                 subject_id=subject_id,
                 recording_id=f"{subject_id}:{cell.key}",
+                source_video_id=f"{subject_id}:{cell.speed}:{cell.clothing}",
                 cell=cell,
-                condition_windows=[condition] * 3,
-                gait_windows=[gait] * 3,
+                factor_blocks=blocks,
                 window_ids=[f"{subject_id}:{cell.key}:w{index}" for index in range(3)],
             )
         )
@@ -74,8 +68,8 @@ class PairingTest(unittest.TestCase):
         shortcut = scores("P1", "shortcut")
         contrast = paired_participant_gfc_gain(learned, shortcut)
         self.assertEqual(contrast.learned_top1, 1.0)
-        self.assertAlmostEqual(contrast.shortcut_top1, 1.0 / 6.0)
-        self.assertAlmostEqual(contrast.difference, 5.0 / 6.0)
+        self.assertAlmostEqual(contrast.shortcut_top1, 1.0 / 8.0)
+        self.assertAlmostEqual(contrast.difference, 7.0 / 8.0)
 
         changed = replace(shortcut.queries[0], split="confirmation")
         mismatched = replace(shortcut, queries=(changed, *shortcut.queries[1:]))
@@ -87,14 +81,14 @@ class PairingTest(unittest.TestCase):
         shortcut = scores("P1", "shortcut")
         reordered = replace(shortcut, queries=tuple(reversed(shortcut.queries)))
         result = paired_participant_gfc_gain(learned, reordered)
-        self.assertAlmostEqual(result.difference, 5.0 / 6.0)
+        self.assertAlmostEqual(result.difference, 7.0 / 8.0)
 
     def test_participants_are_averaged_before_cohort_inference(self):
         learned = [scores("P1", "learned"), scores("P2", "learned")]
         shortcut = [scores("P1", "shortcut"), scores("P2", "shortcut")]
         cohort = paired_cohort_gfc_gain(learned, shortcut)
         self.assertEqual(len(cohort.participants), 2)
-        self.assertAlmostEqual(cohort.mean_difference, 5.0 / 6.0)
+        self.assertAlmostEqual(cohort.mean_difference, 7.0 / 8.0)
 
 
 class InferenceTest(unittest.TestCase):
@@ -144,22 +138,29 @@ class SyntheticEndToEndTest(unittest.TestCase):
                 training_subjects.append(subject_id)
                 training_cells.append(cell)
         training_rows = np.asarray(training_rows, dtype=np.float64)
-        condition_adapter = fit_condition_adapter(
-            training_rows, training_subjects, training_cells
-        )
-        gait_adapter = fit_gait_adapter(training_rows, training_subjects, training_cells)
-        training_condition = condition_adapter.transform(training_rows)
-        training_gait = gait_adapter.transform(training_rows)
-        condition_normalizer = fit_raw_normalizer(
-            training_condition, dimension_policy="retain_all"
-        )
-        gait_normalizer = fit_raw_normalizer(training_gait, dimension_policy="retain_all")
-        shortcut_condition_normalizer = fit_raw_normalizer(
-            np.zeros((len(training_rows), 4)), dimension_policy="retain_all"
-        )
-        shortcut_gait_normalizer = fit_raw_normalizer(
-            np.zeros((len(training_rows), 2)), dimension_policy="retain_all"
-        )
+        factors = ("speed", "clothing", "direction")
+        adapters = {
+            factor: fit_factor_adapter(
+                training_rows,
+                training_subjects,
+                training_cells,
+                factor_name=factor,
+            )
+            for factor in factors
+        }
+        normalizers = {
+            factor: fit_raw_normalizer(
+                adapters[factor].transform(training_rows),
+                dimension_policy="retain_all",
+            )
+            for factor in factors
+        }
+        shortcut_normalizers = {
+            factor: fit_raw_normalizer(
+                np.zeros((len(training_rows), 2)), dimension_policy="retain_all"
+            )
+            for factor in factors
+        }
 
         learned_scores = []
         shortcut_scores = []
@@ -175,23 +176,27 @@ class SyntheticEndToEndTest(unittest.TestCase):
                     for cell in CANONICAL_CELLS
                 ]
             )
-            learned_condition = condition_normalizer.transform(
-                condition_adapter.transform(raw)
-            )
-            learned_gait = gait_normalizer.transform(gait_adapter.transform(raw))
-            shortcut_condition = shortcut_condition_normalizer.transform(
-                np.zeros((8, 4))
-            )
-            shortcut_gait = shortcut_gait_normalizer.transform(np.zeros((8, 2)))
+            learned_blocks = {
+                factor: normalizers[factor].transform(adapters[factor].transform(raw))
+                for factor in factors
+            }
+            shortcut_blocks = {
+                factor: shortcut_normalizers[factor].transform(np.zeros((8, 2)))
+                for factor in factors
+            }
 
-            def make(path, condition_values, gait_values):
+            def make(values):
                 return [
-                    Recording.from_windows(
+                    Recording(
                         subject_id=subject_id,
                         recording_id=f"{subject_id}:{cell.key}",
+                        source_video_id=f"{subject_id}:{cell.speed}:{cell.clothing}",
                         cell=cell,
-                        condition_windows=[condition_values[index]] * 3,
-                        gait_windows=[gait_values[index]] * 3,
+                        factor_blocks=FactorBlocks(
+                            speed=values["speed"][index],
+                            clothing=values["clothing"][index],
+                            direction=values["direction"][index],
+                        ),
                         window_ids=[
                             f"{subject_id}:{cell.key}:w{window}" for window in range(3)
                         ],
@@ -201,7 +206,7 @@ class SyntheticEndToEndTest(unittest.TestCase):
 
             learned_scores.append(
                 evaluate_participant(
-                    make("learned", learned_condition, learned_gait),
+                    make(learned_blocks),
                     split="development",
                     seed=11,
                     representation="learned",
@@ -209,7 +214,7 @@ class SyntheticEndToEndTest(unittest.TestCase):
             )
             shortcut_scores.append(
                 evaluate_participant(
-                    make("shortcut", shortcut_condition, shortcut_gait),
+                    make(shortcut_blocks),
                     split="development",
                     seed=11,
                     representation="shortcut",
