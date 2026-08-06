@@ -62,6 +62,10 @@
   "adapter": {
     "type": "ridge",
     "alpha": 1.0,
+    "sensitivity_alphas": [
+      0.1,
+      10.0
+    ],
     "fit_split": "development_train",
     "input_standardization": "population",
     "factor_names": [
@@ -96,6 +100,62 @@
     "block_l2_epsilon": 1e-12,
     "effective_rank_rounding": "nearest_half_up",
     "pca_solver": "full_svd"
+  },
+  "analyses": [
+    {
+      "analysis_id": "raw_retain_all-alpha-1",
+      "normalization": "raw_retain_all",
+      "ridge_alpha": 1.0,
+      "primary": true,
+      "controls": true
+    },
+    {
+      "analysis_id": "raw_retain_all-alpha-0.1",
+      "normalization": "raw_retain_all",
+      "ridge_alpha": 0.1,
+      "primary": false,
+      "controls": false
+    },
+    {
+      "analysis_id": "raw_retain_all-alpha-10",
+      "normalization": "raw_retain_all",
+      "ridge_alpha": 10.0,
+      "primary": false,
+      "controls": false
+    },
+    {
+      "analysis_id": "raw_effective_rank-alpha-1",
+      "normalization": "raw_effective_rank",
+      "ridge_alpha": 1.0,
+      "primary": false,
+      "controls": false
+    },
+    {
+      "analysis_id": "pca_effective_rank-alpha-1",
+      "normalization": "pca_effective_rank",
+      "ridge_alpha": 1.0,
+      "primary": false,
+      "controls": false
+    }
+  ],
+  "independent_factor_controls": {
+    "hard": {
+      "factor_mass": "equal_mass_over_tied_maxima",
+      "gallery_combination": "factor_mass_product"
+    },
+    "soft": {
+      "factor_mass": "temperature_scaled_softmax",
+      "gallery_combination": "factor_probability_product"
+    },
+    "temperature": {
+      "scope": "shared_per_model_and_ridge_alpha",
+      "objective": "pooled_three_factor_development_nll",
+      "optimization": "bounded_scalar_over_log_temperature",
+      "bounds": [
+        0.001,
+        1000.0
+      ]
+    }
   },
   "shortcut": {
     "columns": [

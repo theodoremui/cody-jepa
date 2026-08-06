@@ -69,6 +69,8 @@ def validate_gfc_config(config: dict[str, Any]) -> None:
             "ties",
             "adapter",
             "normalization",
+            "analyses",
+            "independent_factor_controls",
             "shortcut",
             "metrics",
             "primary_metric",
@@ -167,6 +169,7 @@ def validate_gfc_config(config: dict[str, Any]) -> None:
         {
             "type",
             "alpha",
+            "sensitivity_alphas",
             "fit_split",
             "input_standardization",
             "factor_names",
@@ -184,6 +187,11 @@ def validate_gfc_config(config: dict[str, Any]) -> None:
     _require_equal(adapter["fit_split"], "development_train", "adapter fit split")
     if _require_finite_real(adapter["alpha"], "adapter alpha") <= 0.0:
         raise ValueError("adapter alpha and fit split must be valid")
+    _require_equal(
+        [_require_finite_real(value, "adapter sensitivity alpha") for value in adapter["sensitivity_alphas"]],
+        [0.1, 10.0],
+        "adapter sensitivity alphas",
+    )
     normalization = _require_fields(
         config["normalization"],
         {
@@ -216,6 +224,86 @@ def validate_gfc_config(config: dict[str, Any]) -> None:
     )
     if scale_floor <= 0.0 or block_l2_epsilon <= 0.0:
         raise ValueError("normalization numerical floors must be positive")
+    expected_analyses = [
+        {
+            "analysis_id": "raw_retain_all-alpha-1",
+            "normalization": "raw_retain_all",
+            "ridge_alpha": 1.0,
+            "primary": True,
+            "controls": True,
+        },
+        {
+            "analysis_id": "raw_retain_all-alpha-0.1",
+            "normalization": "raw_retain_all",
+            "ridge_alpha": 0.1,
+            "primary": False,
+            "controls": False,
+        },
+        {
+            "analysis_id": "raw_retain_all-alpha-10",
+            "normalization": "raw_retain_all",
+            "ridge_alpha": 10.0,
+            "primary": False,
+            "controls": False,
+        },
+        {
+            "analysis_id": "raw_effective_rank-alpha-1",
+            "normalization": "raw_effective_rank",
+            "ridge_alpha": 1.0,
+            "primary": False,
+            "controls": False,
+        },
+        {
+            "analysis_id": "pca_effective_rank-alpha-1",
+            "normalization": "pca_effective_rank",
+            "ridge_alpha": 1.0,
+            "primary": False,
+            "controls": False,
+        },
+    ]
+    _require_equal(config["analyses"], expected_analyses, "declared analyses")
+    controls = _require_fields(
+        config["independent_factor_controls"],
+        {"hard", "soft", "temperature"},
+        "independent factor controls",
+    )
+    _require_equal(
+        _require_fields(controls["hard"], {"factor_mass", "gallery_combination"}, "hard control"),
+        {
+            "factor_mass": "equal_mass_over_tied_maxima",
+            "gallery_combination": "factor_mass_product",
+        },
+        "hard control",
+    )
+    _require_equal(
+        _require_fields(controls["soft"], {"factor_mass", "gallery_combination"}, "soft control"),
+        {
+            "factor_mass": "temperature_scaled_softmax",
+            "gallery_combination": "factor_probability_product",
+        },
+        "soft control",
+    )
+    temperature = _require_fields(
+        controls["temperature"],
+        {"scope", "objective", "optimization", "bounds"},
+        "control temperature",
+    )
+    _require_equal(temperature["scope"], "shared_per_model_and_ridge_alpha", "temperature scope")
+    _require_equal(
+        temperature["objective"],
+        "pooled_three_factor_development_nll",
+        "temperature objective",
+    )
+    _require_equal(
+        temperature["optimization"],
+        "bounded_scalar_over_log_temperature",
+        "temperature optimization",
+    )
+    _require_equal(
+        [_require_finite_real(value, "temperature bound") for value in temperature["bounds"]],
+        [0.001, 1000.0],
+        "temperature bounds",
+    )
     shortcut = _require_fields(config["shortcut"], {"columns"}, "shortcut")
     _require_equal(
         shortcut["columns"],

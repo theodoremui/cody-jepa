@@ -3,6 +3,7 @@ import math
 from pathlib import Path
 import tempfile
 import unittest
+from unittest import mock
 
 import numpy as np
 import pandas as pd
@@ -14,6 +15,8 @@ from cody_jepa.evaluation.features import (
 )
 from cody_jepa.gfc import CANONICAL_CELLS
 from scripts.run_gfc import run_gfc
+from cody_jepa.config.gfc import load_gfc_config
+from cody_jepa.evaluation.gfc import runner as gfc_runner
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
@@ -109,6 +112,38 @@ def write_runner_npz(rows, path):
 
 
 class EndToEndResearchTest(unittest.TestCase):
+    def test_alpha_one_normalizations_reuse_prepared_rows_and_raw_ridge_outputs(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            table = pd.DataFrame(synthetic_rows())
+            config_path = PROJECT_ROOT / "configs" / "eval" / "gfc_healthgait.json"
+            prepared = gfc_runner._prepare_gfc_data(
+                table, load_gfc_config(config_path), "development", None
+            )
+            cache = {}
+            real_fit = gfc_runner.fit_factor_adapter
+            with mock.patch.object(
+                gfc_runner, "fit_factor_adapter", wraps=real_fit
+            ) as fitted:
+                for normalization in (
+                    "raw_retain_all",
+                    "raw_effective_rank",
+                    "pca_effective_rank",
+                ):
+                    gfc_runner.run_gfc_table(
+                        table,
+                        config_path,
+                        "development",
+                        root / normalization,
+                        model_label="synthetic-model",
+                        normalization=normalization,
+                        ridge_alpha=1.0,
+                        _prepared=prepared,
+                        _adapter_cache=cache,
+                    )
+            self.assertEqual(fitted.call_count, 6)
+            self.assertEqual(set(cache), {1.0})
+
     def test_feature_table_to_gfc_summary(self):
         rows = synthetic_rows()
 

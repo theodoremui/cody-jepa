@@ -23,6 +23,10 @@ from .core import (
     aggregate_windows,
     evaluate_cohort,
 )
+from .controls import (
+    evaluate_independent_factor_controls,
+    fit_shared_temperature,
+)
 from .inference import (
     bootstrap_gfc_gain,
     paired_cohort_gfc_gain,
@@ -34,6 +38,15 @@ from .normalization import (
     fit_raw_normalizer,
 )
 from .oracle import compile_healthgait_gfc_v2_protocol
+from .roles import (
+    DEVELOPMENT_ROLE,
+    EXPECTED_ASSIGNED_COUNTS,
+    EXPECTED_COMPLETE_COUNTS,
+    LOCKED_OUTCOME_ROLE,
+    ROLE_MAP_VERSION,
+    load_role_map,
+    role_lookup,
+)
 from ...config.gfc import load_gfc_config
 from ..features import read_feature_table
 
@@ -49,6 +62,25 @@ class RecordingRow:
     window_ids: tuple[str, ...]
     learned: np.ndarray
     shortcut: np.ndarray
+
+
+@dataclass(frozen=True)
+class PreparedGFCData:
+    """Role-selected rows and arrays shared by a model's five analyses."""
+
+    learned_columns: tuple[str, ...]
+    training_rows: tuple[RecordingRow, ...]
+    evaluation_rows: tuple[RecordingRow, ...]
+    training_exclusions: tuple[str, ...]
+    private_roles: pd.DataFrame | None
+    complete_counts: dict[str, int] | None
+    excluded_counts: dict[str, int] | None
+    train_learned: np.ndarray
+    train_shortcut: np.ndarray
+    train_subjects: tuple[str, ...]
+    train_cells: tuple[Cell, ...]
+    evaluation_learned: np.ndarray
+    evaluation_shortcut: np.ndarray
 
 def _feature_columns(table: pd.DataFrame) -> list[str]:
     columns = [str(column) for column in table.columns if str(column).startswith("feature_")]
@@ -418,69 +450,94 @@ def _validate_output_directories(
     return detailed, aggregate
 
 
-def run_gfc(
-    features: Path,
-    config_path: Path,
+def _prepare_gfc_data(
+    table: pd.DataFrame,
+    config: dict[str, Any],
     split: str,
-    output_dir: Path,
-    *,
-    model_label: str,
-    normalization: str | None = None,
-    write_queries: bool = False,
-    aggregate_output_dir: Path | None = None,
-) -> dict[str, Any]:
-    """Run the public features-to-summary research path."""
+    role_map: Path | None,
+) -> PreparedGFCData:
+    """Select roles, validate grids, and aggregate recordings exactly once."""
 
-    if not isinstance(model_label, str) or not model_label.strip() or model_label != model_label.strip():
-        raise ValueError("model_label must be nonempty text without surrounding whitespace")
-    output_dir, aggregate_output_dir = _validate_output_directories(
-        output_dir, aggregate_output_dir
-    )
-    config = load_gfc_config(config_path)
-    if features.suffix.casefold() == ".npz":
-        # The runner validates its training + requested evaluation rows below.
-        # Loading without whole-archive semantic validation prevents a known,
-        # unused held-out split from influencing the requested analysis.
-        table, _ = read_feature_table(features, validate=False)
-    else:
-        # The GFC runner intentionally accepts its narrower documented CSV
-        # contract in addition to the full feature-export table contract.
-        table = pd.read_csv(features)
     split_map = dict(config["split_map"])
-    evaluable_splits = ("development", "confirmation")
+    evaluable_splits = ("development", "confirmation", LOCKED_OUTCOME_ROLE)
     if split not in evaluable_splits:
         raise ValueError(f"split must be one of {list(evaluable_splits)}")
+    locked = split == LOCKED_OUTCOME_ROLE
+    if locked and role_map is None:
+        raise ValueError("locked_outcome evaluation requires --role-map")
+    if not locked and role_map is not None:
+        raise ValueError("--role-map is reserved for locked_outcome evaluation")
     adapter_fit_split = str(config["adapter"]["fit_split"])
     normalization_fit_split = str(config["normalization"]["fit_split"])
     if normalization_fit_split != adapter_fit_split:
         raise ValueError("adapter and normalization fit splits must be identical")
     training_label = str(split_map[adapter_fit_split])
-    evaluation_label = str(split_map[split])
+    evaluation_label = None if locked else str(split_map[split])
     split_column = str(config["split_column"])
     if split_column not in table.columns:
         raise ValueError(f"feature table is missing columns: {split_column}")
     raw_splits = table[split_column].astype(str)
-    unknown_splits = sorted(
-        set(raw_splits) - set(split_map.values())
-    )
-    if unknown_splits:
-        raise ValueError(
-            "feature table contains unsupported split labels: "
-            + ", ".join(repr(value) for value in unknown_splits)
-        )
-    # Validate scientific row invariants only for training and the requested
-    # evaluation split. A malformed, known held-out split must not influence a
-    # development run (and vice versa).
-    relevant_table = table.loc[
-        raw_splits.isin({training_label, evaluation_label})
-    ].copy()
+    private_roles = None
+    subject_roles: dict[str, str] | None = None
+    if locked:
+        subject_column = str(config["subject_column"])
+        if subject_column not in table.columns:
+            raise ValueError(f"feature table is missing columns: {subject_column}")
+        archive_subjects = sorted(set(table[subject_column].astype(str)))
+        private_roles = load_role_map(role_map, expected_subject_ids=archive_subjects)
+        subject_roles = role_lookup(private_roles)
+        # Historical archive splits have no selection authority in locked mode.
+        relevant_table = table.copy()
+    else:
+        unknown_splits = sorted(set(raw_splits) - set(split_map.values()))
+        if unknown_splits:
+            raise ValueError(
+                "feature table contains unsupported split labels: "
+                + ", ".join(repr(value) for value in unknown_splits)
+            )
+        relevant_table = table.loc[
+            raw_splits.isin({training_label, evaluation_label})
+        ].copy()
     all_rows, learned_columns = _recording_rows(relevant_table, config)
-    training_rows, training_exclusions = _complete_training_rows(
-        [row for row in all_rows if row.split == training_label]
-    )
-    evaluation_rows = [row for row in all_rows if row.split == evaluation_label]
+    if locked:
+        assert subject_roles is not None
+        training_candidates = [
+            row for row in all_rows if subject_roles[row.subject_id] == DEVELOPMENT_ROLE
+        ]
+        evaluation_rows = [
+            row for row in all_rows if subject_roles[row.subject_id] == LOCKED_OUTCOME_ROLE
+        ]
+    else:
+        training_candidates = [row for row in all_rows if row.split == training_label]
+        evaluation_rows = [row for row in all_rows if row.split == evaluation_label]
+    training_rows, training_exclusions = _complete_training_rows(training_candidates)
     if not evaluation_rows:
         raise ValueError(f"feature table has no recordings for {split!r}")
+
+    complete_counts = None
+    excluded_counts = None
+    if locked:
+        complete_outcome_rows, outcome_exclusions = _complete_training_rows(evaluation_rows)
+        complete_counts = {
+            DEVELOPMENT_ROLE: len({row.subject_id for row in training_rows}),
+            LOCKED_OUTCOME_ROLE: len({row.subject_id for row in complete_outcome_rows}),
+        }
+        excluded_counts = {
+            DEVELOPMENT_ROLE: len(training_exclusions),
+            LOCKED_OUTCOME_ROLE: len(outcome_exclusions),
+        }
+        if complete_counts != EXPECTED_COMPLETE_COUNTS:
+            raise ValueError(
+                f"complete role counts must be {EXPECTED_COMPLETE_COUNTS}, got {complete_counts}"
+            )
+        expected_excluded = {
+            role: EXPECTED_ASSIGNED_COUNTS[role] - EXPECTED_COMPLETE_COUNTS[role]
+            for role in EXPECTED_ASSIGNED_COUNTS
+        }
+        if excluded_counts != expected_excluded:
+            raise ValueError(
+                f"excluded role counts must be {expected_excluded}, got {excluded_counts}"
+            )
     training_subjects = {row.subject_id for row in training_rows}
     evaluation_subjects = {row.subject_id for row in evaluation_rows}
     overlap = sorted(training_subjects & evaluation_subjects)
@@ -490,49 +547,128 @@ def run_gfc(
             + ", ".join(overlap[:10])
         )
 
-    train_learned = np.stack([row.learned for row in training_rows])
-    train_shortcut = np.stack([row.shortcut for row in training_rows])
-    train_subjects = [row.subject_id for row in training_rows]
-    train_cells = [row.cell for row in training_rows]
-    alpha = float(config["adapter"]["alpha"])
-    factor_names = tuple(compile_healthgait_gfc_v2_protocol().design.factor_names)
-    adapters = {
-        f"{representation}_{factor}": fit_factor_adapter(
-            train_learned if representation == "learned" else train_shortcut,
-            train_subjects,
-            train_cells,
-            factor_name=factor,
-            alpha=alpha,
-        )
-        for representation in ("learned", "shortcut")
-        for factor in factor_names
-    }
+    return PreparedGFCData(
+        learned_columns=tuple(learned_columns),
+        training_rows=tuple(training_rows),
+        evaluation_rows=tuple(evaluation_rows),
+        training_exclusions=tuple(training_exclusions),
+        private_roles=private_roles,
+        complete_counts=complete_counts,
+        excluded_counts=excluded_counts,
+        train_learned=np.stack([row.learned for row in training_rows]),
+        train_shortcut=np.stack([row.shortcut for row in training_rows]),
+        train_subjects=tuple(row.subject_id for row in training_rows),
+        train_cells=tuple(row.cell for row in training_rows),
+        evaluation_learned=np.stack([row.learned for row in evaluation_rows]),
+        evaluation_shortcut=np.stack([row.shortcut for row in evaluation_rows]),
+    )
 
+
+def run_gfc_table(
+    table: pd.DataFrame,
+    config_path: Path,
+    split: str,
+    output_dir: Path,
+    *,
+    model_label: str,
+    normalization: str | None = None,
+    ridge_alpha: float | None = None,
+    role_map: Path | None = None,
+    write_queries: bool = False,
+    aggregate_output_dir: Path | None = None,
+    model_metadata: dict[str, Any] | None = None,
+    revision: dict[str, Any] | None = None,
+    _prepared: PreparedGFCData | None = None,
+    _adapter_cache: dict[float, tuple[dict[str, Any], dict[str, dict[str, np.ndarray]]]]
+    | None = None,
+) -> dict[str, Any]:
+    """Evaluate an already-loaded feature table without re-reading its archive."""
+
+    if not isinstance(model_label, str) or not model_label.strip() or model_label != model_label.strip():
+        raise ValueError("model_label must be nonempty text without surrounding whitespace")
+    output_dir, aggregate_output_dir = _validate_output_directories(
+        output_dir, aggregate_output_dir
+    )
+    config = load_gfc_config(config_path)
+    if not isinstance(table, pd.DataFrame):
+        raise TypeError("table must be a pandas DataFrame")
+    locked = split == LOCKED_OUTCOME_ROLE
+    prepared = _prepared or _prepare_gfc_data(table, config, split, role_map)
+    learned_columns = prepared.learned_columns
+    training_rows = list(prepared.training_rows)
+    evaluation_rows = list(prepared.evaluation_rows)
+    training_exclusions = list(prepared.training_exclusions)
+    private_roles = prepared.private_roles
+    complete_counts = prepared.complete_counts
+    excluded_counts = prepared.excluded_counts
+    train_learned = prepared.train_learned
+    train_shortcut = prepared.train_shortcut
+    train_subjects = list(prepared.train_subjects)
+    train_cells = list(prepared.train_cells)
     analysis_name = normalization or str(config["normalization"]["primary"])
-    allowed_analyses = {
-        str(config["normalization"]["primary"]),
-        *(str(item) for item in config["normalization"].get("sensitivities", [])),
-    }
-    if analysis_name not in allowed_analyses:
-        raise ValueError(f"normalization must be one of {sorted(allowed_analyses)}")
+    alpha = float(config["adapter"]["alpha"] if ridge_alpha is None else ridge_alpha)
+    declared = [
+        item
+        for item in config["analyses"]
+        if item["normalization"] == analysis_name
+        and float(item["ridge_alpha"]) == alpha
+    ]
+    if len(declared) != 1:
+        allowed = [
+            f"{item['normalization']}@alpha={float(item['ridge_alpha']):g}"
+            for item in config["analyses"]
+        ]
+        raise ValueError(
+            "unsupported normalization/ridge-alpha analysis; expected one of "
+            + ", ".join(allowed)
+        )
+    analysis = declared[0]
+    factor_names = tuple(compile_healthgait_gfc_v2_protocol().design.factor_names)
+    cached_fit = _adapter_cache.get(alpha) if _adapter_cache is not None else None
+    if cached_fit is None:
+        adapters = {
+            f"{representation}_{factor}": fit_factor_adapter(
+                train_learned if representation == "learned" else train_shortcut,
+                train_subjects,
+                train_cells,
+                factor_name=factor,
+                alpha=alpha,
+            )
+            for representation in ("learned", "shortcut")
+            for factor in factor_names
+        }
+        training_inputs = {"learned": train_learned, "shortcut": train_shortcut}
+        raw_adapter_outputs = {
+            representation: {
+                factor: adapters[f"{representation}_{factor}"].transform(
+                    training_inputs[representation]
+                )
+                for factor in factor_names
+            }
+            for representation in ("learned", "shortcut")
+        }
+        if _adapter_cache is not None:
+            _adapter_cache[alpha] = (adapters, raw_adapter_outputs)
+    else:
+        adapters, raw_adapter_outputs = cached_fit
+
     fit_normalizer, dimension_policy = _normalizer_factory(analysis_name)
     scale_floor = float(config["normalization"]["scale_floor"])
     block_epsilon = float(config["normalization"]["block_l2_epsilon"])
 
-    training_inputs = {"learned": train_learned, "shortcut": train_shortcut}
     normalizers = {}
     for representation in ("learned", "shortcut"):
         for factor in factor_names:
             name = f"{representation}_{factor}"
             normalizers[name] = fit_normalizer(
-                adapters[name].transform(training_inputs[representation]),
+                raw_adapter_outputs[representation][factor],
                 dimension_policy=dimension_policy,
                 scale_floor=scale_floor,
                 zero_norm_epsilon=block_epsilon,
             )
 
-    evaluation_learned = np.stack([row.learned for row in evaluation_rows])
-    evaluation_shortcut = np.stack([row.shortcut for row in evaluation_rows])
+    evaluation_learned = prepared.evaluation_learned
+    evaluation_shortcut = prepared.evaluation_shortcut
     evaluation_inputs = {
         "learned": evaluation_learned,
         "shortcut": evaluation_shortcut,
@@ -548,6 +684,24 @@ def run_gfc(
         }
         for representation in ("learned", "shortcut")
     }
+
+    temperature_fit = None
+    controls = None
+    if locked and bool(analysis["controls"]):
+        temperature_fit = fit_shared_temperature(
+            raw_adapter_outputs["learned"],
+            train_cells,
+            bounds=tuple(config["independent_factor_controls"]["temperature"]["bounds"]),
+        )
+        raw_evaluation_blocks = {
+            factor: adapters[f"learned_{factor}"].transform(evaluation_learned)
+            for factor in factor_names
+        }
+        controls = evaluate_independent_factor_controls(
+            _make_recordings(evaluation_rows, raw_evaluation_blocks),
+            temperature=temperature_fit.temperature,
+            tie_tolerance=float(config["ties"]["absolute_tolerance"]),
+        )
 
     seed = int(config["bootstrap"]["seed"])
     distance = config["distance"]
@@ -572,6 +726,10 @@ def run_gfc(
         item.to_dict() for item in shortcut.exclusions
     ]:
         raise RuntimeError("learned and shortcut paths produced different exclusions")
+    if controls is not None and [item.to_dict() for item in learned.exclusions] != [
+        item.to_dict() for item in controls.exclusions
+    ]:
+        raise RuntimeError("learned and independent-factor controls produced different exclusions")
     paired = paired_cohort_gfc_gain(learned.participants, shortcut.participants)
     interval = bootstrap_gfc_gain(
         paired,
@@ -600,8 +758,7 @@ def run_gfc(
     learned_by_subject = {item.subject_id: item for item in learned.participants}
     shortcut_by_subject = {item.subject_id: item for item in shortcut.participants}
     for contrast in paired.participants:
-        participant_rows.append(
-            {
+        participant_row = {
                 "participant": public_labels[contrast.subject_id],
                 "learned_top1": contrast.learned_top1,
                 "shortcut_top1": contrast.shortcut_top1,
@@ -621,7 +778,24 @@ def run_gfc(
                     contrast.subject_id
                 ].donor_v_attraction,
             }
-        )
+        if controls is not None:
+            hard_by_subject = {item.subject_id: item for item in controls.hard_participants}
+            soft_by_subject = {item.subject_id: item for item in controls.soft_participants}
+            hard = hard_by_subject[contrast.subject_id]
+            soft = soft_by_subject[contrast.subject_id]
+            participant_row.update(
+                {
+                    "hard_control_top1": hard.top1,
+                    "hard_control_mrr": hard.mrr,
+                    "soft_control_top1": soft.top1,
+                    "soft_control_mrr": soft.mrr,
+                    "soft_control_target_probability": soft.target_probability,
+                    "soft_control_target_nll": soft.target_nll,
+                    "learned_minus_hard_control_top1": contrast.learned_top1 - hard.top1,
+                    "learned_minus_soft_control_top1": contrast.learned_top1 - soft.top1,
+                }
+            )
+        participant_rows.append(participant_row)
     summary: dict[str, Any] = {
         "protocol": GFC_PROTOCOL,
         "gallery": f"retain_all_{EXPECTED_GALLERY_SIZE}",
@@ -630,6 +804,8 @@ def run_gfc(
         "source_independence_verified": True,
         "split": split,
         "normalization": analysis_name,
+        "analysis_id": analysis["analysis_id"],
+        "ridge_alpha": alpha,
         "model_label": model_label,
         "seed": seed,
         "feature_dimension": len(learned_columns),
@@ -645,6 +821,8 @@ def run_gfc(
                 "ties",
                 "adapter",
                 "normalization",
+                "analyses",
+                "independent_factor_controls",
                 "shortcut",
                 "metrics",
                 "primary_metric",
@@ -698,6 +876,30 @@ def run_gfc(
         ],
         "prospective_power": power,
     }
+    if model_metadata is not None:
+        if not isinstance(model_metadata, dict):
+            raise TypeError("model_metadata must be an object")
+        summary["model"] = {**model_metadata, "label": model_label}
+    if revision is not None:
+        if not isinstance(revision, dict):
+            raise TypeError("revision must be an object")
+        summary["revision"] = dict(revision)
+    if locked:
+        assert private_roles is not None
+        summary["cohort_roles"] = {
+            "version": ROLE_MAP_VERSION,
+            "fit_role": DEVELOPMENT_ROLE,
+            "evaluation_role": LOCKED_OUTCOME_ROLE,
+            "assigned_counts": dict(EXPECTED_ASSIGNED_COUNTS),
+            "complete_counts": complete_counts,
+            "excluded_counts": excluded_counts,
+        }
+        summary["independent_factor_controls"] = None
+        if controls is not None and temperature_fit is not None:
+            summary["independent_factor_controls"] = {
+                **controls.aggregate_dict(),
+                "temperature": temperature_fit.to_dict(),
+            }
 
     output_dir.mkdir(parents=True, exist_ok=True)
     pd.DataFrame(participant_rows).to_csv(output_dir / "participants.csv", index=False)
@@ -723,6 +925,82 @@ def run_gfc(
     return summary
 
 
+def run_gfc_analysis_suite(
+    table: pd.DataFrame,
+    config_path: Path,
+    output_root: Path,
+    *,
+    model_label: str,
+    role_map: Path,
+    model_metadata: dict[str, Any],
+    revision: dict[str, Any],
+) -> list[dict[str, Any]]:
+    """Run the frozen five analyses with shared row preparation and ridge fits."""
+
+    config = load_gfc_config(config_path)
+    prepared = _prepare_gfc_data(table, config, LOCKED_OUTCOME_ROLE, role_map)
+    adapter_cache: dict[
+        float, tuple[dict[str, Any], dict[str, dict[str, np.ndarray]]]
+    ] = {}
+    results = []
+    for analysis in config["analyses"]:
+        results.append(
+            run_gfc_table(
+                table,
+                config_path,
+                LOCKED_OUTCOME_ROLE,
+                output_root / str(analysis["analysis_id"]),
+                model_label=model_label,
+                normalization=str(analysis["normalization"]),
+                ridge_alpha=float(analysis["ridge_alpha"]),
+                role_map=role_map,
+                model_metadata=model_metadata,
+                revision=revision,
+                _prepared=prepared,
+                _adapter_cache=adapter_cache,
+            )
+        )
+    return results
+
+
+def run_gfc(
+    features: Path,
+    config_path: Path,
+    split: str,
+    output_dir: Path,
+    *,
+    model_label: str,
+    normalization: str | None = None,
+    ridge_alpha: float | None = None,
+    role_map: Path | None = None,
+    write_queries: bool = False,
+    aggregate_output_dir: Path | None = None,
+    model_metadata: dict[str, Any] | None = None,
+    revision: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    """Load one feature archive and run the single-analysis evaluator."""
+
+    if features.suffix.casefold() == ".npz":
+        # Scientific validation is role/split scoped in run_gfc_table.
+        table, _ = read_feature_table(features, validate=False)
+    else:
+        table = pd.read_csv(features)
+    return run_gfc_table(
+        table,
+        config_path,
+        split,
+        output_dir,
+        model_label=model_label,
+        normalization=normalization,
+        ridge_alpha=ridge_alpha,
+        role_map=role_map,
+        write_queries=write_queries,
+        aggregate_output_dir=aggregate_output_dir,
+        model_metadata=model_metadata,
+        revision=revision,
+    )
+
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--features", type=Path, required=True)
@@ -731,6 +1009,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--output-dir", type=Path, required=True)
     parser.add_argument("--model-label", required=True)
     parser.add_argument("--normalization")
+    parser.add_argument("--ridge-alpha", type=float)
+    parser.add_argument("--role-map", type=Path)
     parser.add_argument("--write-queries", action="store_true")
     parser.add_argument(
         "--aggregate-output-dir",
@@ -749,6 +1029,8 @@ def main() -> None:
         args.output_dir,
         model_label=args.model_label,
         normalization=args.normalization,
+        ridge_alpha=args.ridge_alpha,
+        role_map=args.role_map,
         write_queries=args.write_queries,
         aggregate_output_dir=args.aggregate_output_dir,
     )
@@ -757,3 +1039,12 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
+
+
+__all__ = [
+    "PreparedGFCData",
+    "RecordingRow",
+    "run_gfc",
+    "run_gfc_analysis_suite",
+    "run_gfc_table",
+]

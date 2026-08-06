@@ -1,0 +1,25 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "healthgait-gfc-v2-roles-v1",
+  "title": "Private Health&Gait GFC-v2 cohort role row",
+  "description": "CSV rows use exactly subject_id,role; the loader additionally enforces 80 development and 318 locked_outcome assignments.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "subject_id",
+    "role"
+  ],
+  "properties": {
+    "subject_id": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^(?!\\s)(?!.*\\s$).+$"
+    },
+    "role": {
+      "enum": [
+        "development",
+        "locked_outcome"
+      ]
+    }
+  }
+}

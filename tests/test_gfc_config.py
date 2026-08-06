@@ -83,6 +83,33 @@ class GFCConfigTest(unittest.TestCase):
                 with self.assertRaisesRegex(ValueError, "fields"):
                     validate_gfc_config(config)
 
+    def test_exactly_five_prespecified_analyses_are_declared(self):
+        self.assertEqual(
+            [item["analysis_id"] for item in self.config["analyses"]],
+            [
+                "raw_retain_all-alpha-1",
+                "raw_retain_all-alpha-0.1",
+                "raw_retain_all-alpha-10",
+                "raw_effective_rank-alpha-1",
+                "pca_effective_rank-alpha-1",
+            ],
+        )
+        self.assertEqual(self.config["adapter"]["alpha"], 1.0)
+        self.assertEqual(self.config["adapter"]["sensitivity_alphas"], [0.1, 10.0])
+        self.assertEqual(
+            self.config["independent_factor_controls"]["temperature"]["bounds"],
+            [0.001, 1000.0],
+        )
+        for mutation in (
+            lambda value: value["analyses"].append(value["analyses"][0]),
+            lambda value: value["analyses"][1].update(normalization="raw_effective_rank"),
+            lambda value: value["analyses"][3].update(ridge_alpha=0.1),
+        ):
+            config = copy.deepcopy(self.config)
+            mutation(config)
+            with self.assertRaisesRegex(ValueError, "declared analyses"):
+                validate_gfc_config(config)
+
 
 if __name__ == "__main__":
     unittest.main()
