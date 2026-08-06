@@ -1,0 +1,31 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 420" role="img" aria-labelledby="title desc">
+  <title id="title">Factorial states, partial queries, and an information ceiling</title>
+  <desc id="desc">Eight binary states are reduced to two compatible states by a query that reveals two of three factors, giving a one-half accuracy ceiling.</desc>
+  <defs>
+    <marker id="arrow" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto"><path d="M0,0 L9,3 L0,6 Z" fill="#52606d"/></marker>
+  </defs>
+  <rect width="960" height="420" fill="#fbfaf7"/>
+  <text x="480" y="40" text-anchor="middle" font-family="Arial, sans-serif" font-size="24" font-weight="700" fill="#172b4d">From complete states to a partial-information ceiling</text>
+  <g font-family="Arial, sans-serif">
+    <rect x="42" y="82" width="300" height="274" rx="18" fill="#e8f1fb" stroke="#3b82b8" stroke-width="2"/>
+    <text x="192" y="116" text-anchor="middle" font-size="20" font-weight="700" fill="#173f5f">3 binary factors</text>
+    <g font-size="17" text-anchor="middle" fill="#173f5f">
+      <text x="103" y="158">000</text><text x="187" y="158">001</text><text x="271" y="158">010</text>
+      <text x="103" y="204">011</text><text x="187" y="204">100</text><text x="271" y="204">101</text>
+      <text x="103" y="250">110</text><text x="187" y="250">111</text>
+    </g>
+    <text x="192" y="318" text-anchor="middle" font-size="18" fill="#173f5f">|Ω| = 2³ = 8 cells</text>
+    <line x1="350" y1="219" x2="426" y2="219" stroke="#52606d" stroke-width="3" marker-end="url(#arrow)"/>
+    <rect x="438" y="122" width="210" height="194" rx="18" fill="#fff3d6" stroke="#d89b21" stroke-width="2"/>
+    <text x="543" y="160" text-anchor="middle" font-size="20" font-weight="700" fill="#744b00">Partial query</text>
+    <text x="543" y="202" text-anchor="middle" font-size="22" fill="#744b00">1 ? 1</text>
+    <text x="543" y="239" text-anchor="middle" font-size="17" fill="#744b00">factors 0 and 2 known</text>
+    <text x="543" y="276" text-anchor="middle" font-size="18" fill="#744b00">matches 101, 111</text>
+    <line x1="656" y1="219" x2="726" y2="219" stroke="#52606d" stroke-width="3" marker-end="url(#arrow)"/>
+    <rect x="738" y="142" width="180" height="154" rx="77" fill="#e8f7ee" stroke="#3d9b67" stroke-width="2"/>
+    <text x="828" y="190" text-anchor="middle" font-size="19" font-weight="700" fill="#165b36">Best possible</text>
+    <text x="828" y="232" text-anchor="middle" font-size="31" font-weight="700" fill="#165b36">1 / 2</text>
+    <text x="828" y="264" text-anchor="middle" font-size="17" fill="#165b36">uniform ceiling</text>
+    <text x="480" y="392" text-anchor="middle" font-size="17" fill="#52606d">From the partial query alone, two uniform compatible states cannot be distinguished.</text>
+  </g>
+</svg>

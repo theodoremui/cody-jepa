@@ -1,0 +1,33 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 420" role="img" aria-labelledby="title desc">
+  <title id="title">Equal-factor distance aggregation and tie-aware ranking</title>
+  <desc id="desc">Distances are averaged inside factor blocks, factors are weighted equally, and tied top gallery items share credit.</desc>
+  <defs>
+    <marker id="arrow" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto"><path d="M0,0 L9,3 L0,6 Z" fill="#52606d"/></marker>
+  </defs>
+  <rect width="960" height="420" fill="#fbfaf7"/>
+  <g font-family="Arial, sans-serif">
+    <text x="480" y="40" text-anchor="middle" font-size="24" font-weight="700" fill="#172b4d">Structured distances produce explicit tie-aware ranks</text>
+    <rect x="42" y="82" width="272" height="276" rx="18" fill="#e8f1fb" stroke="#3b82b8" stroke-width="2"/>
+    <text x="178" y="118" text-anchor="middle" font-size="20" font-weight="700" fill="#173f5f">Cosine distances</text>
+    <rect x="72" y="143" width="212" height="72" rx="12" fill="#ffffff" stroke="#69a7d0"/>
+    <text x="178" y="172" text-anchor="middle" font-size="17" fill="#173f5f">Factor A cells</text>
+    <text x="178" y="199" text-anchor="middle" font-size="18" fill="#173f5f">0.20, 0.40 → 0.30</text>
+    <rect x="72" y="236" width="212" height="72" rx="12" fill="#ffffff" stroke="#69a7d0"/>
+    <text x="178" y="265" text-anchor="middle" font-size="17" fill="#173f5f">Factor B cells</text>
+    <text x="178" y="292" text-anchor="middle" font-size="18" fill="#173f5f">0.60, 0.80 → 0.70</text>
+    <line x1="324" y1="220" x2="400" y2="220" stroke="#52606d" stroke-width="3" marker-end="url(#arrow)"/>
+    <rect x="412" y="132" width="208" height="176" rx="18" fill="#fff3d6" stroke="#d89b21" stroke-width="2"/>
+    <text x="516" y="171" text-anchor="middle" font-size="20" font-weight="700" fill="#744b00">Equal-factor mean</text>
+    <text x="516" y="218" text-anchor="middle" font-size="25" fill="#744b00">(0.30 + 0.70) / 2</text>
+    <text x="516" y="261" text-anchor="middle" font-size="30" font-weight="700" fill="#744b00">0.50</text>
+    <line x1="630" y1="220" x2="704" y2="220" stroke="#52606d" stroke-width="3" marker-end="url(#arrow)"/>
+    <rect x="716" y="98" width="202" height="244" rx="18" fill="#e8f7ee" stroke="#3d9b67" stroke-width="2"/>
+    <text x="817" y="134" text-anchor="middle" font-size="20" font-weight="700" fill="#165b36">Gallery rank</text>
+    <text x="817" y="177" text-anchor="middle" font-size="18" fill="#165b36">A  0.10  rank 1</text>
+    <text x="817" y="213" text-anchor="middle" font-size="18" fill="#165b36">B  0.10  rank 1</text>
+    <text x="817" y="249" text-anchor="middle" font-size="18" fill="#165b36">C  0.40  rank 3</text>
+    <line x1="746" y1="268" x2="888" y2="268" stroke="#74b38d"/>
+    <text x="817" y="302" text-anchor="middle" font-size="17" fill="#165b36">top tie: 1/2 credit</text>
+    <text x="480" y="392" text-anchor="middle" font-size="17" fill="#52606d">Average at the level named by the scientific question, then preserve score ties.</text>
+  </g>
+</svg>

@@ -1,0 +1,55 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 720" role="img" aria-labelledby="title desc">
+  <title id="title">Progression through the four tutorial tracks</title>
+  <desc id="desc">A four-stage flow from mathematical foundations through representation learning and evaluation to statistical inference.</desc>
+  <defs>
+    <marker id="arrow" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto" markerUnits="strokeWidth">
+      <path d="M0,0 L0,6 L9,3 z" fill="#475569"/>
+    </marker>
+    <style>
+      .title { font: 700 30px system-ui, sans-serif; fill: #0f172a; }
+      .subtitle { font: 400 17px system-ui, sans-serif; fill: #475569; }
+      .track { font: 700 20px system-ui, sans-serif; fill: #0f172a; }
+      .concept { font: 600 16px system-ui, sans-serif; fill: #1e293b; }
+      .count { font: 500 15px system-ui, sans-serif; fill: #475569; }
+    </style>
+  </defs>
+
+  <rect width="1200" height="720" rx="24" fill="#f8fafc"/>
+  <text x="60" y="62" class="title">From arrays to defensible experiments</text>
+  <text x="60" y="94" class="subtitle">Each track supplies the language and tools needed by the next.</text>
+
+  <rect x="60" y="135" width="1080" height="112" rx="18" fill="#e0f2fe" stroke="#0284c7" stroke-width="2"/>
+  <text x="88" y="171" class="track">Track A · Mathematical and computational foundations</text>
+  <text x="88" y="207" class="concept">01 Tensor geometry</text>
+  <text x="370" y="207" class="concept">02 Vector geometry</text>
+  <text x="650" y="207" class="concept">03 Hierarchical observations</text>
+  <text x="1045" y="207" class="count">3 lessons</text>
+
+  <line x1="600" y1="250" x2="600" y2="284" stroke="#475569" stroke-width="3" marker-end="url(#arrow)"/>
+
+  <rect x="60" y="290" width="1080" height="112" rx="18" fill="#ede9fe" stroke="#7c3aed" stroke-width="2"/>
+  <text x="88" y="326" class="track">Track B · Representation learning</text>
+  <text x="88" y="362" class="concept">04 Attention</text>
+  <text x="270" y="362" class="concept">05 Latent prediction</text>
+  <text x="500" y="362" class="concept">06 Collapse</text>
+  <text x="680" y="362" class="concept">07 Gradient updates</text>
+  <text x="910" y="362" class="concept">08 Group-aware sampling</text>
+
+  <line x1="600" y1="405" x2="600" y2="439" stroke="#475569" stroke-width="3" marker-end="url(#arrow)"/>
+
+  <rect x="60" y="445" width="1080" height="112" rx="18" fill="#dcfce7" stroke="#16a34a" stroke-width="2"/>
+  <text x="88" y="481" class="track">Track C · Representation geometry and evaluation</text>
+  <text x="88" y="517" class="concept">09 Eigenspectra</text>
+  <text x="290" y="517" class="concept">10 Linear estimation</text>
+  <text x="530" y="517" class="concept">11 Factor spaces</text>
+  <text x="745" y="517" class="concept">12 Ranking</text>
+  <text x="910" y="517" class="concept">13 Interventions</text>
+
+  <line x1="600" y1="560" x2="600" y2="594" stroke="#475569" stroke-width="3" marker-end="url(#arrow)"/>
+
+  <rect x="60" y="600" width="1080" height="82" rx="18" fill="#ffedd5" stroke="#ea580c" stroke-width="2"/>
+  <text x="88" y="634" class="track">Track D · Statistical inference and experimental design</text>
+  <text x="700" y="634" class="concept">14 Paired inference</text>
+  <text x="900" y="634" class="concept">15 Replication</text>
+  <text x="88" y="663" class="count">Quantify uncertainty and distinguish randomization, sampling, and analysis units.</text>
+</svg>

@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 430" role="img" aria-labelledby="title desc">
+  <title id="title">Gradient and exponential moving average parameter paths</title>
+  <desc id="desc">The loss sends gradients backward through the predictor and online encoder, while the target encoder receives no gradient and follows online parameters through an exponential moving average.</desc>
+  <defs><marker id="blue" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto"><path d="M0,0 L0,6 L9,3 z" fill="#2563eb"/></marker><marker id="orange" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto"><path d="M0,0 L0,6 L9,3 z" fill="#d97706"/></marker></defs>
+  <rect width="960" height="430" fill="#fbfaf7"/>
+  <text x="480" y="38" text-anchor="middle" font-family="sans-serif" font-size="24" font-weight="700" fill="#172b4d">Two update mechanisms move different parameters</text>
+  <g font-family="sans-serif" fill="#172b4d">
+    <rect x="90" y="110" width="200" height="90" rx="16" fill="#dbeafe" stroke="#2563eb" stroke-width="2"/><text x="190" y="148" text-anchor="middle" font-size="19" font-weight="700">Online encoder</text><text x="190" y="178" text-anchor="middle" font-size="16">parameters theta</text>
+    <rect x="380" y="110" width="200" height="90" rx="16" fill="#ede9fe" stroke="#7c3aed" stroke-width="2"/><text x="480" y="148" text-anchor="middle" font-size="19" font-weight="700">Predictor</text><text x="480" y="178" text-anchor="middle" font-size="16">parameters phi</text>
+    <rect x="670" y="110" width="200" height="90" rx="16" fill="#fee2e2" stroke="#dc2626" stroke-width="2"/><text x="770" y="148" text-anchor="middle" font-size="19" font-weight="700">Latent loss</text><text x="770" y="178" text-anchor="middle" font-size="16">one scalar</text>
+    <path d="M665 155 H590" stroke="#2563eb" stroke-width="4" marker-end="url(#blue)"/><path d="M375 155 H300" stroke="#2563eb" stroke-width="4" marker-end="url(#blue)"/><text x="480" y="90" text-anchor="middle" font-size="16" fill="#1d4ed8">backpropagated gradient</text>
+    <rect x="380" y="285" width="200" height="90" rx="16" fill="#dcfce7" stroke="#16a34a" stroke-width="2"/><text x="480" y="323" text-anchor="middle" font-size="19" font-weight="700">Target encoder</text><text x="480" y="353" text-anchor="middle" font-size="16">parameters xi</text>
+    <path d="M190 205 C190 330 275 330 370 330" fill="none" stroke="#d97706" stroke-width="4" stroke-dasharray="8 6" marker-end="url(#orange)"/><text x="245" y="292" text-anchor="middle" font-size="16" fill="#92400e">EMA update</text>
+    <path d="M590 330 H770 V210" fill="none" stroke="#64748b" stroke-width="3"/><line x1="736" y1="264" x2="804" y2="298" stroke="#dc2626" stroke-width="5"/><line x1="804" y1="264" x2="736" y2="298" stroke="#dc2626" stroke-width="5"/><text x="770" y="355" text-anchor="middle" font-size="16">no gradient crosses</text>
+    <text x="480" y="410" text-anchor="middle" font-size="17">Optimizer step changes theta and phi. EMA changes xi after the step.</text>
+  </g>
+</svg>

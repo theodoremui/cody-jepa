@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 420" role="img" aria-labelledby="title desc">
+  <title id="title">Regularized linear estimation and temperature-scaled probabilities</title>
+  <desc id="desc">Numeric and categorical inputs are transformed into a design matrix, fitted with regularized linear weights, converted from logits to probabilities, and adjusted by a held-out temperature.</desc>
+  <defs><marker id="arrow10" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto"><path d="M0 0 L10 5 L0 10 z" fill="#34495e"/></marker></defs>
+  <rect width="960" height="420" rx="18" fill="#fbfaf7"/>
+  <text x="480" y="40" text-anchor="middle" font-family="Arial, sans-serif" font-size="24" font-weight="700" fill="#17202a">From mixed features to temperature-scaled probabilities</text>
+  <rect x="34" y="105" width="180" height="205" rx="15" fill="#eaf2f8" stroke="#367cad" stroke-width="2"/>
+  <text x="124" y="138" text-anchor="middle" font-family="Arial, sans-serif" font-size="19" font-weight="700" fill="#1b4f72">Raw features</text>
+  <text x="124" y="178" text-anchor="middle" font-family="Arial, sans-serif" font-size="17" fill="#173b53">numeric</text><text x="124" y="208" text-anchor="middle" font-family="Arial, sans-serif" font-size="17" fill="#173b53">categorical</text><text x="124" y="250" text-anchor="middle" font-family="Arial, sans-serif" font-size="16" fill="#173b53">fit preprocessing</text><text x="124" y="275" text-anchor="middle" font-family="Arial, sans-serif" font-size="16" fill="#173b53">on train only</text>
+  <line x1="220" y1="207" x2="259" y2="207" stroke="#34495e" stroke-width="3" marker-end="url(#arrow10)"/>
+  <rect x="274" y="105" width="190" height="205" rx="15" fill="#f4ecf7" stroke="#8e5aa9" stroke-width="2"/>
+  <text x="369" y="138" text-anchor="middle" font-family="Arial, sans-serif" font-size="19" font-weight="700" fill="#633974">Design matrix</text>
+  <text x="369" y="181" text-anchor="middle" font-family="Arial, sans-serif" font-size="17" fill="#512e5f">standardize</text><text x="369" y="213" text-anchor="middle" font-family="Arial, sans-serif" font-size="17" fill="#512e5f">one-hot encode</text>
+  <rect x="306" y="240" width="126" height="42" rx="8" fill="#c8a8d8"/><text x="369" y="267" text-anchor="middle" font-family="Arial, sans-serif" font-size="17" fill="#512e5f">X: N × D</text>
+  <line x1="470" y1="207" x2="509" y2="207" stroke="#34495e" stroke-width="3" marker-end="url(#arrow10)"/>
+  <rect x="524" y="105" width="180" height="205" rx="15" fill="#fff4d6" stroke="#d49b21" stroke-width="2"/>
+  <text x="614" y="138" text-anchor="middle" font-family="Arial, sans-serif" font-size="19" font-weight="700" fill="#7d6608">Linear fit</text>
+  <text x="614" y="180" text-anchor="middle" font-family="Arial, sans-serif" font-size="17" fill="#5f4b08">weights + intercept</text><text x="614" y="212" text-anchor="middle" font-family="Arial, sans-serif" font-size="17" fill="#5f4b08">L2 regularization</text>
+  <rect x="551" y="240" width="126" height="42" rx="8" fill="#e5b84f"/><text x="614" y="267" text-anchor="middle" font-family="Arial, sans-serif" font-size="17" fill="#5f4b08">logits z</text>
+  <line x1="710" y1="207" x2="749" y2="207" stroke="#34495e" stroke-width="3" marker-end="url(#arrow10)"/>
+  <rect x="764" y="105" width="162" height="205" rx="15" fill="#e8f6f3" stroke="#27896f" stroke-width="2"/>
+  <text x="845" y="138" text-anchor="middle" font-family="Arial, sans-serif" font-size="19" font-weight="700" fill="#145a4a">Temperature fit</text>
+  <text x="845" y="178" text-anchor="middle" font-family="Arial, sans-serif" font-size="17" fill="#174f42">softmax(z / T)</text><text x="845" y="207" text-anchor="middle" font-family="Arial, sans-serif" font-size="16" fill="#174f42">T fitted on held-out</text><text x="845" y="232" text-anchor="middle" font-family="Arial, sans-serif" font-size="16" fill="#174f42">calibration data</text>
+  <rect x="790" y="258" width="110" height="40" rx="20" fill="#91cfbf"/><text x="845" y="284" text-anchor="middle" font-family="Arial, sans-serif" font-size="17" fill="#174f42">probability</text>
+  <text x="480" y="370" text-anchor="middle" font-family="Arial, sans-serif" font-size="17" fill="#34495e">Regularization stabilizes weights. Temperature scaling preserves class order.</text>
+</svg>

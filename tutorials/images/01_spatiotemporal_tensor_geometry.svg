@@ -1,0 +1,29 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 420" role="img" aria-labelledby="title desc">
+  <title id="title">Video tensor to tubelet token grid</title>
+  <desc id="desc">A batched video tensor passes through a three dimensional convolution, becomes a token grid, and supports gather and scatter indexing.</desc>
+  <defs><marker id="a" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto"><path d="M0,0 L0,6 L9,3 z" fill="#52606d"/></marker></defs>
+  <rect width="960" height="420" fill="#fbfaf7"/>
+  <text x="480" y="38" text-anchor="middle" font-family="sans-serif" font-size="24" font-weight="700" fill="#172b4d">Spatiotemporal tensor geometry</text>
+  <g font-family="sans-serif" fill="#172b4d">
+    <rect x="55" y="100" width="190" height="170" rx="16" fill="#dbeafe" stroke="#2563eb" stroke-width="2"/>
+    <text x="150" y="138" text-anchor="middle" font-size="19" font-weight="700">Video batch</text>
+    <text x="150" y="178" text-anchor="middle" font-size="17">x: (B, C, T, H, W)</text>
+    <text x="150" y="214" text-anchor="middle" font-size="16">samples, channels,</text>
+    <text x="150" y="240" text-anchor="middle" font-size="16">time, height, width</text>
+    <path d="M250 185 H332" stroke="#52606d" stroke-width="3" marker-end="url(#a)"/>
+    <rect x="340" y="100" width="215" height="170" rx="16" fill="#dcfce7" stroke="#16a34a" stroke-width="2"/>
+    <text x="447" y="138" text-anchor="middle" font-size="19" font-weight="700">Conv3d tubelets</text>
+    <text x="447" y="178" text-anchor="middle" font-size="17">kernel = stride</text>
+    <text x="447" y="214" text-anchor="middle" font-size="16">local blocks become</text>
+    <text x="447" y="240" text-anchor="middle" font-size="16">D-dimensional vectors</text>
+    <path d="M560 185 H642" stroke="#52606d" stroke-width="3" marker-end="url(#a)"/>
+    <rect x="650" y="100" width="255" height="170" rx="16" fill="#fef3c7" stroke="#d97706" stroke-width="2"/>
+    <text x="777" y="138" text-anchor="middle" font-size="19" font-weight="700">Token representation</text>
+    <text x="777" y="178" text-anchor="middle" font-size="17">grid: (B, D, T', H', W')</text>
+    <text x="777" y="214" text-anchor="middle" font-size="17">sequence: (B, N, D)</text>
+    <text x="777" y="242" text-anchor="middle" font-size="16">N = T'H'W'</text>
+    <rect x="210" y="312" width="540" height="76" rx="14" fill="#ede9fe" stroke="#7c3aed" stroke-width="2"/>
+    <text x="480" y="343" text-anchor="middle" font-size="17">gather selects token indices</text>
+    <text x="480" y="370" text-anchor="middle" font-size="17">scatter writes results back to grid locations</text>
+  </g>
+</svg>

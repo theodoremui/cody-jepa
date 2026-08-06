@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 430" role="img" aria-labelledby="title desc">
+  <title id="title">One table can answer two different population questions</title>
+  <desc id="desc">A small group with two rows and a large group with eight rows feed either a row-weighted mean or an equal-group mean.</desc>
+  <defs><marker id="arrow" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto"><path d="M0,0 L0,6 L9,3 z" fill="#475569"/></marker></defs>
+  <rect width="960" height="430" fill="#fbfaf7"/>
+  <text x="480" y="38" text-anchor="middle" font-family="sans-serif" font-size="24" font-weight="700" fill="#172b4d">The estimand decides what one unit of weight means</text>
+  <g font-family="sans-serif" fill="#172b4d">
+    <rect x="55" y="95" width="245" height="245" rx="18" fill="#f8fafc" stroke="#64748b" stroke-width="2"/>
+    <text x="177" y="130" text-anchor="middle" font-size="19" font-weight="700">Observed table</text>
+    <text x="95" y="170" font-size="17" font-weight="700">Group A</text><circle cx="105" cy="203" r="13" fill="#60a5fa"/><circle cx="142" cy="203" r="13" fill="#60a5fa"/>
+    <text x="95" y="252" font-size="17" font-weight="700">Group B</text><g fill="#f59e0b"><circle cx="105" cy="284" r="10"/><circle cx="132" cy="284" r="10"/><circle cx="159" cy="284" r="10"/><circle cx="186" cy="284" r="10"/><circle cx="105" cy="314" r="10"/><circle cx="132" cy="314" r="10"/><circle cx="159" cy="314" r="10"/><circle cx="186" cy="314" r="10"/></g>
+    <path d="M305 180 H405" stroke="#475569" stroke-width="3" marker-end="url(#arrow)"/><path d="M305 280 H405" stroke="#475569" stroke-width="3" marker-end="url(#arrow)"/>
+    <rect x="415" y="95" width="220" height="125" rx="16" fill="#dbeafe" stroke="#2563eb" stroke-width="2"/>
+    <text x="525" y="132" text-anchor="middle" font-size="19" font-weight="700">Random row</text><text x="525" y="166" text-anchor="middle" font-size="16">each recording has</text><text x="525" y="193" text-anchor="middle" font-size="16">equal weight</text>
+    <rect x="415" y="245" width="220" height="125" rx="16" fill="#dcfce7" stroke="#16a34a" stroke-width="2"/>
+    <text x="525" y="282" text-anchor="middle" font-size="19" font-weight="700">Random group</text><text x="525" y="316" text-anchor="middle" font-size="16">each person has</text><text x="525" y="343" text-anchor="middle" font-size="16">equal weight</text>
+    <rect x="700" y="130" width="205" height="200" rx="18" fill="#ede9fe" stroke="#7c3aed" stroke-width="2"/>
+    <text x="802" y="170" text-anchor="middle" font-size="19" font-weight="700">Neither is automatic</text><text x="802" y="215" text-anchor="middle" font-size="16">state the population</text><text x="802" y="247" text-anchor="middle" font-size="16">state the unit</text><text x="802" y="279" text-anchor="middle" font-size="16">then choose weights</text>
+  </g>
+</svg>

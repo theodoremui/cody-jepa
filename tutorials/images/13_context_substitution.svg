@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 420" role="img" aria-labelledby="title desc">
+  <title id="title">A controlled context substitution</title>
+  <desc id="desc">The identity content remains fixed while context A is replaced by context B, producing a matched change in loss.</desc>
+  <defs><marker id="a13c" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto"><path d="M0 0 L0 6 L9 3 z" fill="#475569"/></marker></defs>
+  <rect width="960" height="420" fill="#fbfaf7"/>
+  <text x="480" y="40" text-anchor="middle" font-family="sans-serif" font-size="24" font-weight="700" fill="#172b4d">Change context while holding identity fixed</text>
+  <g font-family="sans-serif" fill="#172b4d">
+    <rect x="55" y="105" width="230" height="210" rx="16" fill="#dbeafe" stroke="#2563eb" stroke-width="2"/>
+    <text x="170" y="145" text-anchor="middle" font-size="19" font-weight="700">Original pair</text>
+    <text x="170" y="195" text-anchor="middle" font-size="17">identity = person 7</text>
+    <text x="170" y="235" text-anchor="middle" font-size="17">context = daylight</text>
+    <text x="170" y="278" text-anchor="middle" font-size="17">loss = 0.30</text>
+    <path d="M295 210 H370" stroke="#475569" stroke-width="3" marker-end="url(#a13c)"/>
+    <rect x="380" y="105" width="230" height="210" rx="16" fill="#fef3c7" stroke="#d97706" stroke-width="2"/>
+    <text x="495" y="145" text-anchor="middle" font-size="19" font-weight="700">Substituted pair</text>
+    <text x="495" y="195" text-anchor="middle" font-size="17">identity = person 7</text>
+    <text x="495" y="235" text-anchor="middle" font-size="17">context = darkness</text>
+    <text x="495" y="278" text-anchor="middle" font-size="17">loss = 0.45</text>
+    <path d="M620 210 H695" stroke="#475569" stroke-width="3" marker-end="url(#a13c)"/>
+    <rect x="705" y="125" width="200" height="170" rx="16" fill="#dcfce7" stroke="#16a34a" stroke-width="2"/>
+    <text x="805" y="165" text-anchor="middle" font-size="19" font-weight="700">Matched contrast</text>
+    <text x="805" y="215" text-anchor="middle" font-size="24">0.45 - 0.30</text>
+    <text x="805" y="260" text-anchor="middle" font-size="22">+0.15</text>
+    <text x="480" y="375" text-anchor="middle" font-size="17">Only a controlled substitution supports a context-specific interpretation.</text>
+  </g>
+</svg>

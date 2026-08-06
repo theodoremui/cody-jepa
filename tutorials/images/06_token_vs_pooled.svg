@@ -1,0 +1,29 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 420" role="img" aria-labelledby="title desc">
+  <title id="title">Token-level and pooled regularization</title>
+  <desc id="desc">A batch by token by feature tensor follows two paths, either flattening tokens for local statistics or averaging tokens for example-level statistics.</desc>
+  <defs><marker id="a06t" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto"><path d="M0 0 L10 5 L0 10 z" fill="#425466"/></marker></defs>
+  <rect width="960" height="420" rx="18" fill="#fbfaf7"/>
+  <text x="480" y="42" text-anchor="middle" font-family="Arial, sans-serif" font-size="25" font-weight="700" fill="#17202a">Two views of token representations</text>
+  <g font-family="Arial, sans-serif">
+    <rect x="44" y="125" width="220" height="170" rx="16" fill="#eaf2f8" stroke="#367cad" stroke-width="2"/>
+    <text x="154" y="165" text-anchor="middle" font-size="20" font-weight="700" fill="#1b4f72">Token tensor</text>
+    <text x="154" y="214" text-anchor="middle" font-size="25" fill="#1b4f72">B × T × D</text>
+    <text x="154" y="258" text-anchor="middle" font-size="17" fill="#1b4f72">examples, tokens, features</text>
+    <path d="M278 210 C345 210 342 120 403 120" fill="none" stroke="#425466" stroke-width="3" marker-end="url(#a06t)"/>
+    <path d="M278 210 C345 210 342 300 403 300" fill="none" stroke="#425466" stroke-width="3" marker-end="url(#a06t)"/>
+    <rect x="420" y="72" width="238" height="142" rx="16" fill="#f4ecf7" stroke="#8e5aa9" stroke-width="2"/>
+    <text x="539" y="110" text-anchor="middle" font-size="20" font-weight="700" fill="#633974">Flatten tokens</text>
+    <text x="539" y="151" text-anchor="middle" font-size="24" fill="#633974">(B T) × D</text>
+    <text x="539" y="186" text-anchor="middle" font-size="17" fill="#633974">checks local diversity</text>
+    <rect x="420" y="248" width="238" height="142" rx="16" fill="#fff4d6" stroke="#d49b21" stroke-width="2"/>
+    <text x="539" y="286" text-anchor="middle" font-size="20" font-weight="700" fill="#7d6608">Average tokens</text>
+    <text x="539" y="327" text-anchor="middle" font-size="24" fill="#7d6608">B × D</text>
+    <text x="539" y="362" text-anchor="middle" font-size="17" fill="#7d6608">checks example diversity</text>
+    <line x1="672" y1="143" x2="740" y2="143" stroke="#425466" stroke-width="3" marker-end="url(#a06t)"/>
+    <line x1="672" y1="319" x2="740" y2="319" stroke="#425466" stroke-width="3" marker-end="url(#a06t)"/>
+    <rect x="756" y="104" width="168" height="78" rx="14" fill="#e8f6f3" stroke="#27896f" stroke-width="2"/>
+    <text x="840" y="137" text-anchor="middle" font-size="18" font-weight="700" fill="#145a4a">token var-cov</text><text x="840" y="163" text-anchor="middle" font-size="16" fill="#145a4a">correlated rows</text>
+    <rect x="756" y="280" width="168" height="78" rx="14" fill="#e8f6f3" stroke="#27896f" stroke-width="2"/>
+    <text x="840" y="313" text-anchor="middle" font-size="18" font-weight="700" fill="#145a4a">pooled var-cov</text><text x="840" y="339" text-anchor="middle" font-size="16" fill="#145a4a">one row per example</text>
+  </g>
+</svg>

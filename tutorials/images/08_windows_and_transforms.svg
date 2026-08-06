@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 420" role="img" aria-labelledby="title desc">
+  <title id="title">Temporal window sampling and consistent transformations</title>
+  <desc id="desc">A twelve-frame sequence supplies overlapping windows, and each selected window draws one crop and flip shared across all of its frames.</desc>
+  <defs><marker id="a08w" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto"><path d="M0 0 L10 5 L0 10 z" fill="#425466"/></marker></defs>
+  <rect width="960" height="420" rx="18" fill="#fbfaf7"/>
+  <text x="480" y="42" text-anchor="middle" font-family="Arial, sans-serif" font-size="25" font-weight="700" fill="#17202a">Sample a window, then sample one transform policy</text>
+  <g font-family="Arial, sans-serif">
+    <text x="248" y="95" text-anchor="middle" font-size="20" font-weight="700" fill="#1b4f72">Source sequence: L = 12 frames</text>
+    <g fill="#b3d9ee" stroke="#367cad"><rect x="44" y="118" width="34" height="54"/><rect x="84" y="118" width="34" height="54"/><rect x="124" y="118" width="34" height="54"/><rect x="164" y="118" width="34" height="54"/><rect x="204" y="118" width="34" height="54"/><rect x="244" y="118" width="34" height="54"/><rect x="284" y="118" width="34" height="54"/><rect x="324" y="118" width="34" height="54"/><rect x="364" y="118" width="34" height="54"/><rect x="404" y="118" width="34" height="54"/><rect x="444" y="118" width="34" height="54"/><rect x="484" y="118" width="34" height="54"/></g>
+    <rect x="44" y="190" width="154" height="38" rx="8" fill="#f4ecf7" stroke="#8e5aa9" stroke-width="2"/><text x="121" y="215" text-anchor="middle" font-size="16" fill="#633974">window start 0</text>
+    <rect x="164" y="239" width="154" height="38" rx="8" fill="#fff4d6" stroke="#d49b21" stroke-width="2"/><text x="241" y="264" text-anchor="middle" font-size="16" fill="#7d6608">window start 3</text>
+    <rect x="284" y="288" width="154" height="38" rx="8" fill="#e8f6f3" stroke="#27896f" stroke-width="2"/><text x="361" y="313" text-anchor="middle" font-size="16" fill="#145a4a">window start 6</text>
+    <text x="275" y="360" text-anchor="middle" font-size="17" fill="#425466">Overlap increases exposure, not independence.</text>
+    <line x1="536" y1="222" x2="606" y2="222" stroke="#425466" stroke-width="3" marker-end="url(#a08w)"/>
+    <rect x="622" y="92" width="294" height="264" rx="16" fill="#eaf2f8" stroke="#367cad" stroke-width="2"/>
+    <text x="769" y="130" text-anchor="middle" font-size="20" font-weight="700" fill="#1b4f72">One selected window</text>
+    <rect x="655" y="156" width="228" height="54" rx="10" fill="#ffffff" stroke="#367cad"/><text x="769" y="190" text-anchor="middle" font-size="18" fill="#1b4f72">draw crop once</text>
+    <rect x="655" y="226" width="228" height="54" rx="10" fill="#ffffff" stroke="#367cad"/><text x="769" y="260" text-anchor="middle" font-size="18" fill="#1b4f72">draw flip once</text>
+    <rect x="655" y="296" width="228" height="40" rx="10" fill="#91cfbf"/><text x="769" y="322" text-anchor="middle" font-size="17" fill="#145a4a">apply to every frame</text>
+    <text x="480" y="398" text-anchor="middle" font-size="17" fill="#425466">Evaluation fixes starts and transforms; training can sample them with recorded randomness.</text>
+  </g>
+</svg>

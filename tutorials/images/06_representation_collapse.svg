@@ -1,0 +1,35 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 420" role="img" aria-labelledby="title desc">
+  <title id="title">From collapsed to diverse, decorrelated representations</title>
+  <desc id="desc">Three panels show complete collapse, redundant varying features, and a healthy spread encouraged by variance and covariance regularization.</desc>
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#34495e"/>
+    </marker>
+  </defs>
+  <rect width="960" height="420" rx="18" fill="#fbfaf7"/>
+  <text x="480" y="38" text-anchor="middle" font-family="Arial, sans-serif" font-size="24" font-weight="700" fill="#17202a">Representation geometry</text>
+  <rect x="38" y="72" width="250" height="280" rx="16" fill="#fbe9e7" stroke="#c75b4b" stroke-width="2"/>
+  <text x="163" y="105" text-anchor="middle" font-family="Arial, sans-serif" font-size="19" font-weight="700" fill="#7b241c">Complete collapse</text>
+  <line x1="72" y1="310" x2="254" y2="310" stroke="#7f8c8d" stroke-width="2"/>
+  <line x1="72" y1="310" x2="72" y2="140" stroke="#7f8c8d" stroke-width="2"/>
+  <circle cx="164" cy="224" r="13" fill="#c75b4b"/>
+  <circle cx="159" cy="219" r="5" fill="#f7c6bf"/>
+  <circle cx="169" cy="230" r="5" fill="#8e3b31"/>
+  <text x="163" y="335" text-anchor="middle" font-family="Arial, sans-serif" font-size="16" fill="#512e2a">zero feature variance</text>
+  <line x1="300" y1="212" x2="333" y2="212" stroke="#34495e" stroke-width="3" marker-end="url(#arrow)"/>
+  <rect x="348" y="72" width="264" height="280" rx="16" fill="#fff4d6" stroke="#d49b21" stroke-width="2"/>
+  <text x="480" y="105" text-anchor="middle" font-family="Arial, sans-serif" font-size="19" font-weight="700" fill="#7d6608">Dimensional collapse</text>
+  <line x1="386" y1="310" x2="574" y2="310" stroke="#7f8c8d" stroke-width="2"/>
+  <line x1="386" y1="310" x2="386" y2="140" stroke="#7f8c8d" stroke-width="2"/>
+  <line x1="407" y1="285" x2="556" y2="158" stroke="#d49b21" stroke-width="4" opacity="0.55"/>
+  <g fill="#d49b21"><circle cx="420" cy="274" r="8"/><circle cx="455" cy="244" r="8"/><circle cx="493" cy="213" r="8"/><circle cx="529" cy="182" r="8"/></g>
+  <text x="480" y="335" text-anchor="middle" font-family="Arial, sans-serif" font-size="16" fill="#5f4b08">features repeat one direction</text>
+  <line x1="624" y1="212" x2="657" y2="212" stroke="#34495e" stroke-width="3" marker-end="url(#arrow)"/>
+  <rect x="672" y="72" width="250" height="280" rx="16" fill="#e8f6f3" stroke="#27896f" stroke-width="2"/>
+  <text x="797" y="105" text-anchor="middle" font-family="Arial, sans-serif" font-size="19" font-weight="700" fill="#145a4a">Healthy spread</text>
+  <line x1="709" y1="310" x2="888" y2="310" stroke="#7f8c8d" stroke-width="2"/>
+  <line x1="709" y1="310" x2="709" y2="140" stroke="#7f8c8d" stroke-width="2"/>
+  <g fill="#27896f"><circle cx="743" cy="275" r="8"/><circle cx="775" cy="188" r="8"/><circle cx="808" cy="247" r="8"/><circle cx="842" cy="163" r="8"/><circle cx="867" cy="280" r="8"/><circle cx="852" cy="224" r="8"/></g>
+  <text x="797" y="335" text-anchor="middle" font-family="Arial, sans-serif" font-size="16" fill="#174f42">variance plus decorrelation</text>
+  <text x="480" y="390" text-anchor="middle" font-family="Arial, sans-serif" font-size="17" fill="#34495e">Prediction aligns pairs. Variance spreads features. Covariance reduces redundancy.</text>
+</svg>

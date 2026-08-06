@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 420" role="img" aria-labelledby="title desc">
+  <title id="title">From feature cloud to eigenspectrum and effective rank</title>
+  <desc id="desc">A centered elongated point cloud is projected onto principal axes, producing descending eigenvalue bars whose spread determines spectral entropy and effective rank.</desc>
+  <defs>
+    <marker id="arrow09" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto"><path d="M0 0 L10 5 L0 10 z" fill="#34495e"/></marker>
+  </defs>
+  <rect width="960" height="420" rx="18" fill="#fbfaf7"/>
+  <text x="480" y="40" text-anchor="middle" font-family="Arial, sans-serif" font-size="24" font-weight="700" fill="#17202a">Variance becomes a spectrum</text>
+  <rect x="40" y="80" width="330" height="275" rx="16" fill="#eaf2f8" stroke="#367cad" stroke-width="2"/>
+  <text x="205" y="113" text-anchor="middle" font-family="Arial, sans-serif" font-size="19" font-weight="700" fill="#1b4f72">Centered feature cloud</text>
+  <line x1="85" y1="305" x2="327" y2="155" stroke="#c75b4b" stroke-width="4" marker-end="url(#arrow09)"/>
+  <line x1="130" y1="144" x2="285" y2="324" stroke="#27896f" stroke-width="3" marker-end="url(#arrow09)"/>
+  <g fill="#367cad"><circle cx="111" cy="287" r="7"/><circle cx="145" cy="268" r="7"/><circle cx="176" cy="253" r="7"/><circle cx="199" cy="220" r="7"/><circle cx="230" cy="217" r="7"/><circle cx="256" cy="189" r="7"/><circle cx="294" cy="177" r="7"/><circle cx="221" cy="245" r="7"/></g>
+  <text x="301" y="145" font-family="Arial, sans-serif" font-size="16" fill="#7b241c">v1</text><text x="292" y="339" font-family="Arial, sans-serif" font-size="16" fill="#145a4a">v2</text>
+  <line x1="382" y1="215" x2="431" y2="215" stroke="#34495e" stroke-width="3" marker-end="url(#arrow09)"/>
+  <rect x="446" y="80" width="302" height="275" rx="16" fill="#fff4d6" stroke="#d49b21" stroke-width="2"/>
+  <text x="597" y="113" text-anchor="middle" font-family="Arial, sans-serif" font-size="19" font-weight="700" fill="#7d6608">Covariance eigenspectrum</text>
+  <line x1="490" y1="305" x2="710" y2="305" stroke="#7f8c8d" stroke-width="2"/>
+  <rect x="510" y="150" width="42" height="155" fill="#c75b4b"/><rect x="570" y="224" width="42" height="81" fill="#d49b21"/><rect x="630" y="274" width="42" height="31" fill="#27896f"/><rect x="690" y="294" width="20" height="11" fill="#8fc5e8"/>
+  <g font-family="Arial, sans-serif" font-size="16" fill="#5f4b08"><text x="531" y="329" text-anchor="middle">λ1</text><text x="591" y="329" text-anchor="middle">λ2</text><text x="651" y="329" text-anchor="middle">λ3</text><text x="700" y="329" text-anchor="middle">tail</text></g>
+  <line x1="760" y1="215" x2="799" y2="215" stroke="#34495e" stroke-width="3" marker-end="url(#arrow09)"/>
+  <rect x="814" y="125" width="112" height="180" rx="16" fill="#e8f6f3" stroke="#27896f" stroke-width="2"/>
+  <text x="870" y="165" text-anchor="middle" font-family="Arial, sans-serif" font-size="17" font-weight="700" fill="#145a4a">Normalize</text>
+  <text x="870" y="205" text-anchor="middle" font-family="Arial, sans-serif" font-size="17" fill="#174f42">entropy H</text>
+  <text x="870" y="240" text-anchor="middle" font-family="Arial, sans-serif" font-size="17" fill="#174f42">exp(H)</text>
+  <text x="870" y="277" text-anchor="middle" font-family="Arial, sans-serif" font-size="16" font-weight="700" fill="#174f42">effective rank</text>
+  <text x="480" y="390" text-anchor="middle" font-family="Arial, sans-serif" font-size="17" fill="#34495e">A concentrated spectrum has lower effective dimensionality.</text>
+</svg>
