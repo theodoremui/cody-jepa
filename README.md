@@ -91,7 +91,10 @@ uv run python scripts/run_gfc.py \
   --aggregate-output-dir outputs/gfc-v2-aggregates/development
 ```
 
-The command above runs the primary `raw_retain_all` analysis. Run the two declared sensitivities into separate directories:
+The command above runs the primary `raw_retain_all` analysis. The legacy diagnostic
+interface can run the two normalization sensitivities into separate directories; the
+locked study command instead runs the exact five-analysis suite, including ridge
+alphas 0.1 and 10, automatically:
 
 ```bash
 uv run python scripts/run_gfc.py \
@@ -122,6 +125,54 @@ uv run python scripts/make_paper_results.py \
 ```
 
 Detailed participant, optional query, and current GFC-v2 aggregate outputs stay under ignored `outputs/`. The paper renderer accepts only the checked-in, protocol-tagged legacy GFC summaries for its legacy table; it intentionally rejects v2 or mixed-protocol inputs.
+
+The revised study uses the private `healthgait-gfc-v2-roles-v1` map described by
+[`gfc_role_map.schema.json`](configs/eval/gfc_role_map.schema.json). Build it under the
+ignored `data/` tree, then run the frozen gate and study from the annotated tag:
+
+```bash
+uv run cody-jepa-gfc-study build-role-map \
+  --manifest /external/healthgait-gfc-candidates.csv \
+  --output data/private/gfc-v2-roles.csv
+uv run cody-jepa-gfc-study preflight \
+  --registry /external/gfc-v2-registry.csv \
+  --role-map data/private/gfc-v2-roles.csv \
+  --output-root outputs/gfc-v2-study/private \
+  --aggregate-output outputs/gfc-v2-study/aggregate
+uv run cody-jepa-gfc-study run \
+  --registry /external/gfc-v2-registry.csv \
+  --config configs/eval/gfc_healthgait.json \
+  --role-map data/private/gfc-v2-roles.csv \
+  --output-root outputs/gfc-v2-study/private \
+  --aggregate-output outputs/gfc-v2-study/aggregate
+uv run cody-jepa-gfc-study summarize \
+  --registry /external/gfc-v2-registry.csv \
+  --output-root outputs/gfc-v2-study/private \
+  --aggregate-output outputs/gfc-v2-study/aggregate
+```
+
+Preflight requires all 20 final-step checkpoints and feature archives, exact assigned
+and complete cohort counts, empty destinations, a clean worktree, and the annotated
+`gfc-v2-analysis-freeze-v1` tag at `HEAD`. The historical archive split column has no
+selection authority in locked mode; only the private role map selects fitting and
+outcome participants. Eligible checkpoints carry a small `study_metadata` mapping with
+version `gfc-v2-training-checkpoint-v1`, dataset `GaitLU-1M`, final-step kind, model and
+checkpoint IDs, both seeds, actual unique-sequence count, and training exposure; every
+field must agree with the private registry.
+
+After the frozen 20-model study has been evaluated and summarized, render its separate
+aggregate-only paper artifacts with:
+
+```bash
+uv run python scripts/make_gfc_study_results.py \
+  --aggregate-dir outputs/gfc-v2-study/aggregate \
+  --output-dir outputs/gfc-v2-study/paper
+```
+
+That command reads only `outcome_summary.json`, `run_table.csv`, and
+`ladder_contrasts.csv`. It produces a 20-run table, a five-ladder contrast table, and
+matching PDF/PNG scaling figures. It rejects legacy, mixed-protocol, participant-level,
+and path-bearing inputs. The historical generator above remains unchanged.
 
 ## Documentation
 

@@ -7,7 +7,7 @@ This directory contains compact, non-identifying inputs to the paper-result gene
 - `context_diagnosis.json` records the aggregate context-substitution, foreground, and representation-rank diagnosis.
 - `checkpoint_histories.csv` contains one flattened row per recorded training epoch for the maintained Phase 0 and Phase 1 runs.
 - `checkpoint_histories.json` records the history schema, CSV hash, source-checkpoint hashes, run configurations, mask definitions, data contracts, and checkpoint-selection metadata.
-- `gfc-*` directories contain historical legacy aggregate `summary.json` and `summary.csv` files. Current GFC-v2 runs belong under ignored `outputs/` until a v2 result publication path is added.
+- `gfc-*` directories contain historical legacy aggregate `summary.json` and `summary.csv` files. Private GFC-v2 run outputs remain under ignored `outputs/`; only the three aggregate study files may enter a later result-only commit.
 - `generated/phase0_table.csv` and `generated/phase1_table.csv` are the paper-ready diagnostic tables.
 - `generated/phase1_diagnostics.png` and `generated/context_diagnosis.png` are the active diagnostic figures.
 - `generated/legacy_gfc_table.csv` and `generated/legacy_gfc_comparison.png` are added after a protocol-tagged legacy GFC summary exists.
@@ -19,6 +19,21 @@ uv run python scripts/make_paper_results.py \
   --results-dir results \
   --output-dir results/generated
 ```
+
+Do not pass GFC-v2 files to that historical generator. After unblinding, the separate
+study renderer accepts only the aggregate summary and tables produced by the frozen
+study summarizer:
+
+```bash
+uv run cody-jepa-make-gfc-study-results \
+  --aggregate-dir outputs/gfc-v2-study/aggregate \
+  --output-dir outputs/gfc-v2-study/paper
+```
+
+Its only inputs are `outcome_summary.json`, `run_table.csv`, and
+`ladder_contrasts.csv`; its outputs are two paper CSVs plus PDF and PNG versions of the
+five-ladder scaling figure. Participant rows, identity-bearing keys, feature paths, and
+checkpoint paths are rejected.
 
 When the ignored local checkpoints are available, refresh the portable notebook histories with:
 

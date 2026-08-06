@@ -361,7 +361,7 @@ protocol=gfc_v2
 gallery=retain_all_8
 queries_per_participant=16
 factor_heads=three_matched_ridge_heads
-cohort_roles=<checksum of frozen prospective role map>
+cohort_roles=healthgait-gfc-v2-roles-v1
 ```
 
 ## 12. Required evaluator checks

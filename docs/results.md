@@ -240,6 +240,44 @@ Interpretation then follows the controls:
 - if the frozen protocol or full data rung fails, do not retrofit the legacy result into
   an ICLR scaling claim.
 
+## Rendering the frozen GFC-v2 study
+
+The study summarizer is the only component allowed to read private participant outputs.
+It writes three aggregate files: `outcome_summary.json`, `run_table.csv`, and
+`ladder_contrasts.csv`. Once all 20 runs pass the frozen study checks, render those
+files from the tagged evaluator worktree:
+
+```bash
+uv run cody-jepa-make-gfc-study-results \
+  --aggregate-dir /external/gfc-v2-study/aggregate \
+  --output-dir outputs/gfc-v2-study/paper
+```
+
+The compatibility form is:
+
+```bash
+uv run python scripts/make_gfc_study_results.py \
+  --aggregate-dir /external/gfc-v2-study/aggregate \
+  --output-dir outputs/gfc-v2-study/paper
+```
+
+The renderer enforces the frozen `gfc-v2-study-aggregate-v1` schema, exactly 20 ordered
+model rows and five ladder rows, the primary alpha and normalization, and agreement
+between the JSON and CSV contrasts. It emits:
+
+- `gfc_study_run_table.csv`, containing the primary learned and shortcut results, hard
+  and soft controls, and all four declared sensitivity results;
+- `gfc_study_ladder_contrasts.csv`, containing each four-rung curve and its paired
+  full-minus-small interval; and
+- `gfc_study_scaling.pdf` and `gfc_study_scaling.png`, showing the five prespecified
+  curves and their restrained mean curve.
+
+The renderer reads no feature archive, role map, registry, checkpoint, participant row,
+or source identifier. It refuses legacy and mixed-protocol inputs and removes its own
+stale outputs before each attempt, so a failed validation cannot leave an older figure
+looking current. Aggregate result files are committed only after the tagged run is
+unblinded; evaluator and figure code must not change in that result-only commit.
+
 ## Regenerating existing preliminary artifacts
 
 The current generator reads compact historical files directly:
@@ -250,10 +288,11 @@ uv run python scripts/make_paper_results.py \
   --output-dir results/generated
 ```
 
-It does not consume notebooks or prose as data sources. Revised-study generators must
-write protocol version, gallery policy, query count, cohort-role checksum, rung size,
-pool seed, optimization seed, exposure, and analysis-freeze commit into every compact
-result file so legacy and GFC-v2 outputs cannot be silently combined.
+It does not consume notebooks or prose as data sources. The separate revised-study
+aggregate contract records protocol version, gallery policy, query count, role-map
+version and aggregate counts, rung size, pool seed, optimization seed, exposure, code
+commit, and analysis-freeze tag so legacy and GFC-v2 outputs cannot be silently
+combined. Private identifiers and paths never enter the aggregate contract.
 
 ## Claims currently permitted
 
