@@ -1,5 +1,6 @@
 """Versioned, exact-resume training checkpoints."""
 
+from collections.abc import Mapping
 from dataclasses import asdict
 import os
 from pathlib import Path
@@ -57,8 +58,11 @@ def checkpoint_payload(
     best_epoch,
     best_healthy_val_loss,
     best_healthy_epoch,
+    study_metadata=None,
 ):
-    return {
+    if study_metadata is not None and not isinstance(study_metadata, Mapping):
+        raise TypeError("study_metadata must be a mapping when provided")
+    payload = {
         "schema": CHECKPOINT_SCHEMA,
         "architecture": MODEL_ARCHITECTURE,
         "config": checkpoint_config(config),
@@ -86,6 +90,9 @@ def checkpoint_payload(
         "cuda_rng_state": torch.cuda.get_rng_state_all() if torch.cuda.is_available() else None,
         "torch_version": torch.__version__,
     }
+    if study_metadata is not None:
+        payload["study_metadata"] = dict(study_metadata)
+    return payload
 
 
 def validate_resume_state(state, config, mask_groups, data_contract):

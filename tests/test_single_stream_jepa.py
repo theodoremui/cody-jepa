@@ -797,6 +797,18 @@ class AntiCollapseSafeguardTest(unittest.TestCase):
         self.assertIsNone(result["history"][0]["train_clip_variance_loss"])
         self.assertIsNone(result["history"][0]["train_clip_covariance_loss"])
 
+    def test_training_checkpoint_carries_declared_study_metadata(self):
+        cfg = tiny_config(num_epochs=1)
+        cfg["study_metadata"] = {
+            "version": "gfc-v2-training-checkpoint-v1",
+            "checkpoint_kind": "final_step",
+        }
+        train, val = tiny_loaders()
+        result = train_jepa(cfg, train, val, {"dataset": "study"}, device="cpu")
+        self.assertEqual(
+            result["checkpoint_state"]["study_metadata"], cfg["study_metadata"]
+        )
+
     def test_clip_vicreg_runs_logs_and_changes_encoder_updates(self):
         baseline_cfg = tiny_config(num_epochs=1)
         baseline_train, baseline_val = tiny_loaders()

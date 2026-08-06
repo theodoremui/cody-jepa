@@ -378,6 +378,7 @@ def train_jepa(
             best_epoch,
             best_healthy_val_loss,
             best_healthy_epoch,
+            study_metadata=config.get("study_metadata"),
         )
         if checkpoint_dir is not None and (
             completed_epochs % int(config.get("checkpoint_every_epochs", 1)) == 0
@@ -446,6 +447,7 @@ def train_jepa(
             best_epoch,
             best_healthy_val_loss,
             best_healthy_epoch,
+            study_metadata=config.get("study_metadata"),
         ),
     }
 

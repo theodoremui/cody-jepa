@@ -26,6 +26,8 @@ cody-jepa-build-manifest = "cody_jepa.cli.build_manifest:main"
 cody-jepa-prepare-gfc-features = "cody_jepa.cli.prepare_gfc_features:main"
 cody-jepa-make-results = "cody_jepa.cli.make_results:main"
 cody-jepa-export-histories = "cody_jepa.cli.export_histories:main"
+cody-jepa-gfc-study = "cody_jepa.cli.gfc_study:main"
+cody-jepa-make-gfc-study-results = "cody_jepa.cli.make_gfc_study_results:main"
 
 [dependency-groups]
 dev = [
