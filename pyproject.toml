@@ -28,6 +28,8 @@ cody-jepa-make-results = "cody_jepa.cli.make_results:main"
 cody-jepa-export-histories = "cody_jepa.cli.export_histories:main"
 cody-jepa-gfc-study = "cody_jepa.cli.gfc_study:main"
 cody-jepa-make-gfc-study-results = "cody_jepa.cli.make_gfc_study_results:main"
+cody-jepa-prepare-gaitlu = "cody_jepa.cli.prepare_gaitlu:main"
+cody-jepa-train-gaitlu-study = "cody_jepa.cli.train_gaitlu_study:main"
 
 [dependency-groups]
 dev = [

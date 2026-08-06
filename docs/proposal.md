@@ -8,11 +8,13 @@
 
 **Paper deadline:** September 25, 2026, Anywhere on Earth
 
-> **Current status.** This document describes a planned experiment. It includes
-> preliminary results that motivated the design, but the new GaitLU scaling runs and the
-> locked Health&Gait outcome analysis have not yet been completed. Whenever this
-> tutorial says *we will measure*, it refers to future work. Whenever it reports a
-> number, it labels that number as preliminary or historical.
+> **Current status (August 6, 2026).** This document describes a planned experiment. The
+> GFC-v2 evaluator and GaitLU v2 preparation/training path are implemented and tested on
+> constructed data. The private GaitLU corpus has not yet been prepared, the throughput
+> tier has not been selected, the 20 scaling runs have not started, and the locked
+> Health&Gait outcome analysis remains unopened. Whenever this tutorial says *we will
+> measure*, it refers to future work. Whenever it reports a number, it labels that number
+> as preliminary or historical.
 
 ## The proposal in one paragraph
 
@@ -140,7 +142,12 @@ four pretraining pools. Before making those pools, we will:
 
 We will report the real value of $U_{\max}$ after filtering. We will not call the pool
 exactly one million or claim a 400-fold range unless the validated counts support those
-statements.
+statements. Content SHA-256 belongs to this preparation stage: it names and reuses
+identical packed records and establishes exact duplicates, and remains in the audit
+inventories. Final training and holdout manifests omit per-record hashes. A checkpoint
+instead records one digest over the ordered pair of complete manifests and enforces it
+on resume. Structural and bounds checks remain at load time, but same-length corruption
+of readable packed data is not detected there.
 
 ### 2.2 Health&Gait evaluates frozen encoders
 
@@ -786,7 +793,7 @@ about 2.7–4.3 elapsed days. A more conservative aggregate rate of one million 
 per hour gives 6.8 days.
 
 Bit-packed silhouettes for 92.6 million frames need about 145 GB before indexes,
-checksums, and temporary artifacts. We budget 250 GB.
+preparation inventories, and temporary artifacts. We budget 250 GB.
 
 ### 16.2 Throughput gate
 
@@ -803,9 +810,11 @@ enough.
 
 ### 16.3 Why engineering, not training, is the critical path
 
-Training is mostly unattended. The human work is implementing and validating GFC-v2,
-packing GaitLU, completing the novelty audit, freezing the protocol, checking reference
-models, exporting features, running analysis, and writing.
+Training is mostly unattended. GFC-v2 and the GaitLU ingestion path are now implemented
+and pass constructed-data tests. The remaining human work is running and auditing the
+private GaitLU conversion, measuring 25k and full-pool throughput, selecting and freezing
+the exposure tier, completing the novelty audit, checking reference models, exporting
+features, running the locked analysis, and writing.
 
 The estimated load is 41 person-days across eight weeks:
 
@@ -876,8 +885,10 @@ The evaluator must verify all of the following before outcomes are opened:
 - queries are averaged within participant before inference;
 - every run reaches the same frozen exposure or follows the prespecified systems-failure
   rule; and
-- compact results record protocol version, pool and role-map checksums, seeds, rung size,
-  exposure, checkpoint, exclusions, gallery policy, query count, and freeze commit.
+- training checkpoints record the combined GaitLU train-plus-holdout manifest digest;
+  compact outcomes record protocol version, role-map version and aggregate counts,
+  seeds, rung size, exposure, checkpoint ID, exclusions, gallery policy, query count,
+  code commit, and freeze tag without exposing private paths or cohort checksums.
 
 These are not implementation details separate from the science. They are executable
 versions of the assumptions needed for the scientific interpretation.

@@ -4,7 +4,11 @@ CoDy-JEPA is a research codebase for asking whether video representations preser
 
 The maintained Health&Gait evaluator implements GFC-v2: a complete participant has eight observed cells and contributes 16 session-safe queries, both donors remain in the full eight-cell gallery, and learned features are compared with matched ridge heads fitted from the same nine shortcut cues. The checked-in preliminary GFC results are unchanged historical artifacts from the legacy 24-query, donor-excluded protocol; they are not GFC-v2 outcomes.
 
-The repository contains model-training code, aggregate Phase 0/1 diagnostics, and development-split GFC results for three selected checkpoints. It does **not** yet contain a confirmation-split GFC result, an external gait-measurement result, or a cross-dataset result.
+The repository contains model-training code, the GaitLU-1M preparation and fixed-exposure
+loader path, aggregate Phase 0/1 diagnostics, and development-split legacy GFC results
+for three selected checkpoints. It does **not** yet contain trained GaitLU ladder
+checkpoints, a locked-outcome GFC-v2 result, an external gait-measurement result, or a
+cross-dataset result.
 
 ## Setup
 
@@ -29,7 +33,8 @@ The maintained implementation lives under `src/cody_jepa/`:
 - `models/`: encoder, predictor, attention blocks, positional embeddings, and model factories.
 - `masks/`: context and target mask policies.
 - `training/`: optimization, losses, diagnostics, checkpoints, runtime setup, and the training engine.
-- `data/`: the Health&Gait manifest schema, frame discovery, datasets, loaders, and diagnostics.
+- `data/`: Health&Gait manifests and diagnostics plus GaitLU pickle-shard preparation,
+  indexed bit-packed archives, manifests, and fixed-exposure loaders.
 - `evaluation/features.py`: frozen-feature export and the validated feature-table boundary.
 - `evaluation/probes/`: identity and gait-system protocols.
 - `evaluation/gfc/`: GFC scoring, normalization, inference, configuration, and orchestration.
@@ -38,6 +43,27 @@ The maintained implementation lives under `src/cody_jepa/`:
 Configs are grouped by purpose under `configs/train/` and `configs/eval/`. The top-level `single_stream_jepa.py`, `probes.py`, and `gfc*.py` modules preserve older imports; new code should use the packages above.
 
 ## Research workflow
+
+### Prepare and train the GaitLU scaling ladders
+
+The prospective study trains twenty GaitLU-only encoders: four nested unique-sequence
+rungs for each of five paired pool/optimization seeds. The ingestion and training code
+is implemented, but the private HAIC shards have not yet been processed and no eligible
+ladder checkpoint is checked in. Follow the complete operator runbook rather than
+training directly from `.tar.gz` files:
+
+- [GaitLU-1M preparation and training runbook](docs/gaitlu_training.md)
+- [GaitLU scaling configuration](configs/train/gaitlu_scaling.json)
+- [Preparation Slurm array](slurm/prepare-gaitlu-shards.sbatch)
+- [Twenty-run training Slurm array](slurm/train-gaitlu-study.sbatch)
+
+The pipeline converts trusted pickle members into seekable bit-packed `.tar` records,
+audits invalid sequences and exact duplicates, reserves one common holdout, constructs
+five nested ladders, and trains with equal exposure. The checked-in primary configuration
+implements 8,192,000 examples per model. The prespecified 4,096,000 fallback still needs
+a separate checked-in configuration if the HAIC throughput gate selects it.
+
+### Run historical Health&Gait diagnostics
 
 Health&Gait is not redistributed. After obtaining access from the dataset provider, place the extracted release under `data/healthgait/raw/Health_Gait/`; `data/` remains excluded from Git. Build the subject-disjoint manifest:
 
@@ -178,10 +204,14 @@ and path-bearing inputs. The historical generator above remains unchanged.
 
 - [Method](docs/method.md): GFC construction, controls, normalization, scoring, and inference.
 - [Data](docs/data.md): Health&Gait access, layout, splits, privacy, and preprocessing boundaries.
+- [GaitLU training runbook](docs/gaitlu_training.md): HAIC conversion, pool construction,
+  throughput gates, fixed-exposure training, resume, and evaluation handoff.
 - [Results](docs/results.md): current aggregate evidence and the claims it does and does not support.
 - [Paper draft](docs/paper.md): concise manuscript skeleton for the revised ICLR 2027 study.
 - [Research proposal](docs/proposal.md): accessible motivation, study design, preliminary evidence, and proposed confirmation work.
 - [Result files](results/README.md): compact inputs to the paper-result generator.
+- [Technical tutorials](tutorials/README.md): repository-independent foundations and
+  executable synthetic notebooks.
 
 ## Data and claim boundaries
 

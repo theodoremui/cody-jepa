@@ -128,3 +128,9 @@ The assertions in the notebooks are teaching tools. When an assertion fails afte
 ## Scope
 
 These tutorials explain reusable technical concepts. They do not document the CoDy-JEPA package, reproduce repository experiments, or make claims about research results. After completing the curriculum, use the repository documentation and source code to study how these ideas are assembled into the full system.
+
+Applied next steps:
+
+- [Data roles and preprocessing](../docs/data.md)
+- [GaitLU-1M preparation and fixed-exposure training](../docs/gaitlu_training.md)
+- [GFC-v2 method and inference](../docs/method.md)

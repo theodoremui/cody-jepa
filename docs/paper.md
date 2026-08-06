@@ -2,9 +2,10 @@
 
 ## Factor recombination, context reliance, and identity in silhouette gait
 
-> **Draft status (July 31, 2026).** This is the paper skeleton for the revised ICLR 2027
-> study. Sections describing the prospective experiment use future tense because the 20
-> primary GaitLU runs and locked Health&Gait outcome analysis have not been completed.
+> **Draft status (August 6, 2026).** This is the paper skeleton for the revised ICLR 2027
+> study. GFC-v2 and the GaitLU v2 preparation/training path are implemented and tested on
+> constructed data, but the private corpus has not been prepared, the 20 primary GaitLU
+> runs have not started, and the locked Health&Gait outcome analysis remains unopened.
 > Historical numbers are labelled *preliminary* or *legacy* and cannot be promoted into
 > headline results.
 
@@ -105,8 +106,13 @@ metadata are unavailable, sequences become singletons after exact deduplication 
 absence of source-level independence is disclosed.
 
 Five seeded group orders define nested pools near 2,500, 25,000, 250,000, and
-$U_{\max}$. Actual counts and checksums are reported. The common holdout supplies
+$U_{\max}$. Actual counts are reported. SHA-256 content fingerprints are used only
+during preparation for packed-record reuse and exact deduplication; finalized manifests
+omit them. Each checkpoint records one digest over its ordered training-plus-holdout
+manifest pair and enforces that digest on resume. The common holdout supplies
 training-health and context-reliance measurements and never contributes encoder updates.
+Runtime loading validates manifest structure and record bounds but does not detect
+same-length corruption of readable packed records.
 
 ### 3.2 Health&Gait
 
@@ -301,10 +307,13 @@ is one million examples per hour across the machine; measured historical rates a
 higher but full-pool streaming must be probed directly. Storage is budgeted at 250 GB
 for packed silhouettes and temporary validation artifacts.
 
-Compact results must record protocol version, source-group and role-map checksums, pool
-and optimization seeds, actual rung size, exposure, checkpoint, evaluator commit,
-gallery policy, query count, exclusions, and analysis-freeze commit. Tables and figures
-must regenerate from those compact files without reading notebooks or prose.
+Training checkpoints record the role-sensitive digest of their exact GaitLU train and
+holdout manifests. The aggregate outcome contract records protocol version, role-map
+version and aggregate counts, pool and optimization seeds, actual rung size, exposure,
+checkpoint ID, evaluator commit, gallery policy, query count, exclusions, and
+analysis-freeze tag. It does not expose participant IDs, role-map paths, cohort
+checksums, feature paths, or checkpoint paths. Tables and figures must regenerate from
+those aggregate files without reading notebooks or prose.
 
 ## 11. Limitations
 

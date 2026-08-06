@@ -33,6 +33,12 @@ Every primary run uses the same:
 - training exposure of $C=8{,}192{,}000$ examples, or 128,000 updates at effective
   batch size 64.
 
+The checked-in primary configuration realizes this as microbatches of 16, four-way
+gradient accumulation, 65,536 sampled examples per virtual epoch, 1,024 updates per
+virtual epoch, and 125 virtual epochs. The fixed-exposure sampler draws source sequences
+with replacement and includes the draw index in temporal and spatial augmentation seeds.
+These are implementation facts, not extra independent observations.
+
 Horizontal flipping is disabled because direction is an evaluated factor.
 
 A *Vision Transformer* (ViT) represents the video as tokens and uses attention to mix
@@ -47,6 +53,13 @@ eligible sequences. This gives 20 primary runs. Within a ladder, the same replic
 drives optimization at every rung. Adding a rung adds source groups rather than
 replacing the earlier data.
 
+Exact-content SHA-256 is confined to GaitLU preparation, where it supports packed-record
+reuse and deduplication. Final manifests omit record hashes. Each checkpoint instead
+stores one digest over the ordered training-plus-holdout manifest pair and requires it,
+the manifest roles, loader settings, and the `splitmix64-v1` seed scheme to match on
+resume. Runtime loading still validates structure, paths, bounds, and short reads, but
+same-length corruption of packed bits is not detected.
+
 ![Four nested unique-data pools are compared at a fixed training exposure in each of five ladders.](images/scaling-ladders.svg)
 
 A prespecified throughput gate may reduce **all** runs to 4,096,000 examples before any
@@ -54,6 +67,10 @@ Health&Gait outcome is opened. Exposure cannot differ by rung. The final-step ch
 is primary; a downstream result may not select a favorable epoch. Because pool sampling
 and optimization share one seed, the five ladders estimate their combined variability,
 not two separate variance components.
+
+The repository currently contains the 8,192,000-example configuration only. If the
+throughput gate selects the lower tier, its compatible configuration and regenerated
+twenty-row training registry must be checked in and frozen before primary training.
 
 ## 3. Convert each recording into one frozen vector
 
@@ -345,6 +362,8 @@ Before any outcome aggregate is viewed, freeze in a timestamped commit:
 
 - participant roles and exclusions;
 - GaitLU pools and training exposure;
+- the combined training-plus-holdout manifest digest and seed scheme for every GaitLU
+  checkpoint;
 - all 20 checkpoints and reference checkpoints;
 - GFC-v2, the oracle enumerator, and both completion controls;
 - factor heads, cue heads, normalizers, and temperature;

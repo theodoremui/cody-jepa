@@ -2,17 +2,19 @@
 
 ## Status at a glance
 
-The revised GaitLU scaling experiment has **not yet produced results**. Current checked-in
-artifacts come from earlier Health&Gait-only, seed-0 experiments and a legacy GFC
-protocol. They justify the revised question and expose design failures; they do not
-answer whether unique-data scale improves GFC-v2.
+The revised GaitLU scaling experiment has **not yet produced results**. Its evaluator,
+preparation code, indexed loader, and primary training launcher are implemented, but the
+private corpus has not been prepared and no eligible scaling checkpoint exists. Current
+checked-in result artifacts come from earlier Health&Gait-only, seed-0 experiments and a
+legacy GFC protocol. They justify the revised question and expose design failures; they
+do not answer whether unique-data scale improves GFC-v2.
 
 | Stage | Data and protocol | What exists | Evidentiary role |
 |---|---|---|---|
 | Phase 0 | Health&Gait encoder, one seed | Training, pooling, context, identity, and speed diagnostics | Feasibility and anomaly discovery |
 | Phase 1 | Health&Gait encoder sweep, one seed | Diagnostic comparison across checkpoints | Shows standard metrics disagree |
 | Legacy GFC | 24 queries, two donors deleted, 308 complete fit / 76 complete evaluate participants | Development scores for three checkpoints | Preliminary result and protocol self-audit |
-| Revised ICLR study | GaitLU-only encoders, GFC-v2, 20 runs, locked 318-person outcome cohort (308 complete) | No outcome results yet | Planned prospectively locked scaling audit |
+| Revised ICLR study | GaitLU-only encoders, GFC-v2, 20 runs, locked 318-person outcome cohort (308 complete) | Preparation/training code only; no corpus-derived checkpoints or outcomes | Planned prospectively locked scaling audit |
 
 The terms *primary*, *development*, and *confirmation* in historical compact files refer
 to their original analyses. They must not be carried into the revised protocol without

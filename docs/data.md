@@ -30,6 +30,15 @@ roles and a different evaluator. Their aggregates remain preliminary evidence in
 
 ## 2. Prepare GaitLU-1M for encoder pretraining
 
+The exact HAIC conversion, loader-smoke, and twenty-run commands are in
+[gaitlu_training.md](gaitlu_training.md).
+
+The v2 preparation, indexed-loader, and primary-exposure code now exists and passes
+synthetic tests. The private 100-shard corpus has not yet been processed with it, so the
+eligible count, exclusion count, actual rung sizes, storage use, and measured throughput
+remain unknown. Treat all nominal counts below as design targets until
+`study_pools.json` is produced and reviewed on HAIC.
+
 GaitLU-1M contains about 1.02 million unlabelled silhouette sequences. A *silhouette
 sequence* is an ordered set of binary-looking frames in which foreground pixels show a
 walking body. The study uses no identity, speed, clothing, or direction labels from
@@ -42,7 +51,8 @@ Before making any training pool:
 
 1. Check that each sequence decodes, has enough frames, uses a valid silhouette range,
    and does not contain too many empty frames.
-2. Hash the content, group exact duplicates, and retain one canonical copy.
+2. During preparation, hash each packed record together with its shape, reuse identical
+   storage, group exact duplicates, and retain one canonical copy.
 3. Preserve any distributor-provided *source group*. A source group contains sequences
    that may come from the same original video or capture event.
 4. If source metadata are missing, say so. Treat each exactly deduplicated sequence as
@@ -53,9 +63,10 @@ Before making any training pool:
    value.
 
 For example, if two files have different names but identical frame content, their
-hashes place them in one duplicate group. Only one may enter the eligible corpus. If
-three clips are known to come from the same source video, all three stay together when
-the data are split.
+preparation hashes place them in one duplicate group. Only one may enter the eligible
+corpus. If three clips are known to come from the same source video, all three stay
+together when the data are split. Content hashes remain in the preparation inventories,
+not the finalized training and holdout manifests.
 
 The paper should say “about one million” or “roughly a 400-fold range” only when the
 validated counts support those descriptions.
@@ -72,7 +83,7 @@ Prefixes of that order create four pools as close as possible to:
 
 The pools are *nested*: every item in the 2.5k pool also appears in the 25k pool, and so
 on. A source group is never split merely to hit a round number. Record the actual size,
-checksum, seed, grouping policy, and exclusions for every pool.
+seed, grouping policy, manifest path, and exclusions for every pool.
 
 ![Four nested unique-data pools receive the same number of training examples.](images/scaling-ladders.svg)
 
@@ -104,6 +115,9 @@ sequences while keeping total training examples constant.
 Before launching all 20 runs, use the 25k pool for a systems pilot and the full pool for
 a short read-and-update probe. The full-pool probe matters because a 2.5k pool may fit
 in memory or page cache even when a million-sequence pool cannot be streamed quickly.
+The checked-in primary configuration implements 8,192,000 examples. If the prespecified
+throughput gate selects 4,096,000 examples, add and freeze the compatible fallback
+configuration and regenerate the training registry before launching any primary run.
 
 ### 2.4 Keep one common GaitLU holdout
 
@@ -117,6 +131,14 @@ When the context experiment needs a similar or dissimilar replacement sequence, 
 uses fixed, non-learned descriptors: frame count, foreground-area summaries,
 centroid-trajectory summaries, and motion extent. This choice prevents a trained model
 from defining its own comparison set.
+
+For resume safety, each GaitLU checkpoint records one SHA-256 digest over the ordered
+pair of complete training and holdout manifests. This checkpoint digest is distinct
+from preparation content hashes. The runtime loader validates manifest structure,
+paths, record bounds, and read lengths, but it does not hash records; same-length packed
+bit corruption is therefore not detected while loading. The v2 format is a clean break:
+regenerate prepared outputs in a clean directory, and do not resume checkpoints created
+with the v1 prototype data contract. Health&Gait compatibility is unchanged.
 
 ## 3. Turn Health&Gait recordings into evaluation examples
 
@@ -251,9 +273,10 @@ No participant in either cohort contributes an encoder update. The outcome cohor
 called *prospective*, not *untouched external*, because its recordings and labels
 informed earlier experiments in this repository.
 
-Before opening outcomes, save a separate role map containing participant IDs,
-exclusions, and a checksum—a compact fingerprint that changes when a file changes.
-Then freeze the evaluator, data rules, 20 primary model
+Before opening outcomes, save the exact private `healthgait-gfc-v2-roles-v1` role map.
+Only its version and aggregate assigned, complete, and excluded counts enter summaries;
+the participant IDs and map path remain private, and the aggregate contract intentionally
+requires no cohort checksum. Then freeze the evaluator, data rules, 20 primary model
 runs, reference checkpoints, analysis script, effect thresholds, and figure templates
 in a timestamped commit. During development, exported features may be checked for
 schema and counts, but aggregate GFC-v2 and identity outcomes must remain unopened.
@@ -299,8 +322,9 @@ external criterion. Neither table is a primary outcome.
 
 Before the outcome run, verify that:
 
-- every GaitLU pool has an actual count, source-group policy, checksum, and exclusion
-  log;
+- every GaitLU pool has an actual count, source-group policy, manifest path, and
+  exclusion log, and every checkpoint has one combined train-plus-holdout manifest
+  digest;
 - the 10,000 GaitLU holdout sequences are group-disjoint from all training pools;
 - every complete Health&Gait participant has exactly eight unique factor cells;
 - each direction recording has a valid `source_video_id` and at least 18 contiguous

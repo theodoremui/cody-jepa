@@ -30,6 +30,17 @@ from .healthgait_diagnostics import (
     summarize_healthgait_manifest,
     write_healthgait_metadata_summary,
 )
+from .gaitlu import (
+    FixedExposureSampler,
+    GAITLU_MANIFEST_COLUMNS,
+    GAITLU_MANIFEST_VERSION,
+    GAITLU_SEED_SCHEME,
+    GaitLUIndexedDataset,
+    GaitLULoaderConfig,
+    build_gaitlu_datasets_from_config,
+    build_gaitlu_loaders_from_config,
+    gaitlu_manifest_pair_sha256,
+)
 
 __all__ = [
     "DEFAULT_BASE_SEED",
@@ -41,6 +52,12 @@ __all__ = [
     "DEFAULT_MODALITY",
     "DEFAULT_WINDOW_POLICY",
     "GFC_FACTOR_COLUMNS",
+    "FixedExposureSampler",
+    "GAITLU_MANIFEST_COLUMNS",
+    "GAITLU_MANIFEST_VERSION",
+    "GAITLU_SEED_SCHEME",
+    "GaitLUIndexedDataset",
+    "GaitLULoaderConfig",
     "HealthGaitManifestDataset",
     "HealthGaitLoaderConfig",
     "ManifestValidationError",
@@ -52,6 +69,9 @@ __all__ = [
     "build_healthgait_datasets_from_config",
     "build_healthgait_loaders_from_config",
     "build_sequential_healthgait_loaders",
+    "build_gaitlu_datasets_from_config",
+    "build_gaitlu_loaders_from_config",
+    "gaitlu_manifest_pair_sha256",
     "find_repo_root",
     "healthgait_manifest_path",
     "preview_manifest",
