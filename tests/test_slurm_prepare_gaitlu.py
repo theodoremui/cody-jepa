@@ -17,6 +17,7 @@ class PrepareGaitLUShardsSlurmTest(unittest.TestCase):
                 "CODY_JEPA_ROOT": str(PROJECT_ROOT),
                 "GAITLU_RAW_ROOT": str(root / "raw"),
                 "GAITLU_PREPARED_ROOT": str(root / "prepared"),
+                "PREP_LOG_ROOT": str(root / "logs" / "prepare-shards"),
             }
         )
         return environment
@@ -41,6 +42,8 @@ class PrepareGaitLUShardsSlurmTest(unittest.TestCase):
 
             submissions = log_path.read_text(encoding="utf-8").splitlines()
             self.assertEqual(len(submissions), 13)
+            preparation_logs = Path(environment["PREP_LOG_ROOT"])
+            self.assertTrue(preparation_logs.is_dir())
             expected_ranges = [
                 f"{start}-{min(start + 7, 99)}%8" for start in range(0, 100, 8)
             ]
@@ -48,6 +51,9 @@ class PrepareGaitLUShardsSlurmTest(unittest.TestCase):
                 self.assertIn("--wait", submission)
                 self.assertIn(f"--array={expected_range}", submission)
                 self.assertIn("--export=ALL", submission)
+                self.assertIn(
+                    f"--output={preparation_logs}/slurm-%x-%A_%a.out", submission
+                )
                 self.assertTrue(submission.endswith(str(SCRIPT)))
 
     def test_array_worker_converts_only_its_assigned_shard(self):

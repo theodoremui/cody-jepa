@@ -12,6 +12,7 @@ set -euo pipefail
 PROJECT_ROOT="${CODY_JEPA_ROOT:-/hai/scratch/$USER/cody-jepa}"
 RAW_ROOT="${GAITLU_RAW_ROOT:?set GAITLU_RAW_ROOT to the directory containing gaitlu-000.tar.gz}"
 PREPARED_ROOT="${GAITLU_PREPARED_ROOT:?set GAITLU_PREPARED_ROOT to the output directory}"
+PREP_LOG_ROOT="${PREP_LOG_ROOT:-$(dirname "$PREPARED_ROOT")/logs/prepare-shards}"
 
 cd "$PROJECT_ROOT"
 
@@ -21,6 +22,7 @@ if [[ -z "${SLURM_ARRAY_TASK_ID:-}" ]]; then
     exit 2
   fi
 
+  mkdir -p "$PREP_LOG_ROOT"
   for START in $(seq 0 8 96); do
     END=$((START + 7))
     if ((END > 99)); then
@@ -30,6 +32,7 @@ if [[ -z "${SLURM_ARRAY_TASK_ID:-}" ]]; then
     sbatch --wait \
       --array="$START-$END%8" \
       --export=ALL \
+      --output="$PREP_LOG_ROOT/slurm-%x-%A_%a.out" \
       "$PROJECT_ROOT/slurm/prepare-gaitlu-shards.sbatch"
   done
   exit 0

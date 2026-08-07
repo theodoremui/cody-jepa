@@ -113,7 +113,10 @@ bash slurm/prepare-gaitlu-shards.sbatch
 Run the launcher on the HAIC login node, preferably inside `tmux` so that a disconnected
 SSH session does not stop later groups from being submitted. Do not pass the launcher to
 `sbatch`: it submits at most eight shard workers, waits for that group to finish, and then
-submits the next group. Monitor the array jobs printed by the launcher:
+submits the next group. Worker logs go to
+`$PREP_LOG_ROOT/slurm-prepare-gaitlu-<array-job-id>_<shard>.out`. If
+`PREP_LOG_ROOT` is unset, it defaults to `logs/prepare-shards` beside the prepared-data
+directory. Monitor the array jobs printed by the launcher:
 
 ```bash
 squeue -u "$USER"
