@@ -1,0 +1,52 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 360" role="img" aria-labelledby="title desc">
+  <title id="title">Reproducible scientific evaluator pipeline</title>
+  <desc id="desc">A four-stage pipeline validates inputs, constructs immutable fitted state, computes deterministic results, and atomically publishes artifacts.</desc>
+  <defs>
+    <marker id="arrow" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto">
+      <path d="M0,0 L0,6 L9,3 z" fill="#52606d"/>
+    </marker>
+  </defs>
+  <rect width="960" height="360" rx="24" fill="#f7fafc"/>
+  <text x="480" y="42" text-anchor="middle" font-family="sans-serif" font-size="24" font-weight="700" fill="#243b53">A result is a chain of contracts</text>
+  <g font-family="sans-serif" text-anchor="middle">
+    <g transform="translate(42 92)">
+      <rect width="180" height="174" rx="16" fill="#e3f2fd" stroke="#367cad" stroke-width="2"/>
+      <text x="90" y="38" font-size="19" font-weight="700" fill="#1f4e79">Validate</text>
+      <text x="90" y="72" font-size="14" fill="#334e68">shape and dtype</text>
+      <text x="90" y="98" font-size="14" fill="#334e68">finite values</text>
+      <text x="90" y="124" font-size="14" fill="#334e68">policy vocabulary</text>
+      <text x="90" y="150" font-size="14" fill="#334e68">scientific keys</text>
+    </g>
+    <g transform="translate(274 92)">
+      <rect width="180" height="174" rx="16" fill="#e8f5e9" stroke="#4d8b57" stroke-width="2"/>
+      <text x="90" y="38" font-size="19" font-weight="700" fill="#2f6b3a">Freeze</text>
+      <text x="90" y="72" font-size="14" fill="#334e68">defensive copy</text>
+      <text x="90" y="98" font-size="14" fill="#334e68">read-only arrays</text>
+      <text x="90" y="124" font-size="14" fill="#334e68">cross-field checks</text>
+      <text x="90" y="150" font-size="14" fill="#334e68">owned parameters</text>
+    </g>
+    <g transform="translate(506 92)">
+      <rect width="180" height="174" rx="16" fill="#fff4df" stroke="#c8841b" stroke-width="2"/>
+      <text x="90" y="38" font-size="19" font-weight="700" fill="#8a5a10">Compute</text>
+      <text x="90" y="72" font-size="14" fill="#334e68">canonical order</text>
+      <text x="90" y="98" font-size="14" fill="#334e68">explicit dtype</text>
+      <text x="90" y="124" font-size="14" fill="#334e68">fixed random stream</text>
+      <text x="90" y="150" font-size="14" fill="#334e68">declared tolerance</text>
+    </g>
+    <g transform="translate(738 92)">
+      <rect width="180" height="174" rx="16" fill="#f3e8ff" stroke="#805ad5" stroke-width="2"/>
+      <text x="90" y="38" font-size="19" font-weight="700" fill="#553c9a">Publish</text>
+      <text x="90" y="72" font-size="14" fill="#334e68">temporary artifact</text>
+      <text x="90" y="98" font-size="14" fill="#334e68">read-back validation</text>
+      <text x="90" y="124" font-size="14" fill="#334e68">atomic replacement</text>
+      <text x="90" y="150" font-size="14" fill="#334e68">metadata sidecar</text>
+    </g>
+  </g>
+  <g stroke="#52606d" stroke-width="3" marker-end="url(#arrow)">
+    <path d="M226 179 H266"/>
+    <path d="M458 179 H498"/>
+    <path d="M690 179 H730"/>
+  </g>
+  <rect x="238" y="302" width="484" height="34" rx="17" fill="#ffffff" stroke="#9fb3c8"/>
+  <text x="480" y="325" text-anchor="middle" font-family="sans-serif" font-size="15" fill="#334e68">Every boundary has an invariant and a failure test</text>
+</svg>

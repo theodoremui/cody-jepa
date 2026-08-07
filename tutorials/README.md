@@ -1,6 +1,6 @@
 # Technical foundations for CoDy-JEPA
 
-This curriculum teaches the mathematical, machine learning, and statistical ideas that a reader needs before studying the CoDy-JEPA codebase. The lessons begin with arrays and vector geometry, build toward representation learning and evaluation, and finish with statistical inference and experimental design.
+This curriculum teaches the mathematical, machine learning, statistical, and numerical-engineering ideas that a reader needs before studying the CoDy-JEPA codebase. The lessons begin with arrays and vector geometry, build toward representation learning and evaluation, and finish with statistical inference and reproducible evaluator construction.
 
 The lessons are deliberately independent of repository internals. Every notebook uses small synthetic examples, runs on CPU, and can be understood without access to private data.
 
@@ -53,6 +53,12 @@ Read the lecture first, then run the matching notebook. The lessons are progress
 | --- | --- | --- |
 | 14. Paired contrasts, uncertainty, and decision thresholds | [Lecture](lectures/14_paired_inference.md) | [Notebook](implementations/14_paired_inference.ipynb) |
 | 15. Exposure, replication, and variance decomposition | [Lecture](lectures/15_exposure_and_replication.md) | [Notebook](implementations/15_exposure_and_replication.ipynb) |
+
+### Track E: Reproducible evaluator engineering
+
+| Lesson | Lecture | Implementation |
+| --- | --- | --- |
+| 16. Reproducible scientific evaluators and numerical contracts | [Lecture](lectures/16_reproducible_scientific_evaluators.md) | [Notebook](implementations/16_reproducible_scientific_evaluators.ipynb) |
 
 ## Directory layout
 
@@ -123,7 +129,7 @@ The assertions in the notebooks are teaching tools. When an assertion fails afte
 - Vectorized NumPy and PyTorch operations are preferred over Python loops when they make the array structure clearer.
 - Small explicit loops remain useful when they expose a statistical sampling unit or a mathematical recurrence.
 - All tensor examples default to CPU. You can move selected experiments to an accelerator after verifying the CPU result.
-- The notebooks explain efficient APIs where they appear, including broadcasting, batched matrix multiplication, indexed gathering, stable linear solves, and grouped aggregation.
+- The notebooks explain efficient APIs where they appear, including broadcasting, batched matrix multiplication, `np.einsum`, indexed gathering, stable linear solves, log-space likelihoods, grouped aggregation, crossed resampling, frozen inference, and atomic artifact publication.
 
 ## Scope
 

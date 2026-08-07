@@ -1,6 +1,6 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 720" role="img" aria-labelledby="title desc">
-  <title id="title">Progression through the four tutorial tracks</title>
-  <desc id="desc">A four-stage flow from mathematical foundations through representation learning and evaluation to statistical inference.</desc>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 875" role="img" aria-labelledby="title desc">
+  <title id="title">Progression through the five tutorial tracks</title>
+  <desc id="desc">A five-stage flow from mathematical foundations through representation learning, evaluation, statistical inference, and reproducible evaluator engineering.</desc>
   <defs>
     <marker id="arrow" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto" markerUnits="strokeWidth">
       <path d="M0,0 L0,6 L9,3 z" fill="#475569"/>
@@ -14,7 +14,7 @@
     </style>
   </defs>
 
-  <rect width="1200" height="720" rx="24" fill="#f8fafc"/>
+  <rect width="1200" height="875" rx="24" fill="#f8fafc"/>
   <text x="60" y="62" class="title">From arrays to defensible experiments</text>
   <text x="60" y="94" class="subtitle">Each track supplies the language and tools needed by the next.</text>
 
@@ -52,4 +52,11 @@
   <text x="700" y="634" class="concept">14 Paired inference</text>
   <text x="900" y="634" class="concept">15 Replication</text>
   <text x="88" y="663" class="count">Quantify uncertainty and distinguish randomization, sampling, and analysis units.</text>
+
+  <line x1="600" y1="685" x2="600" y2="719" stroke="#475569" stroke-width="3" marker-end="url(#arrow)"/>
+
+  <rect x="60" y="725" width="1080" height="112" rx="18" fill="#f3e8ff" stroke="#805ad5" stroke-width="2"/>
+  <text x="88" y="761" class="track">Track E · Reproducible evaluator engineering</text>
+  <text x="700" y="761" class="concept">16 Numerical contracts</text>
+  <text x="88" y="801" class="count">Freeze fitted state, control numeric order, test failures, and publish complete artifacts.</text>
 </svg>

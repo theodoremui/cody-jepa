@@ -20,6 +20,7 @@ By the end of this lesson, you will be able to:
 6. estimate a cluster design effect as an intuition tool;
 7. identify leakage and complete-case selection; and
 8. lock a design prospectively and state its generalization limits.
+9. implement participant-only and crossed participant-by-model bootstraps with an explicit random stream.
 
 ## 1. Motivating scenario: 3,600 windows from 20 people
 
@@ -203,6 +204,69 @@ third terms but do not reduce the model-seed term. Independent replication on bo
 needed when both are part of the generalization claim; a balanced crossing makes the
 components easier to identify and estimate.
 
+### Bootstrap the axes named by the claim
+
+The resampling scheme should reproduce the population axes over which the estimand
+generalizes. If a fitted model is treated as fixed and the claim concerns new participants,
+resample participant rows while carrying every model column for a selected participant.
+If the claim averages over both new participants and independently trained models, a
+crossed bootstrap can resample both axes.
+
+Let `scores` have shape `(M,P,R)`, where `M` is model ladders or seeds, `P` is participants,
+and `R` is an ordered set of conditions or data rungs. One crossed replicate draws `M`
+model indices and `P` participant indices with replacement:
+
+```python
+rng = np.random.Generator(np.random.PCG64(seed))
+model_draw = rng.integers(0, M, size=M, endpoint=False)
+participant_draw = rng.integers(0, P, size=P, endpoint=False)
+sampled = scores[model_draw][:, participant_draw, :]
+```
+
+The two indexing operations are intentionally separate. `scores[model_draw]` selects model
+rows and keeps the other axes. Indexing the result with `[:, participant_draw, :]` then
+selects participant columns for every sampled model. Supplying two advanced index arrays in
+one bracket can trigger NumPy's paired advanced-indexing rules and select element pairs
+instead of the Cartesian crossing that the bootstrap requires.
+
+Suppose the primary contrast is the last condition minus the first. Compute that contrast
+inside each sampled model, average sampled participants within model, then average the
+sampled models:
+
+$$
+\Delta^{\ast}
+{}={}
+\frac{1}{M}\sum_{m=1}^{M}
+\left[
+\frac{1}{P}\sum_{p=1}^{P}
+(Y^{\ast}_{mpR}-Y^{\ast}_{mp1})
+\right].
+$$
+
+The order makes the weighting visible: every sampled participant has equal weight within
+every sampled model, and every sampled model has equal weight in the final estimate.
+Changing the reduction order gives the same arithmetic mean in a complete rectangular
+array, but writing the nested estimand explicitly prevents accidental row weighting when
+data become unbalanced.
+
+An explicit bit generator strengthens reproducibility. `np.random.default_rng(seed)` is a
+convenient modern interface, but `np.random.Generator(np.random.PCG64(seed))` records the
+chosen generator family as part of the analysis contract. A seed alone does not fully name
+a pseudorandom sequence if the generator algorithm is allowed to change. Store the seed,
+generator family, replicate count, resampled axes, and interval rule.
+
+Use one documented stream in a documented order or derive independent child streams with a
+declared spawning rule. Reusing the same seed in several separately constructed generators
+can accidentally synchronize resamples. Conversely, changing loop order while drawing from
+one stream changes every later draw. Reproducibility means freezing these choices, not
+pretending that one seed makes implementation details irrelevant.
+
+Participant-only, model-only, and crossed intervals answer different questions and should
+usually differ. A crossed interval is not automatically more conservative: its width
+depends on observed variation and the resampling model. With only a few model seeds, the
+empirical model distribution is coarse. Report the number of independent models and treat
+the bootstrap as an approximation rather than as a way to manufacture training runs.
+
 ## 8. Variance components explain shared dependence
 
 For nested measurements, a useful model is
@@ -377,6 +441,9 @@ separation, but you must still choose the correct group key.
 For variance components, prefer established mixed-model software when inference matters.
 Use simulations to verify that aggregation and resampling reproduce the intended hierarchy.
 Store random seeds and exact split maps, not only a verbal description.
+For a crossed array, test the index shapes before computing statistics and keep each
+resampled axis visible in the code. Generate bootstrap replicates in chunks when the full
+index tensor would be too large.
 
 ## 16. Misconceptions and failure modes
 
@@ -390,6 +457,10 @@ Store random seeds and exact split maps, not only a verbal description.
 7. **"One held-out split proves all generalization."** It tests only its held-out axes.
 8. **"Preregistration prevents every bias."** It clarifies decisions but cannot fix poor
    measurement, attrition, or unrepresentative sampling.
+9. **"One seed fully specifies randomness."** Reproducibility also requires the generator
+   family, draw order, and mapping from draws to sampling axes.
+10. **"Two index arrays create a crossing."** NumPy advanced indexing can pair arrays;
+    apply model and participant selections on separate axes when a Cartesian resample is intended.
 
 ## Exercises
 
@@ -428,16 +499,36 @@ What population does a complete-case paired mean directly describe?
 **Brief solution:** participants who satisfy the completeness rule, written
 $E[D_i\mid R_i=1]$.
 
+### Exercise 6
+
+A score tensor has shape `(5, 30, 4)` for model, participant, and rung. What shape remains
+after drawing five model indices and thirty participant indices with the two-step indexing
+shown above?
+
+**Brief solution:** `(5,30,4)`. Sampling is with replacement, so identifiers may repeat,
+but the bootstrap replicate keeps the original axis sizes.
+
+### Exercise 7
+
+Why is `scores[model_draw, participant_draw, :]` not the intended crossed bootstrap when
+the two draw arrays have compatible shapes?
+
+**Brief solution:** NumPy pairs advanced indices element by element. The desired resample
+needs every selected participant column within every selected model row, which requires
+separate axis indexing or an explicit Cartesian indexing helper.
+
 ## Recap
 
 Row count, source count, exposure, and replication are different quantities. Nested pools
 encode weighting choices, and independent units come from design rather than file layout.
 Participant and model seeds contribute separate variance components. Leakage, missingness,
 and unsupported extrapolation can invalidate a precise-looking result. A prospective,
-unit-aware plan makes the evidence and its limits auditable.
+unit-aware plan makes the evidence and its limits auditable. Crossed resampling must name
+its axes, weighting order, random generator, and advanced-indexing semantics explicitly.
 
 ## Continue
 
 - Previous: [14. Paired contrasts, uncertainty, and decision thresholds](14_paired_inference.md)
 - Notebook: [15. Exposure, replication, and variance decomposition](../implementations/15_exposure_and_replication.ipynb)
+- Next: [16. Reproducible scientific evaluators and numerical contracts](16_reproducible_scientific_evaluators.md)
 - Curriculum: [Tutorial README](../README.md)

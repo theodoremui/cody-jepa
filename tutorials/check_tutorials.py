@@ -37,6 +37,7 @@ EXPECTED_BASENAMES = {
     "13_context_interventions",
     "14_paired_inference",
     "15_exposure_and_replication",
+    "16_reproducible_scientific_evaluators",
 }
 ALLOWED_THIRD_PARTY_IMPORTS = {
     "IPython",
@@ -402,7 +403,8 @@ def main() -> int:
     svg_count = len(list(IMAGES.glob("*.svg")))
     print(
         "Tutorial validation passed: "
-        f"15 lectures, 15 notebooks, and {svg_count} SVG figures."
+        f"{len(EXPECTED_BASENAMES)} lectures, {len(EXPECTED_BASENAMES)} notebooks, "
+        f"and {svg_count} SVG figures."
     )
     return 0
 

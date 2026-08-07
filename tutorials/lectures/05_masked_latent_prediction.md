@@ -40,6 +40,7 @@ By the end of this lesson, you will be able to:
 4. Describe stop-gradient as a boundary in the computation graph.
 5. Distinguish online, predictor, and target parameters.
 6. Derive and implement an exponential moving average target update.
+7. Export deterministic frozen features with an explicit inference contract.
 
 ## 1. Prediction as a representation-learning signal
 
@@ -470,7 +471,67 @@ array operations but dangerous here because it can compare one target against mu
 predictions without an error. Also check that both tensors are finite and that the target
 branch has no accumulated gradients.
 
-## 13. A simple predictor with target queries
+## 13. Frozen inference and feature export
+
+Training and feature export use the same encoder but require different execution
+contracts. During training, the online branch builds an autograd graph and some modules
+may behave stochastically. During export, the model must be frozen, deterministic, and
+cheap to execute. Three controls address different parts of that requirement:
+
+1. `model.eval()` selects evaluation behavior for modules such as dropout and batch
+   normalization.
+2. `model.requires_grad_(False)` records that parameters are not trainable and prevents
+   parameter gradients from being accumulated.
+3. `torch.inference_mode()` disables autograd recording and additional tensor version
+   bookkeeping for the decorated computation.
+
+None of these operations implies the other two. Evaluation mode does not disable
+gradients. Disabling parameter gradients does not switch off dropout. An inference-mode
+block does not permanently change how modules behave after the block exits. A robust
+export path declares all three intentions instead of relying on an accidental default.
+
+`torch.inference_mode()` is stronger than `torch.no_grad()`. Both prevent an autograd
+graph from being recorded. Inference mode can remove more overhead because tensors
+created inside it do not participate in ordinary autograd version tracking. That makes it
+well suited to a terminal export pipeline. Use `no_grad()` when values created inside the
+block must later re-enter a gradient-tracked calculation; use inference mode when the
+result is leaving the training computation entirely.
+
+Restore checkpoints strictly before exporting:
+
+```python
+encoder.load_state_dict(checkpoint, strict=True)
+encoder.requires_grad_(False).eval()
+
+@torch.inference_mode()
+def export_batch(encoder, video):
+    normalized, pre_norm = encoder(video, return_pre_norm=True)
+    if pre_norm.ndim != 3:
+        raise ValueError("expected pre-normalization tokens with shape [B, N, D]")
+    features = pre_norm.mean(dim=1)
+    if not torch.isfinite(features).all():
+        raise FloatingPointError("encoder returned non-finite features")
+    return features.float().cpu().numpy()
+```
+
+Strict loading rejects missing or unexpected parameter names instead of silently
+exporting from a partly initialized model. The selected representation is also part of
+the contract. Pooling `pre_norm` tokens and pooling normalized tokens are different
+feature definitions even when both produce shape `(B,D)`.
+
+The conversion chain is deliberate. `mean(dim=1)` pools tokens while preserving batch
+and feature axes. `float()` chooses float32 as the interchange type. `cpu()` transfers
+accelerator data to host memory. Only then can `numpy()` expose the storage as a NumPy
+array. Calling `.numpy()` directly on a CUDA tensor fails, and calling it on a tensor that
+requires gradients can expose an ambiguous boundary unless it is detached first.
+
+Feature export should be tested as a deterministic function. Run the same fixed batch
+twice, assert exact or justified close agreement, verify shapes and finite values, and
+record the feature definition beside the output. Determinism tests do not prove semantic
+quality, but they do catch active dropout, inconsistent checkpoint restoration, changing
+pooling rules, and unintended dtype or device behavior.
+
+## 14. A simple predictor with target queries
 
 For teaching purposes, summarize context by its mean and combine it with a learned or
 fixed embedding $p_m$ for each target location:
@@ -496,7 +557,7 @@ while context features produce keys and values. Target queries can then read dif
 parts of context rather than sharing one pooled summary. This reuses the mechanism from
 Lesson 04 while keeping hidden target content out of the predictor input.
 
-## 14. Collapse and asymmetry
+## 15. Collapse and asymmetry
 
 A trivial constant representation makes every target easy to predict. If both encoders
 map every input to the same vector, a prediction loss alone may be small without useful
@@ -517,7 +578,7 @@ avoid a constant solution while failing downstream tasks. Diagnostics should exa
 variation, redundancy, stability, and task-relevant information rather than relying on one
 number. Lesson 06 develops these representation checks in detail.
 
-## 15. Worked example
+## 16. Worked example
 
 Suppose a $4\times4$ grid gives $N=16$ tokens, each with width 32. Hide the center
 $2\times2$ block at rows 1 to 2 and columns 1 to 2.
@@ -540,10 +601,12 @@ the grid, yet the scattered targets may each border visible tokens on all sides.
 mask fraction therefore does not imply equal prediction difficulty or equal learned
 invariances.
 
-## 16. Efficiency notes and failure modes
+## 17. Efficiency notes and failure modes
 
 - Encode all target tokens once, then gather, rather than re-encoding each target block.
 - Run the target branch inside `torch.no_grad()` to avoid storing activations for backward.
+- Use `torch.inference_mode()` for terminal frozen export, and keep `eval()` and
+  `requires_grad_(False)` explicit because they control different behavior.
 - Use `expand` rather than `repeat` for gather indices.
 - Avoid CPU-GPU mask transfers in a training loop; create masks on the data device.
 - Verify context and target sets are disjoint and nonempty.
@@ -603,13 +666,21 @@ $4\times4$ block. Explain why equal target count does not define the same task.
 while the block removes nearby evidence and requires longer-range inference. Geometry
 changes the conditional information available.
 
+### Exercise 6
+
+Why does `encoder.eval()` alone not define a frozen feature exporter?
+
+**Brief solution:** it changes training-dependent module behavior but does not disable
+autograd, freeze parameters, validate checkpoint completeness, select the exported tensor,
+or define the dtype and device conversion into NumPy.
+
 ## Recap
 
 Masked latent prediction learns by inferring hidden representations from visible context.
 Mask geometry defines what evidence is available. Stop-gradient makes the optimization
 direction asymmetric, and EMA turns the target encoder into a slow temporal ensemble of
-online states. Correct shapes, location information, and explicit gradient boundaries are
-central to a sound implementation.
+online states. Correct shapes, location information, explicit gradient boundaries, and a
+separate frozen-inference contract are central to a sound implementation.
 
 Next: [06. Representation collapse and variance-covariance regularization](06_representation_collapse.md).
 

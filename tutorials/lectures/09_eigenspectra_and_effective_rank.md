@@ -22,6 +22,7 @@ By the end of this lesson, you will be able to:
 4. Project and reconstruct data with principal components.
 5. Handle signs, tied eigenvalues, and nearly tied eigenspaces correctly.
 6. Compute spectral entropy and effective rank.
+7. Construct a deterministic basis when serialized PCA coordinates must be reproducible.
 
 ## 1. Start with a cloud of points
 
@@ -365,7 +366,91 @@ These values are cosines of principal angles. Values near one indicate similar s
 
 Not necessarily. The sign may have flipped, or the basis may have rotated inside a tied eigenspace. Compare eigenvalues and subspaces before interpreting individual coordinates.
 
-## 12. Spectral entropy
+## 12. Canonicalizing a tied PCA subspace
+
+Subspace ambiguity is harmless when an analysis uses only the projector or reconstruction.
+It becomes an engineering problem when downstream code serializes PCA coordinates,
+compares fitted parameters byte for byte, or expects reruns to choose identical axes.
+Two mathematically correct SVD implementations may orient a tied subspace differently,
+which changes projected coordinates even though the represented geometry is identical.
+
+A deterministic pipeline needs an additional convention. The convention does not reveal
+scientifically meaningful axes hidden inside a tie. It merely selects one reproducible
+coordinate system from the many equivalent bases. Treat canonicalization as a software
+contract, not as evidence that a particular tied component has a unique interpretation.
+
+For a single non-tied component, choose a canonical sign. Find the coordinate with largest
+absolute magnitude, breaking magnitude ties by the smallest coordinate index. Flip the
+vector when that pivot coordinate is negative:
+
+```python
+def canonical_sign(vector):
+    magnitudes = np.abs(vector)
+    pivot = int(np.flatnonzero(magnitudes == magnitudes.max())[0])
+    return -vector if vector[pivot] < 0 else vector
+```
+
+This rule is invariant to the arbitrary sign returned by the decomposition. A fixed pivot
+rule matters because `argmax`-like ties otherwise leave room for another hidden choice.
+
+For a group of tied components, sign correction is insufficient because the solver may
+return any rotation of the group. Let the rows of $Q$ be an orthonormal basis for the tied
+subspace. Its projector is
+
+$$
+P=Q^\mathsf{T}Q.
+$$
+
+Rotating the rows of $Q$ does not change $P$. The projector therefore contains the stable
+subspace information from which a canonical basis can be built. Project the ordinary
+coordinate axes through $P$, scan them in increasing axis order, and retain each projected
+axis that adds a linearly independent direction. Orthogonalize retained candidates with
+modified Gram-Schmidt, normalize them, and apply the canonical sign rule.
+
+Modified Gram-Schmidt subtracts projections one at a time:
+
+$$
+v\leftarrow v-(q_j^\mathsf{T}v)q_j.
+$$
+
+Repeating the orthogonalization pass reduces residual components caused by finite-precision
+arithmetic. Stop after collecting as many basis vectors as the multiplicity of the tied
+eigenvalue. Because the input axis order, dependence threshold, and sign convention are
+fixed, the resulting basis is reproducible for the same projector.
+
+The numerical threshold should be related to machine precision and problem scale. NumPy
+exposes float64 machine epsilon as `np.finfo(np.float64).eps`. A multiple such as 64 times
+epsilon can distinguish roundoff residue from a usable unit-scale candidate in a small
+orthogonal projector. A production implementation should validate the resulting basis:
+
+```python
+identity = canonical_basis @ canonical_basis.T
+assert np.allclose(identity, np.eye(len(canonical_basis)), rtol=0.0, atol=1e-10)
+```
+
+The covariance should also be symmetrized before a symmetric eigensolver:
+
+$$
+C\leftarrow\frac{C+C^\mathsf{T}}{2}.
+$$
+
+Mathematically, $X^\mathsf{T}X$ is symmetric. Floating-point evaluation can leave tiny
+asymmetries, and explicit symmetrization states which matrix the solver should interpret.
+Likewise, tiny negative eigenvalues consistent with roundoff can be clipped to zero only
+after their scale has been audited.
+
+Full SVD and thin SVD serve different purposes here. Thin SVD is efficient when only the
+data-supported leading subspace matters. A deterministic normalizer that promises a full
+coordinate basis, including a null space when $D>N$, needs `full_matrices=True` or another
+explicit null-space construction. The choice is part of the fitted-model schema.
+
+Canonicalization should pass invariance tests. Permuting input rows must not change the
+fitted projector. Replacing a tied solver basis by an arbitrary orthogonal rotation must
+produce the same canonical basis. Applying the procedure twice should be idempotent. Tests
+should compare projectors when only geometry matters and compare canonical axes only when
+the deterministic-coordinate contract is actually required.
+
+## 13. Spectral entropy
 
 Shannon entropy of the variance fractions is
 
@@ -385,7 +470,7 @@ $$
 
 Entropy is larger when variance is spread more evenly.
 
-## 13. Effective rank
+## 14. Effective rank
 
 Entropy effective rank is
 
@@ -437,7 +522,7 @@ Useful comparisons include:
 
 Reference spectra turn one isolated number into an interpretable contrast.
 
-## 14. Whitening follows from the eigendecomposition
+## 15. Whitening follows from the eigendecomposition
 
 Keep $K$ eigenvectors in $V_K$ with shape $(D,K)$ and their positive eigenvalues in the diagonal matrix $\Lambda_K$ with shape $(K,K)$. Define whitened scores:
 
@@ -455,7 +540,7 @@ Whitening removes linear scale and correlation. Tiny eigenvalues make $1/\sqrt{\
 
 PCA projection and whitening are different. Projection rotates into principal coordinates. Whitening additionally rescales every retained component to unit variance.
 
-## 15. Minimal implementation
+## 16. Minimal implementation
 
 ~~~python
 import numpy as np
@@ -483,7 +568,7 @@ def spectrum_and_effective_rank(features, eps=1e-12):
 
 Use <code>np.linalg.eigh</code>, not the general <code>eig</code>, for a symmetric covariance matrix. It uses symmetry and returns real values. NumPy returns eigenvalues in ascending order, so reverse them. The code returns <code>NaN</code> as an explicit sentinel when total variance is numerically zero. For a positive total, normalize the complete clipped spectrum before dropping exact zero probabilities from the logarithm. This preserves the requirement that probabilities sum to one.
 
-## 16. Efficiency and numerical stability
+## 17. Efficiency and numerical stability
 
 - Center in float32 or float64, not low-precision integer or float16 arithmetic.
 - Use float64 when small eigenvalues matter scientifically.
@@ -491,11 +576,13 @@ Use <code>np.linalg.eigh</code>, not the general <code>eig</code>, for a symmetr
 - Use <code>torch.linalg.eigh</code> or <code>torch.linalg.svd</code> in PyTorch.
 - Use low-rank methods when only a few leading components are needed.
 - Clamp tiny negative roundoff values only after checking their scale.
+- Canonicalize a tied subspace only when deterministic coordinates are required; use its
+  projector when the scientific object is the subspace itself.
 - Record pooling, standardization, and sample composition when comparing spectra.
 
 Because centering removes one observation-space degree of freedom, sample covariance rank is at most $\min(D,N-1)$.
 
-## 17. Common failure modes
+## 18. Common failure modes
 
 1. **No centering:** the leading singular direction can reflect the mean.
 2. **Mixed feature units:** large-scale coordinates dominate the spectrum.
@@ -504,13 +591,17 @@ Because centering removes one observation-space degree of freedom, sample covari
 5. **Counting numerical noise:** algebraic rank can be full because of tiny eigenvalues.
 6. **Comparing different datasets:** effective rank changes with sampling and preprocessing.
 7. **Small $N$, large $D$:** most covariance directions must be zero.
+8. **Interpreting canonical axes:** deterministic orientation is a convention, not a
+   newly identified scientific direction.
 
-## 18. Exercises
+## 19. Exercises
 
 1. Centered data have singular values $6$ and $3$ with $N=10$. Find covariance eigenvalues.
 2. Find effective rank for eigenvalues $[2,2,2,2]$.
 3. Why can two PCA runs return different first axes when the first two eigenvalues are equal?
 4. Show that total variance equals the sum of covariance eigenvalues.
+5. Explain why applying a sign rule independently cannot canonicalize a two-dimensional
+   tied eigenspace.
 
 ### Brief solutions
 
@@ -518,10 +609,13 @@ Because centering removes one observation-space degree of freedom, sample covari
 2. The spectrum is uniform across four directions, so $H=\log4$ and $r_{\mathrm{eff}}=4$.
 3. Any rotation inside the tied two-dimensional eigenspace is valid.
 4. The covariance trace is the sum of diagonal feature variances. Eigendecomposition preserves trace, so it also equals $\sum_k\lambda_k$.
+5. A solver may rotate both axes continuously inside the tied subspace. Sign flips correct
+   only two orientations per axis and cannot undo an arbitrary rotation; a projector-based
+   basis convention is needed.
 
 ## Recap
 
-Covariance measures variance in every direction. Its eigenvectors identify orthogonal principal directions, and its eigenvalues give their variances. SVD reaches the same geometry from the data matrix. PCA projects and reconstructs with leading directions. Effective rank summarizes how evenly variance occupies those directions while respecting the ambiguity of tied eigenspaces.
+Covariance measures variance in every direction. Its eigenvectors identify orthogonal principal directions, and its eigenvalues give their variances. SVD reaches the same geometry from the data matrix. PCA projects and reconstructs with leading directions. Effective rank summarizes how evenly variance occupies those directions while respecting the ambiguity of tied eigenspaces. When software requires deterministic coordinates, projector-based canonicalization selects a reproducible basis without giving tied axes scientific uniqueness.
 
 ## Next lesson
 

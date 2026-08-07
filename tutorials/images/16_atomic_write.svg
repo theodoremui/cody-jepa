@@ -1,0 +1,44 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 920 350" role="img" aria-labelledby="title desc">
+  <title id="title">Atomic artifact publication</title>
+  <desc id="desc">A new artifact is written and validated at a temporary path. Success atomically replaces the destination while failure deletes the temporary file and preserves the old destination.</desc>
+  <defs>
+    <marker id="arrow" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto">
+      <path d="M0,0 L0,6 L9,3 z" fill="#52606d"/>
+    </marker>
+  </defs>
+  <rect width="920" height="350" rx="22" fill="#f7fafc"/>
+  <text x="460" y="40" text-anchor="middle" font-family="sans-serif" font-size="23" font-weight="700" fill="#243b53">Publish only complete artifacts</text>
+  <g font-family="sans-serif" text-anchor="middle">
+    <g transform="translate(42 88)">
+      <rect width="188" height="122" rx="14" fill="#e3f2fd" stroke="#367cad" stroke-width="2"/>
+      <text x="94" y="38" font-size="18" font-weight="700" fill="#1f4e79">Write temporary</text>
+      <text x="94" y="72" font-size="14" fill="#334e68">same directory</text>
+      <text x="94" y="96" font-size="14" fill="#334e68">complete bytes</text>
+    </g>
+    <g transform="translate(286 88)">
+      <rect width="188" height="122" rx="14" fill="#fff4df" stroke="#c8841b" stroke-width="2"/>
+      <text x="94" y="38" font-size="18" font-weight="700" fill="#8a5a10">Validate</text>
+      <text x="94" y="72" font-size="14" fill="#334e68">parse and inspect</text>
+      <text x="94" y="96" font-size="14" fill="#334e68">schema checks</text>
+    </g>
+    <g transform="translate(620 66)">
+      <rect width="250" height="96" rx="14" fill="#e8f5e9" stroke="#4d8b57" stroke-width="2"/>
+      <text x="125" y="36" font-size="18" font-weight="700" fill="#2f6b3a">Success</text>
+      <text x="125" y="66" font-size="14" fill="#334e68">os.replace(temp, final)</text>
+    </g>
+    <g transform="translate(620 206)">
+      <rect width="250" height="96" rx="14" fill="#fdecec" stroke="#c75b4b" stroke-width="2"/>
+      <text x="125" y="36" font-size="18" font-weight="700" fill="#8b2f28">Failure</text>
+      <text x="125" y="66" font-size="14" fill="#334e68">delete temp, keep old final</text>
+    </g>
+  </g>
+  <g fill="none" stroke="#52606d" stroke-width="3" marker-end="url(#arrow)">
+    <path d="M234 149 H278"/>
+    <path d="M478 149 C540 149 540 114 612 114"/>
+    <path d="M478 149 C540 149 540 254 612 254"/>
+  </g>
+  <text x="536" y="105" font-family="sans-serif" font-size="13" fill="#2f6b3a">passes</text>
+  <text x="536" y="246" font-family="sans-serif" font-size="13" fill="#8b2f28">raises</text>
+  <rect x="286" y="274" width="188" height="42" rx="12" fill="#ffffff" stroke="#9fb3c8"/>
+  <text x="380" y="300" text-anchor="middle" font-family="sans-serif" font-size="14" fill="#334e68">reader never sees partial final</text>
+</svg>

@@ -28,6 +28,8 @@ By the end of this lesson, you will be able to:
 5. Build binary logistic and multiclass softmax models.
 6. Use class weights without confusing them with population probabilities.
 7. Fit a temperature by held-out negative log likelihood and state what that does not prove.
+8. Read `np.einsum` subscripts and implement a multi-output ridge map.
+9. Compute class likelihoods in log space and optimize a positive temperature continuously.
 
 ## 1. Begin with a mixed-feature scenario
 
@@ -296,6 +298,62 @@ def ridge_with_intercept(x, y, alpha):
 
 Use <code>np.linalg.solve</code> instead of explicitly computing a matrix inverse. Direct solvers are more efficient and usually more stable.
 
+### Multi-output ridge and `np.einsum`
+
+A factor head or multivariate regression can predict $K$ outputs at once. Replace target
+vector $y$ with target matrix $Y$ of shape `(N,K)` and coefficient vector $w$ with
+coefficient matrix $W$ of shape `(D,K)`. After centering the inputs and targets, solve
+
+$$
+(X^\mathsf{T}X+\alpha I)W=X^\mathsf{T}Y.
+$$
+
+The left side is one `(D,D)` system shared by all outputs. The right side has shape
+`(D,K)`, and `np.linalg.solve` returns all $K$ coefficient columns in one call. The
+intercept is recovered from the means rather than penalized:
+
+$$
+b=\bar y-\bar xW.
+$$
+
+NumPy's `einsum` expresses these contractions with named index letters:
+
+```python
+gram = np.einsum("ni,nj->ij", centered_x, centered_x, dtype=np.float64)
+rhs = np.einsum("ni,nk->ik", centered_x, centered_y, dtype=np.float64)
+weights = np.linalg.solve(gram + alpha * np.eye(gram.shape[0]), rhs)
+predictions = np.einsum("nd,dk->nk", standardized_x, weights, optimize=False) + intercept
+```
+
+Each letter names an axis. In `"nd,dk->nk"`, both inputs contain `d`, so the feature axis
+is multiplied and summed away. The output retains observation axis `n` and output axis
+`k`. In `"ni,nj->ij"`, observation axis `n` is contracted while two feature axes remain,
+producing the Gram matrix. Letters are local labels, not fixed NumPy keywords.
+
+The arrow is valuable documentation because it states the output order explicitly. Without
+an arrow, NumPy orders surviving indices alphabetically, which can obscure intent. Reusing
+a letter inside one operand selects a diagonal, while omitting a letter from the output
+sums over it. Those are powerful operations, but an accidental repeated or omitted letter
+can compute a plausible array with the wrong meaning.
+
+For these two-operand contractions, ordinary matrix multiplication is equally valid:
+
+```python
+gram = centered_x.T @ centered_x
+rhs = centered_x.T @ centered_y
+predictions = standardized_x @ weights + intercept
+```
+
+Prefer `@` for a familiar two-dimensional matrix product. Prefer `einsum` when named axes
+make a batched or multi-output contraction easier to audit. Pass an explicit accumulation
+`dtype` when precision matters. `optimize=False` fixes the direct contraction choice;
+optimized paths can improve larger multi-operand expressions, but their intermediate
+order should be benchmarked and tested rather than assumed.
+
+Shape reasoning comes before execution. If `centered_x` is `(N,D)` and `centered_y` is
+`(N,K)`, then `"ni,nk->ik"` must be `(D,K)`. Predicting that shape by hand catches many
+subscript mistakes before numeric assertions are considered.
+
 ## 8. Logistic regression turns scores into probabilities
 
 For binary classification, compute a logit:
@@ -481,6 +539,65 @@ Suppose logits are $[3,1,0]$. Class 1 has the largest logit. Dividing by $T=2$ g
 
 Dividing by $T=0.5$ gives $[6,2,0]$. The gaps are larger, so the distribution becomes sharper. One temperature controls global confidence spread, not class-specific or region-specific errors.
 
+### Stable log probabilities and continuous temperature fitting
+
+Subtracting the maximum makes exponentiation safer, but a probability can still underflow
+to zero when logits are extremely separated. Taking `log(softmax(scores))` then produces
+negative infinity. If the final goal is negative log likelihood or multiplication of many
+probabilities, remain in log space.
+
+For one score row $z$ and target class $y$, the negative log likelihood is
+
+$$
+\ell(z,y)=\log\left(\sum_k\exp z_k\right)-z_y.
+$$
+
+SciPy's `logsumexp` evaluates the first term stably without materializing tiny
+probabilities. Batched target selection uses paired advanced indices:
+
+```python
+from scipy.special import logsumexp
+
+scaled = logits / temperature
+losses = logsumexp(scaled, axis=1) - scaled[np.arange(len(targets)), targets]
+mean_nll = losses.mean(dtype=np.float64)
+```
+
+Log probabilities also turn products into sums. If independent factor probabilities are
+combined as $p_1p_2p_3$, their log mass is
+
+$$
+\log p_1+\log p_2+\log p_3.
+$$
+
+Impossible events can be represented as negative infinity. Rankings should operate on log
+masses directly rather than exponentiating them into indistinguishable zeros.
+
+A positive temperature can be optimized continuously by introducing unconstrained
+coordinate $\eta=\log T$. Bounds $T_{\min}$ and $T_{\max}$ become finite log bounds. A
+bounded scalar optimizer then searches a smooth one-dimensional domain:
+
+```python
+from scipy.optimize import minimize_scalar
+
+result = minimize_scalar(
+    lambda eta: temperature_nll(np.exp(eta)),
+    bounds=(np.log(lower), np.log(upper)),
+    method="bounded",
+)
+temperature = float(np.exp(result.x))
+```
+
+Check `result.success`, the finiteness of the fitted value, and whether the optimum touches
+a configured boundary. A saturated objective may report an interior point whose value is
+numerically tied with an edge, so compare the fitted objective with both boundary values.
+A boundary solution is often a diagnostic that the allowed range, score scale, or model
+behavior needs investigation rather than a value to accept silently.
+
+Continuous optimization avoids making the result depend on an arbitrary temperature grid.
+It does not remove the need for a held-out fitting role, a frozen objective, or evaluation
+on untouched data.
+
 ## 14. Separate training, temperature fitting, and testing
 
 Use three roles:
@@ -533,6 +650,8 @@ When data are grouped, use group-aware cross-validation for regularization selec
 - Use <code>np.linalg.solve</code>, QR, or SVD rather than explicit inversion.
 - Vectorize stable softmax over the final axis.
 - Search temperature on log scale or optimize $\log T$ so positivity is automatic.
+- Use `logsumexp` when the analysis consumes log likelihoods or products of probabilities.
+- Use `einsum` only when its named-axis notation makes the contraction clearer than `@`.
 - Keep a separate calibration partition or use nested cross-validation.
 
 ## 17. Common failure modes
@@ -546,6 +665,10 @@ When data are grouped, use group-aware cross-validation for regularization selec
 7. **Temperature fit on test data:** final evaluation becomes optimistic.
 8. **NLL improvement called calibration proof:** no reliability evidence was measured.
 9. **Ignoring distribution shift:** a fitted temperature may not transfer.
+10. **Uninspected optimizer boundaries:** a saturated temperature fit can look successful
+    while the configured range contains no meaningful interior optimum.
+11. **Incorrect Einstein subscripts:** the result can have a valid shape while contracting
+    the wrong scientific axis.
 
 ## 18. Exercises
 
@@ -554,6 +677,8 @@ When data are grouped, use group-aware cross-validation for regularization selec
 3. Does temperature scaling change top-1 accuracy?
 4. What ambiguity arises from combining a dropped reference category with ignored unknown categories?
 5. What additional evidence is needed before claiming empirical calibration?
+6. Decode `np.einsum("ni,nk->ik", X, Y)` and state the result shape.
+7. Why optimize $\log T$ instead of sending an unconstrained $T$ directly to an optimizer?
 
 ### Brief solutions
 
@@ -562,10 +687,14 @@ When data are grouped, use group-aware cross-validation for regularization selec
 3. No. Positive temperature preserves logit order.
 4. Both the reference and an unknown category map to the same all-zero indicator block.
 5. Evaluate a declared reliability diagnostic and scoring rules on untouched data, with uncertainty.
+6. Axis `n` is summed over; feature axis `i` and output axis `k` remain, so the result has
+   shape `(D,K)`.
+7. Exponentiating the optimizer coordinate guarantees $T>0$, and finite log bounds encode
+   a positive search interval without special invalid-value handling.
 
 ## Recap
 
-Standardization and one-hot encoding create a meaningful design matrix. Ridge stabilizes weakly constrained directions and normally excludes the intercept. Logistic and softmax models convert linear scores into probabilities. Class weights change the fitting population. Temperature scaling changes confidence while preserving class order, but fitting by negative log likelihood is not itself proof of calibration.
+Standardization and one-hot encoding create a meaningful design matrix. Ridge stabilizes weakly constrained directions and normally excludes the intercept. Multi-output contractions can be written with explicit Einstein subscripts. Logistic and softmax models convert linear scores into probabilities, while `logsumexp` preserves likelihood information at extreme scales. Class weights change the fitting population. Temperature scaling changes confidence while preserving class order, but fitting by negative log likelihood is not itself proof of calibration.
 
 ## Next lesson
 
