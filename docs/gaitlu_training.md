@@ -335,13 +335,13 @@ Launch at most eight independent single-GPU runs concurrently:
 
 ```bash
 cd "$CODY_JEPA_ROOT"
-
-sbatch \
-  --export=ALL,GAITLU_PREPARED_ROOT="$GAITLU_PREPARED_ROOT",CODY_JEPA_RUN_ROOT="$CODY_JEPA_RUN_ROOT",CODY_JEPA_ROOT="$CODY_JEPA_ROOT" \
-  slurm/train-gaitlu-study.sbatch
+bash slurm/train-gaitlu-study.sbatch
 ```
 
-The Slurm array index selects one of the twenty rows in `training_registry.csv`. Each
+Run the launcher on the HAIC login node inside `tmux`; do not pass it to `sbatch`. It
+submits runs 0–7, waits for the entire group, then submits 8–15 and finally 16–19. The
+launcher stops without submitting a later group if any current-group run fails. The
+Slurm array index selects one of the twenty rows in `training_registry.csv`. Each
 checkpoint embeds the required final-step study metadata. An existing output directory
 is rejected. To resume an
 interrupted run manually, invoke

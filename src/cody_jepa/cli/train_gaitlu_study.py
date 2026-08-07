@@ -46,8 +46,7 @@ def _read_registry_row(path: Path, index: int):
     return rows[index]
 
 
-def main(argv=None):
-    args = parse_args(argv)
+def run_registered_training(args):
     run_index = args.run_index
     if run_index is None:
         try:
@@ -139,6 +138,10 @@ def main(argv=None):
     }
     (output_dir / "run.json").write_text(json.dumps(run_record, indent=2) + "\n")
     return run_record
+
+
+def main(argv=None) -> None:
+    run_registered_training(parse_args(argv))
 
 
 if __name__ == "__main__":

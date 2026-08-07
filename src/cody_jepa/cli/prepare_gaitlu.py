@@ -48,10 +48,9 @@ def parse_args(argv=None):
     return parser.parse_args(argv)
 
 
-def main(argv=None):
-    args = parse_args(argv)
+def run_preparation(args):
     if args.command == "pack-shard":
-        result = pack_gaitlu_shard(
+        return pack_gaitlu_shard(
             args.input,
             args.prepared_root,
             trust_pickles=args.trust_pickles,
@@ -61,19 +60,21 @@ def main(argv=None):
             max_intermediate_fraction=args.max_intermediate_fraction,
             max_pickle_bytes=args.max_pickle_mib * 1024 * 1024,
         )
-    else:
-        result = finalize_gaitlu_study(
-            args.prepared_root,
-            holdout_size=args.holdout_size,
-            holdout_seed=args.holdout_seed,
-            pool_seeds=args.pool_seeds,
-            pool_sizes=args.pool_sizes,
-            training_exposure=args.training_exposure,
-            source_groups_csv=args.source_groups,
-            expected_shards=args.expected_shards,
-        )
+    return finalize_gaitlu_study(
+        args.prepared_root,
+        holdout_size=args.holdout_size,
+        holdout_seed=args.holdout_seed,
+        pool_seeds=args.pool_seeds,
+        pool_sizes=args.pool_sizes,
+        training_exposure=args.training_exposure,
+        source_groups_csv=args.source_groups,
+        expected_shards=args.expected_shards,
+    )
+
+
+def main(argv=None) -> None:
+    result = run_preparation(parse_args(argv))
     print(json.dumps(result, indent=2, sort_keys=True))
-    return result
 
 
 if __name__ == "__main__":

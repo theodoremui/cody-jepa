@@ -2,7 +2,6 @@
 #SBATCH --job-name=gaitlu-jepa
 #SBATCH --account=mind
 #SBATCH --partition=hai
-#SBATCH --array=0-19%8
 #SBATCH --gres=gpu:h100:1
 #SBATCH --cpus-per-task=8
 #SBATCH --mem=64G
@@ -18,6 +17,23 @@ CONFIG="${CODY_JEPA_CONFIG:-configs/train/gaitlu_scaling.json}"
 NUM_WORKERS="${CODY_JEPA_NUM_WORKERS:-8}"
 
 cd "$PROJECT_ROOT"
+
+if [[ -z "${SLURM_ARRAY_TASK_ID:-}" ]]; then
+  if [[ -n "${SLURM_JOB_ID:-}" ]]; then
+    echo "Run this launcher directly on the login node; do not submit it with sbatch." >&2
+    exit 2
+  fi
+
+  for GROUP in 0-7 8-15 16-19; do
+    echo "Submitting GaitLU training runs $GROUP"
+    sbatch --wait \
+      --array="$GROUP%8" \
+      --export=ALL \
+      "$PROJECT_ROOT/slurm/train-gaitlu-study.sbatch"
+  done
+  exit 0
+fi
+
 nvidia-smi
 
 uv run --frozen --no-sync cody-jepa-train-gaitlu-study \

@@ -191,8 +191,8 @@ def run_training(args, *, config_updates=None):
     return result
 
 
-def main(argv=None):
-    return run_training(parse_args(argv))
+def main(argv=None) -> None:
+    run_training(parse_args(argv))
 
 
 if __name__ == "__main__":
