@@ -107,12 +107,13 @@ copied into the finalized training or holdout manifests.
 mkdir -p "$GAITLU_PREPARED_ROOT"
 
 cd "$CODY_JEPA_ROOT"
-sbatch \
-  --export=ALL,GAITLU_RAW_ROOT="$GAITLU_RAW_ROOT",GAITLU_PREPARED_ROOT="$GAITLU_PREPARED_ROOT",CODY_JEPA_ROOT="$CODY_JEPA_ROOT" \
-  slurm/prepare-gaitlu-shards.sbatch
+bash slurm/prepare-gaitlu-shards.sbatch
 ```
 
-Monitor the returned array job:
+Run the launcher on the HAIC login node, preferably inside `tmux` so that a disconnected
+SSH session does not stop later groups from being submitted. Do not pass the launcher to
+`sbatch`: it submits at most eight shard workers, waits for that group to finish, and then
+submits the next group. Monitor the array jobs printed by the launcher:
 
 ```bash
 squeue -u "$USER"
