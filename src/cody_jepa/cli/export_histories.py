@@ -5,7 +5,6 @@ from __future__ import annotations
 
 import argparse
 import csv
-import hashlib
 import json
 import math
 from pathlib import Path
@@ -16,14 +15,6 @@ from cody_jepa.single_stream_jepa import load_checkpoint
 
 EXPORT_SCHEMA = 1
 IDENTITY_COLUMNS = ("run_id", "phase", "history_index")
-
-
-def _sha256(path: Path) -> str:
-    digest = hashlib.sha256()
-    with path.open("rb") as handle:
-        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
-            digest.update(chunk)
-    return digest.hexdigest()
 
 
 def _json_value(value: Any) -> Any:
@@ -65,7 +56,6 @@ def checkpoint_record(
     *,
     run_id: str,
     phase: str,
-    repo_root: Path,
 ) -> tuple[list[dict[str, Any]], dict[str, Any]]:
     checkpoint_path = checkpoint_path.resolve()
     state = load_checkpoint(checkpoint_path)
@@ -93,18 +83,10 @@ def checkpoint_record(
             }
         )
 
-    try:
-        source = str(checkpoint_path.relative_to(repo_root.resolve()))
-    except ValueError:
-        source = str(checkpoint_path)
     metadata = {
         "run_id": run_id,
         "phase": phase,
-        "source_checkpoint": source,
-        "source_checkpoint_sha256": _sha256(checkpoint_path),
-        "checkpoint_schema": state.get("schema"),
         "architecture": state.get("architecture"),
-        "torch_version": str(state.get("torch_version")),
         "completed_epochs": completed_epochs,
         "global_step": int(state["global_step"]),
         "history_rows": len(history),
@@ -115,7 +97,6 @@ def checkpoint_record(
         "best_healthy_epoch": state.get("best_healthy_epoch"),
         "config": _json_value(state.get("config", {})),
         "mask_groups": _json_value(state.get("mask_groups", [])),
-        "data_contract": _json_value(state.get("data_contract", {})),
     }
     return rows, metadata
 
@@ -124,8 +105,6 @@ def export_histories(
     sources: list[tuple[str, str, Path]],
     csv_path: Path,
     metadata_path: Path,
-    *,
-    repo_root: Path,
 ) -> tuple[Path, Path]:
     """Export ordered checkpoint sources to a CSV history and JSON manifest."""
 
@@ -136,9 +115,7 @@ def export_histories(
         if run_id in seen:
             raise ValueError(f"duplicate run_id {run_id!r}")
         seen.add(run_id)
-        rows, metadata = checkpoint_record(
-            checkpoint_path, run_id=run_id, phase=phase, repo_root=repo_root
-        )
+        rows, metadata = checkpoint_record(checkpoint_path, run_id=run_id, phase=phase)
         all_rows.extend(rows)
         runs.append(metadata)
 
@@ -154,7 +131,6 @@ def export_histories(
     manifest = {
         "schema": EXPORT_SCHEMA,
         "history_csv": str(csv_path.name),
-        "history_csv_sha256": _sha256(csv_path),
         "columns": columns,
         "row_count": len(all_rows),
         "runs": runs,
@@ -204,7 +180,6 @@ def main() -> None:
         default_sources(repo_root),
         (repo_root / args.csv).resolve(),
         (repo_root / args.metadata).resolve(),
-        repo_root=repo_root,
     )
     print(json.dumps([str(csv_path), str(metadata_path)], indent=2))
 

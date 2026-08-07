@@ -162,11 +162,13 @@ uv run cody-jepa-gfc-study build-role-map \
   --output data/private/gfc-v2-roles.csv
 uv run cody-jepa-gfc-study preflight \
   --registry /external/gfc-v2-registry.csv \
+  --training-registry "$GAITLU_PREPARED_ROOT/training_registry.csv" \
   --role-map data/private/gfc-v2-roles.csv \
   --output-root outputs/gfc-v2-study/private \
   --aggregate-output outputs/gfc-v2-study/aggregate
 uv run cody-jepa-gfc-study run \
   --registry /external/gfc-v2-registry.csv \
+  --training-registry "$GAITLU_PREPARED_ROOT/training_registry.csv" \
   --config configs/eval/gfc_healthgait.json \
   --role-map data/private/gfc-v2-roles.csv \
   --output-root outputs/gfc-v2-study/private \
@@ -184,7 +186,9 @@ selection authority in locked mode; only the private role map selects fitting an
 outcome participants. Eligible checkpoints carry a small `study_metadata` mapping with
 version `gfc-v2-training-checkpoint-v1`, dataset `GaitLU-1M`, final-step kind, model and
 checkpoint IDs, both seeds, actual unique-sequence count, and training exposure; every
-field must agree with the private registry.
+field must agree with the private registry. Preflight also requires the GaitLU training
+registry and checks that every checkpoint's manifest digest matches its registry entry
+before any Health&Gait feature archive is parsed.
 
 After the frozen 20-model study has been evaluated and summarized, render its separate
 aggregate-only paper artifacts with:

@@ -35,6 +35,7 @@ from cody_jepa.data.gaitlu import (
 )
 from cody_jepa.data.gaitlu_prepare import (
     INVENTORY_COLUMNS,
+    TRAINING_REGISTRY_COLUMNS,
     finalize_gaitlu_study,
     pack_gaitlu_shard,
     validate_and_pack_sequence,
@@ -331,6 +332,23 @@ class GaitLUPreparationTest(unittest.TestCase):
                 self.assertEqual(fieldnames, GAITLU_MANIFEST_COLUMNS)
                 self.assertNotIn("content_sha256", fieldnames)
             self.assertEqual(GAITLU_MANIFEST_VERSION, "gaitlu-indexed-bitpack-v2")
+
+            registry_path = prepared / "training_registry.csv"
+            registry = read_csv(registry_path)
+            self.assertEqual(tuple(registry[0]), TRAINING_REGISTRY_COLUMNS)
+            self.assertEqual(len(registry), 20)
+            for row in registry:
+                self.assertEqual(
+                    row["manifest_sha256"],
+                    gaitlu_manifest_pair_sha256(
+                        prepared / row["train_manifest"],
+                        prepared / row["val_manifest"],
+                    ),
+                )
+            full_digests = {
+                row["manifest_sha256"] for row in registry if row["rung"] == "full"
+            }
+            self.assertEqual(len(full_digests), 1)
 
             for ladder in range(5):
                 small = read_sequence_ids(

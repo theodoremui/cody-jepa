@@ -7,6 +7,7 @@ from unittest import mock
 import numpy as np
 import pandas as pd
 
+from cody_jepa.data.gaitlu_prepare import TRAINING_REGISTRY_COLUMNS
 from cody_jepa.evaluation.gfc.roles import ROLE_MAP_VERSION
 from cody_jepa.evaluation.gfc.study import (
     ANALYSIS_FREEZE_TAG,
@@ -52,6 +53,26 @@ def registry_table() -> pd.DataFrame:
                 }
             )
     return pd.DataFrame(rows, columns=REGISTRY_COLUMNS)
+
+
+def training_registry_table() -> pd.DataFrame:
+    rows = []
+    for index, row in enumerate(registry_table().itertuples(index=False), start=1):
+        rows.append(
+            {
+                "model_label": row.model_label,
+                "ladder": row.ladder,
+                "rung": row.rung,
+                "train_manifest": f"manifests/{row.model_label}.csv",
+                "val_manifest": "manifests/common-holdout.csv",
+                "manifest_sha256": f"{index:064x}",
+                "pool_seed": row.pool_seed,
+                "optimization_seed": row.optimization_seed,
+                "unique_sequences": row.unique_sequences,
+                "training_exposure": row.training_exposure,
+            }
+        )
+    return pd.DataFrame(rows, columns=TRAINING_REGISTRY_COLUMNS)
 
 
 def cohort_roles() -> dict[str, object]:
@@ -199,6 +220,12 @@ class RegistryTest(unittest.TestCase):
 class PreflightTest(unittest.TestCase):
     def _private_inputs(self, root: Path):
         registry = registry_table().copy()
+        training_registry = training_registry_table()
+        training_registry_path = root / "training_registry.csv"
+        training_registry.to_csv(training_registry_path, index=False)
+        digests = dict(
+            zip(training_registry["model_label"], training_registry["manifest_sha256"])
+        )
         checkpoint_states = {}
         for row in registry.itertuples(index=False):
             checkpoint = root / "checkpoints" / f"{row.model_label}.pt"
@@ -216,6 +243,11 @@ class PreflightTest(unittest.TestCase):
             checkpoint_states[checkpoint.resolve()] = {
                 "config": {"steps": 100},
                 "global_step": 100,
+                "data_contract": {
+                    "dataset": "gaitlu",
+                    "seed_scheme": "splitmix64-v1",
+                    "manifest_sha256": digests[row.model_label],
+                },
                 "study_metadata": {
                     "version": CHECKPOINT_METADATA_VERSION,
                     "training_dataset": "GaitLU-1M",
@@ -245,12 +277,21 @@ class PreflightTest(unittest.TestCase):
             *(f"D{index:03d}" for index in range(76)),
             *(f"O{index:03d}" for index in range(308)),
         }
-        return registry, role_map, subjects, complete, checkpoint_states
+        return (
+            registry,
+            training_registry_path,
+            role_map,
+            subjects,
+            complete,
+            checkpoint_states,
+        )
 
     def test_preflight_checks_all_models_metadata_and_frozen_cohort_counts(self):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
-            registry, role_map, subjects, complete, states = self._private_inputs(root)
+            registry, training_registry, role_map, subjects, complete, states = (
+                self._private_inputs(root)
+            )
             with mock.patch(
                 "cody_jepa.evaluation.gfc.study.load_checkpoint",
                 side_effect=lambda path: states[Path(path).resolve()],
@@ -260,6 +301,7 @@ class PreflightTest(unittest.TestCase):
             ):
                 result = preflight_study(
                     registry,
+                    training_registry=training_registry,
                     role_map=role_map,
                     output_root=root / "private-output",
                     aggregate_output=root / "aggregate-output",
@@ -271,33 +313,37 @@ class PreflightTest(unittest.TestCase):
                 {"development": 76, "locked_outcome": 308},
             )
 
-    def test_preflight_requires_checkpoint_provenance_in_existing_sidecar(self):
+    def test_preflight_rejects_checkpoint_manifest_mismatch_before_opening_features(self):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
-            registry, role_map, subjects, complete, states = self._private_inputs(root)
-            feature = Path(registry.iloc[0]["feature_path"])
-            feature.with_suffix(feature.suffix + ".metadata.json").write_text(
-                json.dumps({"schema": "feature-sidecar-v1"}), encoding="utf-8"
-            )
+            registry, training_registry, role_map, _, _, states = self._private_inputs(root)
+            final_state = list(states.values())[-1]
+            final_state["data_contract"]["manifest_sha256"] = "0" * 64
             with mock.patch(
                 "cody_jepa.evaluation.gfc.study.load_checkpoint",
                 side_effect=lambda path: states[Path(path).resolve()],
             ), mock.patch(
                 "cody_jepa.evaluation.gfc.study._feature_participants",
-                return_value=(subjects, complete),
-            ), self.assertRaisesRegex(ValueError, "lacks checkpoint provenance"):
+                side_effect=AssertionError("feature archive opened before digest validation"),
+            ) as feature_reader, self.assertRaisesRegex(
+                ValueError, "disagrees with the training registry"
+            ):
                 preflight_study(
                     registry,
+                    training_registry=training_registry,
                     role_map=role_map,
                     output_root=root / "private-output",
                     aggregate_output=root / "aggregate-output",
                     require_frozen_revision=False,
                 )
+            feature_reader.assert_not_called()
 
     def test_preflight_rejects_non_gaitlu_metadata_and_wrong_complete_counts(self):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
-            registry, role_map, subjects, complete, states = self._private_inputs(root)
+            registry, training_registry, role_map, subjects, complete, states = (
+                self._private_inputs(root)
+            )
             first = next(iter(states.values()))
             first["study_metadata"]["training_dataset"] = "Health&Gait"
             with mock.patch(
@@ -309,6 +355,7 @@ class PreflightTest(unittest.TestCase):
             ), self.assertRaisesRegex(ValueError, "study metadata disagrees"):
                 preflight_study(
                     registry,
+                    training_registry=training_registry,
                     role_map=role_map,
                     output_root=root / "private-output",
                     aggregate_output=root / "aggregate-output",
@@ -327,6 +374,7 @@ class PreflightTest(unittest.TestCase):
             ), self.assertRaisesRegex(ValueError, "complete role counts"):
                 preflight_study(
                     registry,
+                    training_registry=training_registry,
                     role_map=role_map,
                     output_root=root / "private-output",
                     aggregate_output=root / "aggregate-output",

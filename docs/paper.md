@@ -308,12 +308,9 @@ higher but full-pool streaming must be probed directly. Storage is budgeted at 2
 for packed silhouettes and temporary validation artifacts.
 
 Training checkpoints record the role-sensitive digest of their exact GaitLU train and
-holdout manifests. The aggregate outcome contract records protocol version, role-map
-version and aggregate counts, pool and optimization seeds, actual rung size, exposure,
-checkpoint ID, evaluator commit, gallery policy, query count, exclusions, and
-analysis-freeze tag. It does not expose participant IDs, role-map paths, cohort
-checksums, feature paths, or checkpoint paths. Tables and figures must regenerate from
-those aggregate files without reading notebooks or prose.
+holdout manifests. Before any locked Health&Gait feature archive is parsed, preflight
+checks each digest against the original training registry. Tables and figures report the
+experimental conditions and scientific outcomes.
 
 ## 11. Limitations
 

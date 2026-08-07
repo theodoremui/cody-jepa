@@ -6,7 +6,7 @@ This directory contains compact, non-identifying inputs to the paper-result gene
 - `phase1_summary.csv` compares the Phase 1 diagnostic sweep at each selected checkpoint.
 - `context_diagnosis.json` records the aggregate context-substitution, foreground, and representation-rank diagnosis.
 - `checkpoint_histories.csv` contains one flattened row per recorded training epoch for the maintained Phase 0 and Phase 1 runs.
-- `checkpoint_histories.json` records the history schema, CSV hash, source-checkpoint hashes, run configurations, mask definitions, data contracts, and checkpoint-selection metadata.
+- `checkpoint_histories.json` records the history schema, run configurations, mask definitions, and checkpoint-selection metadata needed to interpret the training curves.
 - `gfc-*` directories contain historical legacy aggregate `summary.json` and `summary.csv` files. Private GFC-v2 run outputs remain under ignored `outputs/`; only the three aggregate study files may enter a later result-only commit.
 - `generated/phase0_table.csv` and `generated/phase1_table.csv` are the paper-ready diagnostic tables.
 - `generated/phase1_diagnostics.png` and `generated/context_diagnosis.png` are the active diagnostic figures.

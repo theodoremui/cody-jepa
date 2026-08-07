@@ -885,10 +885,9 @@ The evaluator must verify all of the following before outcomes are opened:
 - queries are averaged within participant before inference;
 - every run reaches the same frozen exposure or follows the prespecified systems-failure
   rule; and
-- training checkpoints record the combined GaitLU train-plus-holdout manifest digest;
-  compact outcomes record protocol version, role-map version and aggregate counts,
-  seeds, rung size, exposure, checkpoint ID, exclusions, gallery policy, query count,
-  code commit, and freeze tag without exposing private paths or cohort checksums.
+- training finalization independently freezes each combined GaitLU train-plus-holdout
+  manifest digest, training checkpoints record it, and evaluation preflight verifies all
+  checkpoint values against that original registry before outcome feature archives are parsed.
 
 These are not implementation details separate from the science. They are executable
 versions of the assumptions needed for the scientific interpretation.

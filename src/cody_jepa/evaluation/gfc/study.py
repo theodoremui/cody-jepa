@@ -352,9 +352,44 @@ def _validate_checkpoint_metadata(state: Mapping[str, Any], row: Any) -> None:
         )
 
 
+def _training_manifest_digests(
+    records: pd.DataFrame, training_registry: Path
+) -> dict[str, str]:
+    """Read the manifest digest recorded for each trained model."""
+
+    training = pd.read_csv(training_registry, dtype=str)
+    required = {"model_label", "manifest_sha256"}
+    if not required.issubset(training.columns):
+        raise ValueError("training registry must contain model_label and manifest_sha256")
+    if training["model_label"].duplicated().any():
+        raise ValueError("training registry model_label values must be unique")
+    by_model = dict(zip(training["model_label"], training["manifest_sha256"]))
+    evaluation_labels = set(records["model_label"].astype(str))
+    if set(by_model) != evaluation_labels:
+        raise ValueError(
+            "training and evaluation registries must contain exactly the same model labels"
+        )
+    return by_model
+
+
+def _validate_checkpoint_data_contract(
+    state: Mapping[str, Any], row: Any, expected_digest: str
+) -> None:
+    """Verify that a checkpoint used the registered training manifests."""
+
+    contract = state.get("data_contract")
+    digest = contract.get("manifest_sha256") if isinstance(contract, Mapping) else None
+    if digest != expected_digest:
+        raise ValueError(
+            f"checkpoint {row.checkpoint_id!r} manifest digest disagrees with the "
+            "training registry"
+        )
+
+
 def preflight_study(
     registry: pd.DataFrame | Path,
     *,
+    training_registry: Path,
     role_map: Path,
     output_root: Path,
     aggregate_output: Path,
@@ -369,14 +404,14 @@ def preflight_study(
         if isinstance(registry, (str, Path))
         else validate_study_registry(registry)
     )
+    manifest_digests = _training_manifest_digests(records, training_registry)
     _validate_destinations(output_root, aggregate_output)
     code_commit = (
         _validate_frozen_revision(repo_root.expanduser().resolve(), freeze_tag)
         if require_frozen_revision
         else "unverified-test-revision"
     )
-    expected_subjects: set[str] | None = None
-    expected_complete: set[str] | None = None
+    # Validate every checkpoint contract before parsing any Health&Gait feature archive.
     for row in records.itertuples(index=False):
         checkpoint_path = Path(row.checkpoint_path).expanduser().resolve()
         feature_path = Path(row.feature_path).expanduser().resolve()
@@ -384,11 +419,17 @@ def preflight_study(
             raise ValueError(f"checkpoint is not readable: {checkpoint_path}")
         state = load_checkpoint(checkpoint_path)
         _validate_checkpoint_metadata(state, row)
+        _validate_checkpoint_data_contract(state, row, manifest_digests[row.model_label])
         configured_steps = state.get("config", {}).get("steps")
         if configured_steps is None or int(state.get("global_step", -1)) != int(configured_steps):
             raise ValueError(f"checkpoint {row.checkpoint_id!r} is not the final-step checkpoint")
         if not feature_path.is_file():
             raise ValueError(f"feature archive is not readable: {feature_path}")
+
+    expected_subjects: set[str] | None = None
+    expected_complete: set[str] | None = None
+    for row in records.itertuples(index=False):
+        feature_path = Path(row.feature_path).expanduser().resolve()
         subjects, complete = _feature_participants(feature_path)
         if expected_subjects is None:
             expected_subjects = subjects
@@ -397,21 +438,6 @@ def preflight_study(
             raise ValueError("all feature archives must contain the same participant coverage")
         elif complete != expected_complete:
             raise ValueError("all feature archives must contain the same complete participants")
-        sidecar = feature_path.with_suffix(feature_path.suffix + ".metadata.json")
-        if sidecar.is_file():
-            try:
-                metadata = json.loads(sidecar.read_text(encoding="utf-8"))
-            except (OSError, json.JSONDecodeError) as error:
-                raise ValueError(f"invalid feature metadata sidecar for {feature_path}") from error
-            sidecar_checkpoint = metadata.get("checkpoint")
-            if not isinstance(sidecar_checkpoint, str) or not sidecar_checkpoint.strip():
-                raise ValueError(
-                    f"feature metadata sidecar for {feature_path} lacks checkpoint provenance"
-                )
-            if Path(sidecar_checkpoint).expanduser().resolve() != checkpoint_path:
-                raise ValueError(
-                    f"feature archive {feature_path} does not agree with its registry checkpoint"
-                )
     assert expected_subjects is not None and expected_complete is not None
     roles = load_role_map(role_map, expected_subject_ids=expected_subjects)
     counts = roles["role"].value_counts().to_dict()
@@ -956,6 +982,7 @@ def run_study(
 def run_registered_study(
     registry: pd.DataFrame | Path,
     *,
+    training_registry: Path,
     config_path: Path,
     role_map: Path,
     output_root: Path,
@@ -972,6 +999,7 @@ def run_registered_study(
     )
     preflight = preflight_study(
         records,
+        training_registry=training_registry,
         role_map=role_map,
         output_root=output_root,
         aggregate_output=aggregate_output,
@@ -1030,6 +1058,7 @@ def _parse_args() -> argparse.Namespace:
     role_map.add_argument("--output", type=Path, required=True)
     preflight = subparsers.add_parser("preflight")
     preflight.add_argument("--registry", type=Path, required=True)
+    preflight.add_argument("--training-registry", type=Path, required=True)
     preflight.add_argument("--role-map", type=Path, required=True)
     preflight.add_argument("--output-root", type=Path, required=True)
     preflight.add_argument("--aggregate-output", type=Path, required=True)
@@ -1037,6 +1066,7 @@ def _parse_args() -> argparse.Namespace:
     preflight.add_argument("--freeze-tag", default=ANALYSIS_FREEZE_TAG)
     run = subparsers.add_parser("run")
     run.add_argument("--registry", type=Path, required=True)
+    run.add_argument("--training-registry", type=Path, required=True)
     run.add_argument("--config", type=Path, required=True)
     run.add_argument("--role-map", type=Path, required=True)
     run.add_argument("--output-root", type=Path, required=True)
@@ -1065,6 +1095,7 @@ def main() -> None:
     elif args.command == "preflight":
         result = preflight_study(
             args.registry,
+            training_registry=args.training_registry,
             role_map=args.role_map,
             output_root=args.output_root,
             aggregate_output=args.aggregate_output,
@@ -1074,6 +1105,7 @@ def main() -> None:
     elif args.command == "run":
         outputs = run_registered_study(
             args.registry,
+            training_registry=args.training_registry,
             config_path=args.config,
             role_map=args.role_map,
             output_root=args.output_root,

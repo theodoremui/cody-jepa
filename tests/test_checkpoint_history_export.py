@@ -1,5 +1,5 @@
+import ast
 import csv
-import hashlib
 import json
 import math
 from pathlib import Path
@@ -15,9 +15,85 @@ from cody_jepa.cli.export_histories import export_histories
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 HISTORY_PATH = PROJECT_ROOT / "results" / "checkpoint_histories.csv"
 METADATA_PATH = PROJECT_ROOT / "results" / "checkpoint_histories.json"
+HASH_METADATA_TERMS = ("sha256", "checksum", "digest", "hash")
+HASH_CALLS = {
+    "hash",
+    "md5",
+    "sha1",
+    "sha224",
+    "sha256",
+    "sha384",
+    "sha512",
+    "blake2b",
+    "blake2s",
+}
+
+
+def _hash_metadata_keys(value, location="root"):
+    found = []
+    if isinstance(value, dict):
+        for key, item in value.items():
+            child = f"{location}.{key}"
+            if any(term in str(key).casefold() for term in HASH_METADATA_TERMS):
+                found.append(child)
+            found.extend(_hash_metadata_keys(item, child))
+    elif isinstance(value, list):
+        for index, item in enumerate(value):
+            found.extend(_hash_metadata_keys(item, f"{location}[{index}]"))
+    return found
+
+
+def _implements_hashing(path):
+    tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Import) and any(
+            item.name == "hashlib" for item in node.names
+        ):
+            return True
+        if isinstance(node, ast.ImportFrom) and node.module == "hashlib":
+            return True
+        if isinstance(node, ast.Call):
+            name = node.func.id if isinstance(node.func, ast.Name) else None
+            attribute = node.func.attr if isinstance(node.func, ast.Attribute) else None
+            if name in HASH_CALLS or attribute in HASH_CALLS:
+                return True
+    return False
 
 
 class CheckpointHistoryExportTest(unittest.TestCase):
+    def test_runtime_hashing_is_limited_to_gaitlu_data_integrity(self):
+        implementations = {
+            path.relative_to(PROJECT_ROOT).as_posix()
+            for path in (PROJECT_ROOT / "src").rglob("*.py")
+            if _implements_hashing(path)
+        }
+        self.assertEqual(
+            implementations,
+            {
+                "src/cody_jepa/data/gaitlu.py",
+                "src/cody_jepa/data/gaitlu_prepare.py",
+            },
+        )
+
+    def test_tracked_result_metadata_contains_no_hash_fields(self):
+        results_root = PROJECT_ROOT / "results"
+        violations = []
+        for path in results_root.rglob("*.json"):
+            value = json.loads(path.read_text(encoding="utf-8"))
+            violations.extend(
+                f"{path.relative_to(PROJECT_ROOT)}:{key}"
+                for key in _hash_metadata_keys(value)
+            )
+        for path in results_root.rglob("*.csv"):
+            with path.open(encoding="utf-8", newline="") as handle:
+                columns = csv.DictReader(handle).fieldnames or []
+            violations.extend(
+                f"{path.relative_to(PROJECT_ROOT)}:{column}"
+                for column in columns
+                if any(term in column.casefold() for term in HASH_METADATA_TERMS)
+            )
+        self.assertEqual(violations, [])
+
     def test_export_is_flat_deterministic_and_json_safe(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
@@ -63,7 +139,6 @@ class CheckpointHistoryExportTest(unittest.TestCase):
                 [("synthetic-run", "test", checkpoint)],
                 csv_path,
                 metadata_path,
-                repo_root=root,
             )
 
             with csv_path.open(encoding="utf-8") as handle:
@@ -76,10 +151,7 @@ class CheckpointHistoryExportTest(unittest.TestCase):
             metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
             self.assertIsNone(metadata["runs"][0]["best_healthy_val_loss"])
             self.assertEqual(metadata["runs"][0]["evaluation_epochs"], [2])
-            self.assertEqual(
-                metadata["history_csv_sha256"],
-                hashlib.sha256(csv_path.read_bytes()).hexdigest(),
-            )
+            self.assertFalse(_hash_metadata_keys(metadata))
 
     def test_committed_histories_are_complete_and_match_summaries(self):
         histories = pd.read_csv(HISTORY_PATH)
@@ -98,10 +170,7 @@ class CheckpointHistoryExportTest(unittest.TestCase):
         self.assertFalse(histories.duplicated(["run_id", "epoch"]).any())
         self.assertEqual(metadata["row_count"], len(histories))
         self.assertEqual(metadata["columns"], histories.columns.tolist())
-        self.assertEqual(
-            metadata["history_csv_sha256"],
-            hashlib.sha256(HISTORY_PATH.read_bytes()).hexdigest(),
-        )
+        self.assertFalse(_hash_metadata_keys(metadata))
 
         phase0 = json.loads(
             (PROJECT_ROOT / "results" / "phase0_summary.json").read_text(encoding="utf-8")

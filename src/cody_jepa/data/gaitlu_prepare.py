@@ -15,7 +15,10 @@ import tempfile
 
 import numpy as np
 
-from .gaitlu import GAITLU_MANIFEST_COLUMNS
+from .gaitlu import (
+    GAITLU_MANIFEST_COLUMNS,
+    gaitlu_manifest_pair_sha256,
+)
 
 
 INVENTORY_COLUMNS = (
@@ -47,6 +50,7 @@ TRAINING_REGISTRY_COLUMNS = (
     "rung",
     "train_manifest",
     "val_manifest",
+    "manifest_sha256",
     "pool_seed",
     "optimization_seed",
     "unique_sequences",
@@ -560,7 +564,8 @@ def finalize_gaitlu_study(
                 row for row in training_rows if row["source_group"] in names
             ]
             manifest_relative = f"manifests/{ladder}-{rung}.csv"
-            _write_manifest(prepared_root / manifest_relative, selected, "train")
+            manifest_path = prepared_root / manifest_relative
+            _write_manifest(manifest_path, selected, "train")
             model_label = f"{ladder}-{rung}"
             registry.append(
                 {
@@ -569,6 +574,9 @@ def finalize_gaitlu_study(
                     "rung": rung,
                     "train_manifest": manifest_relative,
                     "val_manifest": "manifests/common-holdout.csv",
+                    "manifest_sha256": gaitlu_manifest_pair_sha256(
+                        manifest_path, holdout_path
+                    ),
                     "pool_seed": pool_seed,
                     "optimization_seed": pool_seed,
                     "unique_sequences": len(selected),

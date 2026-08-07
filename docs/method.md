@@ -54,11 +54,12 @@ drives optimization at every rung. Adding a rung adds source groups rather than
 replacing the earlier data.
 
 Exact-content SHA-256 is confined to GaitLU preparation, where it supports packed-record
-reuse and deduplication. Final manifests omit record hashes. Each checkpoint instead
-stores one digest over the ordered training-plus-holdout manifest pair and requires it,
-the manifest roles, loader settings, and the `splitmix64-v1` seed scheme to match on
-resume. Runtime loading still validates structure, paths, bounds, and short reads, but
-same-length corruption of packed bits is not detected.
+reuse and deduplication. Final manifests omit record hashes. Finalization stores one
+role-sensitive digest over each ordered training-plus-holdout manifest pair in the
+private training registry. Each checkpoint stores that digest and requires it, the
+manifest roles, loader settings, and the `splitmix64-v1` seed scheme to match on resume.
+Runtime loading still validates structure, paths, bounds, and short reads, but same-length
+corruption of packed bits is not detected.
 
 ![Four nested unique-data pools are compared at a fixed training exposure in each of five ladders.](images/scaling-ladders.svg)
 
@@ -70,7 +71,7 @@ not two separate variance components.
 
 The repository currently contains the 8,192,000-example configuration only. If the
 throughput gate selects the lower tier, its compatible configuration and regenerated
-twenty-row training registry must be checked in and frozen before primary training.
+twenty-row training registry must be created before primary training.
 
 ## 3. Convert each recording into one frozen vector
 

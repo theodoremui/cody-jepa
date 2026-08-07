@@ -138,7 +138,10 @@ from preparation content hashes. The runtime loader validates manifest structure
 paths, record bounds, and read lengths, but it does not hash records; same-length packed
 bit corruption is therefore not detected while loading. The v2 format is a clean break:
 regenerate prepared outputs in a clean directory, and do not resume checkpoints created
-with the v1 prototype data contract. Health&Gait compatibility is unchanged.
+with the v1 prototype data contract. Before GFC-v2 parses a Health&Gait feature archive,
+preflight independently compares every checkpoint digest with the corresponding value
+frozen by GaitLU finalization in the original private training registry. Health&Gait
+compatibility is unchanged.
 
 ## 3. Turn Health&Gait recordings into evaluation examples
 
@@ -324,7 +327,7 @@ Before the outcome run, verify that:
 
 - every GaitLU pool has an actual count, source-group policy, manifest path, and
   exclusion log, and every checkpoint has one combined train-plus-holdout manifest
-  digest;
+  digest that passes preflight comparison against the original private training registry;
 - the 10,000 GaitLU holdout sequences are group-disjoint from all training pools;
 - every complete Health&Gait participant has exactly eight unique factor cells;
 - each direction recording has a valid `source_video_id` and at least 18 contiguous
