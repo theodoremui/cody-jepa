@@ -137,6 +137,7 @@ These tutorials explain reusable technical concepts. They do not document the Co
 
 Applied next steps:
 
-- [Data roles and preprocessing](../docs/data.md)
+- [Data roles and preprocessing](../docs/unique-sequence-scaling/data.md)
 - [GaitLU-1M preparation and fixed-exposure training](../docs/gaitlu_training.md)
-- [GFC-v2 method and inference](../docs/method.md)
+- [Unique-sequence GFC-v2 method and inference](../docs/unique-sequence-scaling/method.md)
+- [Proposed hierarchical-diversity method](../docs/hierarchical-diversity/method.md)

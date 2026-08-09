@@ -1,0 +1,10 @@
+{
+  "schema": 1,
+  "study_id": "gaitlu-scaling-v2-2026-08",
+  "dataset": "GaitLU-1M",
+  "status": "planned",
+  "architecture": "cody-jepa-single-stream-masked-v3",
+  "config_source": "configs/train/gaitlu_scaling.json",
+  "expected_runs": 20,
+  "notes": "Prospective fixed-exposure scaling study; no completed runs were present during migration."
+}

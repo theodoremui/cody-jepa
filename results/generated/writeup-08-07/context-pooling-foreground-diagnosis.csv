@@ -1,0 +1,14 @@
+checkpoint_label,panel,item,estimate,interval_low,interval_high,rows,dimension,unit
+phase0-best-loss-epoch-80,context substitution,self,0,0,0,3744,,loss difference
+phase0-best-loss-epoch-80,context substitution,same_subject,0.000161303037,0.000151967882,0.000170597179,3744,,loss difference
+phase0-best-loss-epoch-80,context substitution,cross_subject,0.00015634854000000001,0.000148615128,0.000164237602,3744,,loss difference
+phase0-best-loss-epoch-80,context substitution,temporal_shuffle,4.7535868399999999e-05,4.4482971000000002e-05,5.07267272e-05,3744,,loss difference
+phase0-best-loss-epoch-80,context substitution,blank,9.5643956799999993e-05,9.2232624299999996e-05,9.9103337499999996e-05,3744,,loss difference
+phase0-best-loss-epoch-80,target token rule,all-token rule,0.00015634854000000001,,,,,loss difference
+phase0-best-loss-epoch-80,target token rule,foreground rule,4.66827297e-05,,,,,loss difference
+phase0-best-loss-epoch-80,target token rule,background rule,0.00016793249300000001,,,,,loss difference
+phase0-best-loss-epoch-80,representation rank,online_full_view_pooled,0.027182000000000001,,,1872,384,effective-rank ratio
+phase0-best-loss-epoch-80,representation rank,ema_target_pre_norm_pooled,0.029999000000000001,,,1872,384,effective-rank ratio
+phase0-best-loss-epoch-80,representation rank,context_tokens_all_mask_groups,0.99370199999999997,,,1180672,384,effective-rank ratio
+phase0-best-loss-epoch-80,representation rank,context_tokens_large_blocks,0.99168699999999999,,,446848,384,effective-rank ratio
+phase0-best-loss-epoch-80,representation rank,context_tokens_small_blocks,0.99129900000000004,,,733824,384,effective-rank ratio

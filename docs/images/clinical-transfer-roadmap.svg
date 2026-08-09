@@ -1,0 +1,125 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="1000" viewBox="0 0 1600 1000" role="img" aria-labelledby="title desc">
+  <title id="title">From controlled gait pretraining to clinical movement assessment</title>
+  <desc id="desc">A concise roadmap. First, train the same JEPA encoder with increasing numbers of unique unlabeled gait videos while holding architecture and exposure fixed. Second, test motion, factor recombination, context, and identity. Third, freeze the encoder. Finally, transfer it to Sequoias fall-risk prediction and validate it against OpenCap and OpenSim biomechanics.</desc>
+  <defs>
+    <linearGradient id="hero" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#102A43"/>
+      <stop offset="1" stop-color="#164E63"/>
+    </linearGradient>
+    <linearGradient id="jepaFill" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#E0F2FE"/>
+      <stop offset="1" stop-color="#ECFEFF"/>
+    </linearGradient>
+    <filter id="shadow" x="-15%" y="-15%" width="130%" height="140%">
+      <feDropShadow dx="0" dy="7" stdDeviation="11" flood-color="#0F172A" flood-opacity="0.10"/>
+    </filter>
+    <marker id="arrow" markerWidth="12" markerHeight="12" refX="10" refY="6" orient="auto">
+      <path d="M1 1 L11 6 L1 11 Z" fill="#64748B"/>
+    </marker>
+    <style>
+      .title { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif; font-size: 40px; font-weight: 700; font-style: normal; fill: #FFFFFF; letter-spacing: -0.6px; }
+      .subtitle { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif; font-size: 19px; font-weight: 400; font-style: normal; fill: #D7EEF5; }
+      .eyebrow { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif; font-size: 13px; font-weight: 700; font-style: normal; fill: #0E7490; letter-spacing: 1.35px; }
+      .step { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif; font-size: 13px; font-weight: 700; font-style: normal; fill: #FFFFFF; }
+      .heading { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif; font-size: 22px; font-weight: 700; font-style: normal; fill: #172033; }
+      .body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif; font-size: 16px; font-weight: 400; font-style: normal; fill: #42526A; }
+      .small { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif; font-size: 14px; font-weight: 500; font-style: normal; fill: #526075; }
+      .branchHead { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif; font-size: 22px; font-weight: 700; font-style: normal; fill: #172033; }
+      .footerHead { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif; font-size: 18px; font-weight: 700; font-style: normal; fill: #FFFFFF; }
+      .footerBody { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif; font-size: 15px; font-weight: 400; font-style: normal; fill: #D7EEF5; }
+      .card { fill: #FFFFFF; stroke: #CBD5E1; stroke-width: 1.6; }
+      .flow { fill: none; stroke: #64748B; stroke-width: 3; marker-end: url(#arrow); }
+      .branchLine { fill: none; stroke: #94A3B8; stroke-width: 3; }
+    </style>
+  </defs>
+
+  <rect width="1600" height="1000" fill="#F5F8FB"/>
+  <rect width="1600" height="178" fill="url(#hero)"/>
+  <circle cx="1470" cy="25" r="170" fill="#22D3EE" opacity="0.09"/>
+  <circle cx="1340" cy="118" r="95" fill="#67E8F9" opacity="0.08"/>
+  <text x="80" y="68" class="title">From gait video pretraining to clinical movement assessment</text>
+  <text x="80" y="108" class="subtitle">A planned evidence chain for Sequoias fall-risk prediction and the Delp Lab balance-assessment work</text>
+  <text x="80" y="145" class="subtitle">Each transition is tested: data diversity → movement structure → clinical utility</text>
+
+  <!-- Three-step research sequence -->
+  <g filter="url(#shadow)">
+    <rect x="70" y="228" width="440" height="287" rx="22" class="card"/>
+    <rect x="580" y="228" width="440" height="287" rx="22" fill="url(#jepaFill)" stroke="#56B4CC" stroke-width="1.8"/>
+    <rect x="1090" y="228" width="440" height="287" rx="22" class="card"/>
+  </g>
+
+  <circle cx="112" cy="262" r="21" fill="#0E7490"/>
+  <text x="112" y="267" text-anchor="middle" class="step">1</text>
+  <text x="173" y="256" class="eyebrow">CONTROLLED PRETRAINING</text>
+  <text x="105" y="314" class="heading">Change diversity—not compute</text>
+  <text x="105" y="353" class="body">Train the same JEPA encoder on more unique</text>
+  <text x="105" y="379" class="body">unlabeled walking videos.</text>
+  <g transform="translate(105 416)">
+    <rect x="0" y="29" width="47" height="22" rx="5" fill="#BAE6FD"/>
+    <rect x="59" y="20" width="47" height="31" rx="5" fill="#7DD3FC"/>
+    <rect x="118" y="10" width="47" height="41" rx="5" fill="#38BDF8"/>
+    <rect x="177" y="0" width="47" height="51" rx="5" fill="#0284C7"/>
+    <text x="258" y="21" class="small">Fixed architecture</text>
+    <text x="258" y="45" class="small">Fixed total exposure</text>
+  </g>
+
+  <circle cx="622" cy="262" r="21" fill="#0E7490"/>
+  <text x="622" y="267" text-anchor="middle" class="step">2</text>
+  <text x="683" y="256" class="eyebrow">REPRESENTATION TESTS</text>
+  <text x="615" y="314" class="heading">Verify what the model learned</text>
+  <text x="615" y="353" class="body">Test movement structure—not acquisition shortcuts.</text>
+  <g transform="translate(615 399)">
+    <circle cx="7" cy="8" r="6" fill="#0891B2"/><text x="24" y="13" class="small">Speed · clothing · direction</text>
+    <circle cx="7" cy="40" r="6" fill="#0891B2"/><text x="24" y="45" class="small">Cross-recording factor recombination</text>
+    <circle cx="7" cy="72" r="6" fill="#0891B2"/><text x="24" y="77" class="small">Context and identity controls</text>
+  </g>
+
+  <circle cx="1132" cy="262" r="21" fill="#0E7490"/>
+  <text x="1132" y="267" text-anchor="middle" class="step">3</text>
+  <text x="1193" y="256" class="eyebrow">LOCK THE FEATURE EXTRACTOR</text>
+  <text x="1125" y="314" class="heading">Freeze the tested encoder</text>
+  <text x="1125" y="353" class="body">Apply it to new clinical recordings without</text>
+  <text x="1125" y="379" class="body">updating the learned video features.</text>
+  <g transform="translate(1257 415)">
+    <rect x="0" y="20" width="82" height="66" rx="12" fill="#E2E8F0" stroke="#64748B" stroke-width="2"/>
+    <path d="M20 20 V6 C20 -23 62 -23 62 6 V20" fill="none" stroke="#64748B" stroke-width="7" stroke-linecap="round"/>
+    <circle cx="41" cy="50" r="8" fill="#0E7490"/>
+    <path d="M41 56 V71" stroke="#0E7490" stroke-width="6" stroke-linecap="round"/>
+  </g>
+
+  <path d="M510 371 H568" class="flow"/>
+  <path d="M1020 371 H1078" class="flow"/>
+
+  <!-- Clear split into two clinical applications -->
+  <path d="M1310 515 V558" class="branchLine"/>
+  <path d="M435 558 H1310" class="branchLine"/>
+  <path d="M435 558 V593" class="flow"/>
+  <path d="M1165 558 V593" class="flow"/>
+
+  <g filter="url(#shadow)">
+    <rect x="110" y="605" width="650" height="215" rx="22" fill="#EFF6FF" stroke="#7BA7D8" stroke-width="1.8"/>
+    <rect x="840" y="605" width="650" height="215" rx="22" fill="#F0FDF4" stroke="#63A879" stroke-width="1.8"/>
+  </g>
+
+  <circle cx="152" cy="639" r="21" fill="#2563A9"/>
+  <text x="152" y="644" text-anchor="middle" class="step">4A</text>
+  <text x="213" y="633" class="eyebrow" fill="#2563A9">SEQUOIAS STUDY</text>
+  <text x="145" y="690" class="branchHead">Transfer to fall-risk prediction</text>
+  <text x="145" y="728" class="body">Fit a small model with limited labeled older-adult recordings.</text>
+  <rect x="145" y="756" width="570" height="39" rx="10" fill="#DDEBFA"/>
+  <text x="430" y="781" text-anchor="middle" class="small">Test robustness across speed, direction, clothing, and environment</text>
+
+  <circle cx="882" cy="639" r="21" fill="#2F7D4A"/>
+  <text x="882" y="644" text-anchor="middle" class="step">4B</text>
+  <text x="943" y="633" class="eyebrow" fill="#2F7D4A">BALANCE ASSESSMENT</text>
+  <text x="875" y="690" class="branchHead">Ground learned features in biomechanics</text>
+  <text x="875" y="728" class="body">Validate them with OpenCap and OpenSim measurements.</text>
+  <rect x="875" y="756" width="570" height="39" rx="10" fill="#DDF4E4"/>
+  <text x="1160" y="781" text-anchor="middle" class="small">Probe gait speed, joint motion, and other movement variables</text>
+
+  <!-- Shared downstream decision -->
+  <rect x="70" y="865" width="1460" height="90" rx="18" fill="url(#hero)"/>
+  <text x="105" y="903" class="footerHead">Planned comparison:</text>
+  <text x="294" y="903" class="footerBody">conventional measures · biomechanics · frozen JEPA features · biomechanics + JEPA</text>
+  <text x="105" y="932" class="footerBody">Question: does the learned representation add fall-risk information beyond established measurements?</text>
+</svg>

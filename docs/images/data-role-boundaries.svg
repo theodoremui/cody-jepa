@@ -1,5 +1,5 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1400" height="720" viewBox="0 0 1400 720" role="img" aria-labelledby="title desc">
-  <title id="title">Five data roles in the revised study</title>
+  <title id="title">Five data roles in the unique-sequence scaling study</title>
   <desc id="desc">GaitLU pretraining sequences train encoders, a separate GaitLU holdout measures context reliance, Health and Gait development participants fit evaluation heads, locked Health and Gait outcome participants provide final scores, and constructed cases validate code.</desc>
   <defs>
     <marker id="arrow" markerWidth="10" markerHeight="10" refX="9" refY="5" orient="auto"><path d="M0,0 L10,5 L0,10 Z" fill="#56657a"/></marker>

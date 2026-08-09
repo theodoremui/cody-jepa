@@ -1,9 +1,11 @@
 # Data guide
 
-This document explains what each dataset contributes, what it may be used for, and how
-raw recordings become model inputs. The scientific motivation is in
-[proposal.md](proposal.md); the exact evaluation procedure is in
-[method.md](method.md).
+This document defines the shared data roles and the preprocessing used by the
+unique-sequence scaling study. Its scientific motivation is in
+[proposal.md](proposal.md), and its evaluation procedure is in [method.md](method.md).
+The proposed hierarchical-diversity replacement uses the same role boundaries but has
+its own [proposal](../hierarchical-diversity/proposal.md) and
+[methods](../hierarchical-diversity/method.md).
 
 The central rule is simple: **GaitLU-1M trains the encoder; Health&Gait evaluates the
 frozen encoder.** No Health&Gait recording is used to update an encoder.
@@ -14,7 +16,7 @@ A *data role* is the set of operations a group of examples is allowed to influen
 Separating roles prevents a result from benefiting, even indirectly, from the data on
 which it will be judged.
 
-![Five data groups flow to their allowed uses, with prohibited uses shown beside each group.](images/data-role-boundaries.svg)
+![Five data groups flow to their allowed uses, with prohibited uses shown beside each group.](../images/data-role-boundaries.svg)
 
 | Data group | What it is used for | What it must not influence |
 |---|---|---|
@@ -26,12 +28,12 @@ which it will be judged.
 
 The repository also contains older Health&Gait-only experiments. They used different
 roles and a different evaluator. Their aggregates remain preliminary evidence in
-[results.md](results.md), not results of the revised study.
+[results.md](results.md), not results of the unique-sequence scaling study.
 
 ## 2. Prepare GaitLU-1M for encoder pretraining
 
 The exact HAIC conversion, loader-smoke, and twenty-run commands are in
-[gaitlu_training.md](gaitlu_training.md).
+[gaitlu_training.md](../gaitlu_training.md).
 
 The v2 preparation, indexed-loader, and primary-exposure code now exists and passes
 synthetic tests. The private 100-shard corpus has not yet been processed with it, so the
@@ -85,7 +87,7 @@ The pools are *nested*: every item in the 2.5k pool also appears in the 25k pool
 on. A source group is never split merely to hit a round number. Record the actual size,
 seed, grouping policy, manifest path, and exclusions for every pool.
 
-![Four nested unique-data pools receive the same number of training examples.](images/scaling-ladders.svg)
+![Four nested unique-data pools receive the same number of training examples.](../images/scaling-ladders.svg)
 
 The five seeds create five *ladders*, and each ladder has four rungs. The complete
 experiment therefore trains $5\times4=20$ encoders.
@@ -179,7 +181,7 @@ Health&Gait varies three binary experimental conditions:
 These produce $2\times2\times2=8$ condition cells. A *complete participant* has one
 valid direction recording in every cell.
 
-![The eight Health&Gait cells formed by speed, clothing, and walking direction.](images/factorial-grid.svg)
+![The eight Health&Gait cells formed by speed, clothing, and walking direction.](../images/factorial-grid.svg)
 
 “Fast” is an instructed condition, not an instrumented measurement of exact velocity.
 The labels tell us which condition was requested; they do not tell us the participant's
@@ -190,7 +192,7 @@ precise speed in each video.
 One physical back-and-forth walk produces two direction clips. Those clips share a
 `source_video_id`, so they are related observations rather than independent sessions.
 
-![A participant condition produces one source walk, two direction clips, and three deterministic windows per clip.](images/healthgait-recording-lineage.svg)
+![A participant condition produces one source walk, two direction clips, and three deterministic windows per clip.](../images/healthgait-recording-lineage.svg)
 
 For example, participant `PA000` walking fast with a jacket may produce source video
 `S1042`. Splitting that video yields an `R2L` clip and an `L2R` clip, but both retain

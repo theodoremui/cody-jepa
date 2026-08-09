@@ -46,8 +46,8 @@ Configs are grouped by purpose under `configs/train/` and `configs/eval/`. The t
 
 ### Prepare and train the GaitLU scaling ladders
 
-The prospective study trains twenty GaitLU-only encoders: four nested unique-sequence
-rungs for each of five paired pool/optimization seeds. The ingestion and training code
+The unique-sequence scaling study trains twenty GaitLU-only encoders: four nested
+unique-sequence rungs for each of five paired pool/optimization seeds. The ingestion and training code
 is implemented, but the private HAIC shards have not yet been processed and no eligible
 ladder checkpoint is checked in. Follow the complete operator runbook rather than
 training directly from `.tar.gz` files:
@@ -92,7 +92,7 @@ uv run python scripts/eval_probes.py \
   --output-dir outputs/training-baseline/probes
 ```
 
-Run GFC from the exported window-level feature table. The runner averages its three rows per recording before fitting or scoring; required factor, split, learned-feature, and shortcut columns are described in [the method](docs/method.md).
+Run GFC from the exported window-level feature table. The runner averages its three rows per recording before fitting or scoring; required factor, split, learned-feature, and shortcut columns are described in [the method](docs/unique-sequence-scaling/method.md).
 
 If you have a legacy deterministic NPZ export, upgrade it to the validated GFC feature
 boundary without changing its float32 feature values:
@@ -152,7 +152,8 @@ uv run python scripts/make_paper_results.py \
 
 Detailed participant, optional query, and current GFC-v2 aggregate outputs stay under ignored `outputs/`. The paper renderer accepts only the checked-in, protocol-tagged legacy GFC summaries for its legacy table; it intentionally rejects v2 or mixed-protocol inputs.
 
-The revised study uses the private `healthgait-gfc-v2-roles-v1` map described by
+The unique-sequence scaling study uses the private
+`healthgait-gfc-v2-roles-v1` map described by
 [`gfc_role_map.schema.json`](configs/eval/gfc_role_map.schema.json). Build it under the
 ignored `data/` tree, then run the frozen gate and study from the annotated tag:
 
@@ -206,19 +207,22 @@ and path-bearing inputs. The historical generator above remains unchanged.
 
 ## Documentation
 
-- [Method](docs/method.md): GFC construction, controls, normalization, scoring, and inference.
-- [Data](docs/data.md): Health&Gait access, layout, splits, privacy, and preprocessing boundaries.
+- [Documentation map](docs/README.md): the two alternative research directions and their status.
+- [Unique-sequence proposal](docs/unique-sequence-scaling/proposal.md): concise motivation, design, and claim boundary.
+- [Unique-sequence methods](docs/unique-sequence-scaling/method.md): the paper-style methodology for the implemented 20-model design.
+- [Hierarchical-diversity proposal](docs/hierarchical-diversity/proposal.md): the proposed sequence-by-window study.
+- [Hierarchical-diversity methods](docs/hierarchical-diversity/method.md): the proposed 32-model factorial protocol.
+- [Hierarchical-diversity execution plan](docs/hierarchical-diversity/execution-plan.md): implementation and deadline gates.
+- [Data](docs/unique-sequence-scaling/data.md): Health&Gait access, layout, splits, privacy, and preprocessing boundaries.
 - [GaitLU training runbook](docs/gaitlu_training.md): HAIC conversion, pool construction,
   throughput gates, fixed-exposure training, resume, and evaluation handoff.
-- [Results](docs/results.md): current aggregate evidence and the claims it does and does not support.
-- [Paper draft](docs/paper.md): concise manuscript skeleton for the revised ICLR 2027 study.
-- [Research proposal](docs/proposal.md): accessible motivation, study design, preliminary evidence, and proposed confirmation work.
+- [Results](docs/unique-sequence-scaling/results.md): current aggregate evidence and the claims it does and does not support.
 - [Result files](results/README.md): compact inputs to the paper-result generator.
 - [Technical tutorials](tutorials/README.md): repository-independent foundations and
   executable synthetic notebooks.
 
 ## Data and claim boundaries
 
-Keep raw frames, archives, participant tables, checkpoints, and participant-level feature exports outside Git. Publish only aggregate, non-identifying results. The maintained evaluator fits all factor heads and normalizers on training participants only, aggregates windows before scoring, retains both donors, verifies source independence, and weights participants equally. Checked-in legacy outcomes remain labeled as donor-excluded historical results; no GFC-v2 outcome is currently checked in.
+Keep raw frames, archives, participant tables, checkpoints, and participant-level feature exports outside Git. Publish only aggregate, non-identifying results. The maintained evaluator fits all factor heads and normalizers on training participants only, aggregates windows before scoring, retains both donors, verifies source-disjoint donor selection, and weights participants equally. Checked-in legacy outcomes remain labeled as donor-excluded historical results; no GFC-v2 outcome is currently checked in.
 
 Current results are single-seed diagnostics on one Health&Gait split. They motivate GFC because prediction loss, representation breadth, context sensitivity, and probe scores prefer different checkpoints. They do not establish semantic factorization, causal gait structure, clinical validity, or transfer beyond Health&Gait.

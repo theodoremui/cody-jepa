@@ -44,7 +44,7 @@ showed that the trainer and feature export worked and that speed was linearly
 recoverable. They did not demonstrate factorization or meaningful use of context.
 
 The compact source is `results/phase0_summary.json`; the active table is
-[phase0_table.csv](../results/generated/phase0_table.csv).
+[phase0_table.csv](../../results/generated/phase0_table.csv).
 
 ## Stage 2: Phase 1 checkpoint disagreement
 
@@ -68,9 +68,9 @@ This rank disagreement motivated a real-target completion test. It did not ident
 which checkpoint had scientifically better factor structure.
 
 Source: `results/phase1_summary.csv`. Generated outputs:
-[phase1_table.csv](../results/generated/phase1_table.csv) and the figure below.
+[phase1_table.csv](../../results/generated/phase1_table.csv) and the figure below.
 
-![Phase 1 validation loss and effective-rank ratio](../results/generated/phase1_diagnostics.png)
+![Phase 1 validation loss and effective-rank ratio](../../results/generated/phase1_diagnostics.png)
 
 ## Stage 3: context and pooling diagnosis
 
@@ -106,7 +106,7 @@ acquisition shortcut causes prediction.
 
 Source: `results/context_diagnosis.json`.
 
-![Context substitution gaps and token-versus-pooled breadth](../results/generated/context_diagnosis.png)
+![Context substitution gaps and token-versus-pooled breadth](../../results/generated/context_diagnosis.png)
 
 ## Stage 4: legacy GFC development results
 
@@ -144,10 +144,10 @@ checkpoints. This is a descriptive rank inversion over three models, not a popul
 estimate of how often standard diagnostics fail.
 
 Source: `results/gfc-*/summary.json`. Generated output:
-[legacy_gfc_table.csv](../results/generated/legacy_gfc_table.csv) and the explicitly legacy figure
+[legacy_gfc_table.csv](../../results/generated/legacy_gfc_table.csv) and the explicitly legacy figure
 below.
 
-![Legacy development GFC comparison](../results/generated/legacy_gfc_comparison.png)
+![Legacy development GFC comparison](../../results/generated/legacy_gfc_comparison.png)
 
 ## Why the legacy positive result is not confirmatory
 
@@ -191,9 +191,9 @@ to the declared primary analysis.
 Together, these findings mean the legacy table is evidence for revising the instrument,
 not evidence that data scale improves compositional representation.
 
-## Stage 5: revised prospective study
+## Stage 5: unique-sequence scaling proposal
 
-The revised experiment replaces every material legacy choice:
+The unique-sequence experiment replaces every material legacy choice:
 
 | Legacy issue | Revised design |
 |---|---|
@@ -207,17 +207,17 @@ The revised experiment replaces every material legacy choice:
 | 80-person development evaluation | 80-person adapter development; locked 318-person outcome cohort |
 | Raw context loss gap | Normalized paired near-substitute ratio on common GaitLU holdout |
 | Competing identity metrics | One frozen cross-condition rank-1/MRR protocol |
-| Classification explanation untested | Hard and soft independent-factor completion controls |
+| Classification explanation untested | Independent-factor completion top-1 and soft calibration diagnostics |
 
 No file currently contains a GFC-v2 outcome for a GaitLU scale rung. In particular, the
 numbers `69.79%`, `65.46%`, and `+4.33 pp` must never appear in a figure or abstract as
-results of the revised study.
+results of the unique-sequence scaling study.
 
 ## Planned result table and decision trajectory
 
 The first unblinded table will show all four rungs for each of five replicates, plus the
 mean and run-level interval. At minimum it reports learned GFC-v2 top-1, shortcut top-1,
-hard and soft completion controls, factor probes, near-context ratio, effective rank,
+independent-factor completion, soft calibration diagnostics, factor probes, near-context ratio, effective rank,
 identity rank-1/MRR, training health, and throughput.
 
 The primary estimand is full-minus-small learned GFC-v2 top-1. One of 16 queries defines
@@ -235,7 +235,7 @@ Interpretation then follows the controls:
   protocol's factor-recombination outcome;
 - if GFC-v2 is equivalent to flat while identity improves, the result is an
   identity–composition dissociation for this system;
-- if hard/soft factor completion explains GFC-v2, restrict the claim to joint linear
+- if independent-factor completion explains GFC-v2, restrict the claim to joint linear
   factor recoverability;
 - if replicate curves disagree or uncertainty spans different readings, report an
   inconclusive result; and

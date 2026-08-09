@@ -30,7 +30,7 @@ resolved as follows:
   when sidecar data exist and permits legacy archives without sidecars.
 - Not applied: adding a role-map checksum. The frozen contract deliberately exposes only
   the role-map version and aggregate counts; cohort checksums are explicitly out of scope.
-  The stale checksum placeholder in `docs/method.md` was corrected to the frozen version.
+  The stale checksum placeholder in `docs/unique-sequence-scaling/method.md` was corrected to the frozen version.
 - Not applied: adding pool-membership checksums to the private registry. Its exact frozen
   schema has ten fields and artifact hashes are explicitly out of scope; pool construction
   is an upstream training-data responsibility, while this evaluator records actual sizes,
