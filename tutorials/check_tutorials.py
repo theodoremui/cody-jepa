@@ -38,7 +38,9 @@ EXPECTED_BASENAMES = {
     "14_paired_inference",
     "15_exposure_and_replication",
     "16_reproducible_scientific_evaluators",
+    "17_hierarchical_support_and_factorial_inference",
 }
+ORDERED_BASENAMES = tuple(sorted(EXPECTED_BASENAMES))
 ALLOWED_THIRD_PARTY_IMPORTS = {
     "IPython",
     "matplotlib",
@@ -129,6 +131,45 @@ def validate_notebook(path: Path, errors: list[str]) -> None:
         errors.append(f"{path.relative_to(ROOT)} must set a deterministic seed")
     if "cody_jepa" in code:
         errors.append(f"{path.relative_to(ROOT)} must not depend on repository modules")
+
+    focused_notebook_contracts = {
+        "07_gradient_updates_and_schedules": {
+            "REQUIRED_RESUME_FIELDS": "declare the exact resume field set",
+            "sequence_stream_version": "record the sequence stream version",
+            "temporal_stream_version": "record the temporal stream version",
+            "spatial_stream_version": "record the spatial stream version",
+            "mask_stream_version": "record the mask stream version",
+            "storage_stable": "include the shared-storage stability gate",
+            "rates.shape != (8,)": "require eight concurrent throughput rates",
+        },
+        "08_group_aware_sampling": {
+            "frozen_random": "use the canonical frozen policy label",
+            "resampled_anchor": "use the canonical resampled policy label",
+            "repeated_draw_fraction": "report expected repeated-draw fractions",
+            "mean_distinct_anchor_overlap": "report mean distinct-anchor overlap",
+            "expected_frozen_support": "calculate frozen occupancy",
+            "expected_resampled_support": "calculate resampled occupancy",
+            "required_audit_fields": "assert the complete treatment-audit schema",
+        },
+    }
+    for marker, description in focused_notebook_contracts.get(path.stem, {}).items():
+        if marker not in code:
+            errors.append(
+                f"{path.relative_to(ROOT)} must {description}; missing {marker!r}"
+            )
+
+    if path.stem == "08_group_aware_sampling":
+        noncanonical_policy_fragments = {
+            "policy == 'frozen'",
+            "policy == 'resampled'",
+            "'temporal_policy': 'resampled'",
+        }
+        for fragment in sorted(noncanonical_policy_fragments):
+            if fragment in code:
+                errors.append(
+                    f"{path.relative_to(ROOT)} uses noncanonical policy fragment "
+                    f"{fragment!r}"
+                )
 
     try:
         tree = parse(code)
@@ -344,6 +385,32 @@ def validate_links(path: Path, errors: list[str]) -> None:
             errors.append(f"{path.relative_to(ROOT)} has missing local link {target}")
 
 
+def validate_lesson_navigation(path: Path, errors: list[str]) -> None:
+    """Require neighboring lessons to remain connected in both learning paths."""
+    basename = path.stem
+    if basename not in ORDERED_BASENAMES:
+        return
+
+    lesson_index = ORDERED_BASENAMES.index(basename)
+    text = markdown_text(path)
+    suffix = ".ipynb" if path.suffix == ".ipynb" else ".md"
+
+    if lesson_index > 0:
+        previous_name = f"{ORDERED_BASENAMES[lesson_index - 1]}{suffix}"
+        if previous_name not in text:
+            errors.append(
+                f"{path.relative_to(ROOT)} has no link to previous lesson "
+                f"{previous_name}"
+            )
+
+    if lesson_index + 1 < len(ORDERED_BASENAMES):
+        next_name = f"{ORDERED_BASENAMES[lesson_index + 1]}{suffix}"
+        if next_name not in text:
+            errors.append(
+                f"{path.relative_to(ROOT)} has no link to next lesson {next_name}"
+            )
+
+
 def main() -> int:
     errors: list[str] = []
 
@@ -367,10 +434,12 @@ def main() -> int:
     for path in sorted(IMPLEMENTATIONS.glob("[0-9][0-9]_*.ipynb")):
         validate_notebook(path, errors)
         validate_links(path, errors)
+        validate_lesson_navigation(path, errors)
 
     for path in sorted(LECTURES.glob("[0-9][0-9]_*.md")):
         validate_lecture(path, errors)
         validate_links(path, errors)
+        validate_lesson_navigation(path, errors)
 
     validate_links(ROOT / "README.md", errors)
 

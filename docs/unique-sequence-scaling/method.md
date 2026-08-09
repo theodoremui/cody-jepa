@@ -10,18 +10,24 @@ design are in the [GaitLU runbook](../gaitlu_training.md).
 ## 1. Study design
 
 The study tests whether unique unlabelled pretraining support changes a frozen video
-representation when model architecture and sampled-sequence exposure remain fixed.
+representation when model architecture and sampled-example exposure remain fixed.
 GaitLU-1M is used only to train encoders. Health&Gait is used only to fit evaluation
 heads and score frozen representations. Constructed cases test the evaluator but do not
 support empirical claims.
 
-The research question is:
+The paper-level scientific question is:
 
-> With encoder architecture, JEPA training recipe, and a prespecified sampled-sequence
-> exposure held fixed, does replacing repeated draws from approximately 2,500 unique
-> GaitLU sequences with draws from the full eligible pool materially improve
-> participant-averaged Health&Gait GFC-v2 top-1, and is that improvement distinguishable
-> from the corresponding change in independent-factor completion?
+> When the number of sampled training examples is fixed, does seeing more unique video
+> sequences improve supervised donor-based factor-composition retrieval, and does that
+> improvement differ from matched independent-factor completion?
+
+The operational test is:
+
+> At fixed encoder architecture, JEPA training recipe, and sampled-example exposure,
+> does expanding exact-content-deduplicated GaitLU support from approximately 2,500
+> sequences to the full eligible pool materially improve participant-averaged
+> Health&Gait GFC-v2 top-1, and is that improvement distinguishable from the
+> corresponding change in independent-factor completion?
 
 The primary endpoint is learned full-gallery GFC-v2 top-1. The primary estimand is its
 full-pool minus 2,500-pool change, averaged across five replicated data ladders.
@@ -64,7 +70,7 @@ $112\times112$ pixels. Masking, optimizer, learning-rate schedule, exponential m
 average schedule, spatial augmentation, effective batch size, and final pooling remain
 fixed. Horizontal flipping is disabled because direction is an evaluated factor.
 
-The primary sampled-sequence exposure is
+The primary sampled-example exposure is
 
 $$
 C=8{,}192{,}000

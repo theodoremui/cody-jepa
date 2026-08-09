@@ -1,6 +1,6 @@
 # Technical foundations for CoDy-JEPA
 
-This curriculum teaches the mathematical, machine learning, statistical, and numerical-engineering ideas that a reader needs before studying the CoDy-JEPA codebase. The lessons begin with arrays and vector geometry, build toward representation learning and evaluation, and finish with statistical inference and reproducible evaluator construction.
+This curriculum teaches the mathematical, machine learning, statistical, and numerical-engineering ideas that a reader needs before studying the CoDy-JEPA codebase. The lessons begin with arrays and vector geometry, build toward representation learning and evaluation, and finish with statistical inference, reproducible evaluator construction, and an end-to-end hierarchical-diversity capstone.
 
 The lessons are deliberately independent of repository internals. Every notebook uses small synthetic examples, runs on CPU, and can be understood without access to private data.
 
@@ -41,7 +41,7 @@ Read the lecture first, then run the matching notebook. The lessons are progress
 
 | Lesson | Lecture | Implementation |
 | --- | --- | --- |
-| 09. Covariance eigenspectra and effective dimensionality | [Lecture](lectures/09_eigenspectra_and_effective_rank.md) | [Notebook](implementations/09_eigenspectra_and_effective_rank.ipynb) |
+| 09. Covariance eigenspectra and effective dimensionality, optional diagnostic | [Lecture](lectures/09_eigenspectra_and_effective_rank.md) | [Notebook](implementations/09_eigenspectra_and_effective_rank.ipynb) |
 | 10. Regularized linear estimation and calibration | [Lecture](lectures/10_regularized_linear_estimation.md) | [Notebook](implementations/10_regularized_linear_estimation.ipynb) |
 | 11. Factorial state spaces | [Lecture](lectures/11_factorial_state_spaces.md) | [Notebook](implementations/11_factorial_state_spaces.ipynb) |
 | 12. Blockwise distances and rank statistics | [Lecture](lectures/12_blockwise_distances_and_ranking.md) | [Notebook](implementations/12_blockwise_distances_and_ranking.ipynb) |
@@ -59,6 +59,16 @@ Read the lecture first, then run the matching notebook. The lessons are progress
 | Lesson | Lecture | Implementation |
 | --- | --- | --- |
 | 16. Reproducible scientific evaluators and numerical contracts | [Lecture](lectures/16_reproducible_scientific_evaluators.md) | [Notebook](implementations/16_reproducible_scientific_evaluators.ipynb) |
+
+### Track F: End-to-end research capstone
+
+| Lesson | Lecture | Implementation |
+| --- | --- | --- |
+| 17. Hierarchical support interventions and blocked factorial inference | [Lecture](lectures/17_hierarchical_support_and_factorial_inference.md) | [Notebook](implementations/17_hierarchical_support_and_factorial_inference.ipynb) |
+
+Lesson 11 uses factorial language for the downstream outcome state space. Lessons 14, 15,
+and 17 use factorial language for the training experiment. The first enumerates possible
+factor combinations. The second crosses interventions and estimates their interaction.
 
 ## Directory layout
 
@@ -137,7 +147,8 @@ These tutorials explain reusable technical concepts. They do not document the Co
 
 Applied next steps:
 
+- [Proposed hierarchical-diversity method](../docs/hierarchical-diversity/method.md)
+- [Hierarchical-diversity execution plan](../docs/hierarchical-diversity/execution-plan.md)
 - [Data roles and preprocessing](../docs/unique-sequence-scaling/data.md)
 - [GaitLU-1M preparation and fixed-exposure training](../docs/gaitlu_training.md)
-- [Unique-sequence GFC-v2 method and inference](../docs/unique-sequence-scaling/method.md)
-- [Proposed hierarchical-diversity method](../docs/hierarchical-diversity/method.md)
+- [Unique-sequence scaling fallback method](../docs/unique-sequence-scaling/method.md)

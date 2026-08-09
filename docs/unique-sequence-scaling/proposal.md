@@ -8,7 +8,7 @@
 
 **Paper deadline:** September 25, 2026
 
-> **Status on August 8, 2026.** GFC-v2, GaitLU preparation, and fixed-exposure
+> **Status on August 9, 2026.** GFC-v2, GaitLU preparation, and fixed-exposure
 > training are implemented and tested on constructed data. The private GaitLU corpus
 > has not been prepared, the exposure tier has not been selected, and the 20 primary
 > models have not been trained. The locked Health&Gait outcomes remain unopened.
@@ -19,18 +19,21 @@ hierarchical study is documented separately in
 
 ## Research question
 
-> With encoder architecture, JEPA training recipe, and a prespecified sampled-sequence
-> exposure held fixed, does replacing repeated draws from an approximately
-> 2,500-sequence, exact-content-deduplicated GaitLU pool with draws from the full
-> eligible pool materially improve participant-averaged Health&Gait GFC-v2 top-1, and
-> is that improvement distinguishable from the corresponding change in matched
+> **Scientific question.** When the number of sampled training examples is fixed, does
+> seeing more unique video sequences improve supervised donor-based factor-composition
+> retrieval, and does that improvement differ from matched independent-factor
+> completion?
+>
+> **Operational test.** Under one fixed JEPA recipe, does expanding
+> exact-content-deduplicated GaitLU support from approximately 2,500 sequences to the
+> full eligible pool materially improve participant-averaged Health&Gait GFC-v2 top-1,
+> and is that improvement distinguishable from the corresponding change in matched
 > independent-factor completion?
 
-In simpler terms, the study asks whether a video encoder supports better controlled
-factor recombination
-from seeing more unique walking sequences when sampled-example exposure stays constant. The
-question is not whether a larger dataset helps when it also receives more optimization.
-It is whether replacing repetition with unique data improves the target capability.
+Fixed-exposure diversity studies usually ask whether more unique data improves accuracy.
+This study asks what capability unique support buys: better prediction of each factor,
+better donor-composition retrieval after supervised factor alignment, or neither. The
+distinction is the source of the paper's intended contribution.
 
 ## Study design
 
@@ -41,7 +44,7 @@ clothing, and direction. No Health&Gait recording updates an encoder.
 Five replicate seeds each define four nested GaitLU pools near 2,500, 25,000, 250,000,
 and all eligible sequences. This produces 20 models. Every model uses the same
 six-layer JEPA-style encoder, optimizer, masking policy, augmentations, effective batch
-size, and sampled-sequence exposure. The primary exposure is 8,192,000 examples. A
+size, and sampled-example exposure. The primary exposure is 8,192,000 examples. A
 prespecified throughput rule may reduce every run to 4,096,000 examples. The final-step
 checkpoint is always used.
 
@@ -96,7 +99,7 @@ promoted to a harm claim. Failure to reject zero is not evidence of equivalence.
 
 ## Contribution and limits
 
-Fixed-compute data diversity, JEPA training, supervised factor alignment, and gait
+Fixed-exposure data diversity, JEPA training, supervised factor alignment, and gait
 representation learning already exist. The contribution is a controlled combination:
 a replicated unique-data intervention, a source-disjoint real-target composition test,
 an exact full-gallery oracle, and matched controls that limit the claim.

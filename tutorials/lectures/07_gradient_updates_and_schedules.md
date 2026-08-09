@@ -416,6 +416,40 @@ For accumulated float16 training:
 
 Clipping scaled gradients applies the threshold in the wrong units. Advancing a step-based scheduler once per epoch makes the schedule far slower than intended.
 
+### Fixed exposure makes model comparisons interpretable
+
+The number of examples processed is part of an experiment, not merely a runtime detail.
+If the effective batch size is $B_{mathrm{eff}}$ and training completes $U$ updates,
+then sampled-example exposure is
+
+$$
+C=B_{mathrm{eff}}U.
+$$
+
+Two conditions can use different data support while receiving the same $C$, $U$, batch
+size, optimizer, and schedule. Repeated examples still count toward exposure. They do
+not become new support simply because the optimizer sees them again. Stopping every run
+at the same planned update also makes the final checkpoint rule concrete.
+
+Hardware speed should change wall-clock time, not scientific exposure. If cost requires
+a smaller exposure, choose one common tier with an outcome-blind eight-job concurrent
+throughput probe before training outcomes are viewed. The frozen rule selects 8,192,000
+examples only when all eight jobs sustain at least 60 examples per second per GPU. It
+selects 4,096,000 when all eight sustain at least 30 but at least one is below 60. It
+cancels below 30 or when shared-storage performance is unstable. The same selected tier
+then applies to every model. Choosing a tier separately for each condition would confound
+the condition with exposure.
+
+### Resume provenance is part of optimizer state
+
+An exact resume needs more than model weights and Adam moments. Before loading, require
+the saved and requested metadata to contain the same frozen field set. Compare the
+manifest digest, sequence-support and window-policy labels, total exposure, effective
+batch size, completed update, optimization seed, and versions of the sequence, temporal,
+spatial, and mask streams. Also restore the scheduler and mixed-precision scaler. Stop on
+any missing, extra, or changed field. Continuing with different provenance creates a new
+training trajectory while retaining stale optimizer history.
+
 ## 12. Verify the update pipeline in layers
 
 Before long training, test small invariants:
@@ -448,6 +482,8 @@ These checks isolate errors before model stochasticity makes them difficult to d
 5. **Clipping before unscaling:** the threshold has the wrong meaning.
 6. **Scheduler at the wrong frequency:** an update schedule becomes an epoch schedule.
 7. **Only weights in checkpoints:** Adam moment history and schedule position are lost.
+8. **Unequal exposure across conditions:** compute and data support change together.
+9. **Unchecked resume metadata:** a changed manifest or seed version enters an old trajectory.
 
 ## 15. Exercises
 

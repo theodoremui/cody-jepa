@@ -40,7 +40,9 @@ By the end of this lesson, you will be able to:
 6. explain when exact-byte comparison is appropriate and when tolerance is appropriate;
 7. publish an artifact with a same-directory temporary file and `os.replace()`;
 8. test failure behavior without corrupting the previous valid artifact; and
-9. expose fitted settings and diagnostics without leaking mutable internal state.
+9. validate an exact eight-block by four-cell training registry;
+10. bind manifests and final-step checkpoints to cryptographic digests; and
+11. publish privacy-safe summaries without exposing participant identifiers.
 
 ## 1. Reproducibility has several layers
 
@@ -167,16 +169,17 @@ construction is clearer than discovering the inconsistency during the tenth tran
 ## 5. Type hints state policy families
 
 Scientific pipelines often accept strings that select policies. A bare `str` hides the
-allowed vocabulary. `Literal` makes it visible to readers and type checkers:
+allowed vocabulary. `Literal` makes the active $2\times2$ protocol visible to readers and
+type checkers:
 
 ```python
 from collections.abc import Mapping, Sequence
 from typing import Literal
 
-Normalization = Literal["raw", "pca"]
-DimensionPolicy = Literal["retain_all", "effective_rank"]
+SequenceSupport = Literal["low", "high"]
+WindowPolicy = Literal["frozen_random", "resampled_anchor"]
 
-def fit(rows: Sequence[Sequence[float]], *, method: Normalization):
+def select_cell(*, support: SequenceSupport, policy: WindowPolicy):
     ...
 
 def score(distances: Mapping[str, float], target_id: str):
@@ -189,8 +192,87 @@ state what the function needs. Runtime validation is still required because Pyth
 not enforce annotations automatically and external data can bypass static checking.
 
 Policy names should also be validated against configuration schemas. A type hint helps a
-developer, while a runtime check protects the actual analysis. Keeping one canonical set
-of names prevents code, documentation, and serialized metadata from drifting apart.
+developer, while a runtime check protects the actual analysis. The registry must reject
+old rung labels and close spelling variants. Keeping one canonical set of names prevents
+code, documentation, and serialized metadata from drifting apart.
+
+### Validate the exact $2\times2\times8$ registry
+
+The hierarchical-diversity registry is a scientific object, not just a job list. It must
+contain exactly 32 unique model rows. Replicate blocks are numbered 0 through 7. Every
+block must contain exactly these four cells:
+
+```text
+low,  frozen_random
+low,  resampled_anchor
+high, frozen_random
+high, resampled_anchor
+```
+
+Validation should compare the observed set of `(replicate, sequence_support,
+window_policy)` tuples with the complete expected Cartesian product. Counting 32 rows is
+not enough because a duplicate can hide a missing cell. Model labels must also be unique.
+Reject extra cells, incomplete blocks, duplicate cells, unknown policy names, and old
+scaling-study registries.
+
+Within one block, all four cells share the optimization and replicate seeds. The two low
+cells share one low manifest, and the two high cells share one high manifest. Every row
+uses the same frozen training exposure and anchor spacing. The low sequence count must be
+smaller than the high count, and each recorded count must equal the number of sequences in
+its verified manifest. Window, temporal, spatial, and mask stream versions must match the
+frozen protocol across all rows. These are cross-row invariants, so a schema that checks
+each row separately cannot establish them.
+
+### Validate nested pools, not only manifest filenames
+
+For each block, the low source-group set must be a strict subset of the high source-group
+set. The high manifest must contain every low sequence with the same scientific identity.
+The same sequence must map to the same frozen anchor in both manifests. A shared filename
+or equal sequence count does not prove any of these relationships.
+
+Store a canonical digest of each manifest after sorting by stable scientific identifiers
+and serializing with a fixed encoding and field order. Validate both the digest and the
+nested-pool relationship. A digest proves byte identity with the frozen artifact. The
+explicit nesting check proves the scientific relationship between two different artifacts.
+
+### Bind evaluation to the final-step checkpoint
+
+Checkpoint provenance should include model label, block, cell, optimization seed, training
+exposure, completed step, configuration digest, manifest digest, window-policy version,
+temporal-stream version, spatial-stream version, mask-stream version, and checkpoint
+content digest. Evaluation accepts only the checkpoint whose completed step equals the
+frozen final step.
+
+The checkpoint digest detects changed bytes. The metadata fields detect a checkpoint that
+is internally valid but belongs to a different registry row or protocol version. Both
+checks are necessary. A file named `final.pt` is not evidence that training reached the
+declared final step.
+
+### Resume and evaluation must fail closed
+
+A resume operation may proceed only when every frozen field in the saved run state agrees
+with the selected registry row and current protocol. Evaluation applies the same rule to
+the final-step checkpoint and feature export. If a manifest digest, exposure, policy,
+seed, stream version, model label, or final step differs, stop before loading outcomes or
+writing a replacement artifact.
+
+Fail closed means that missing provenance is a mismatch, not permission to guess. Do not
+silently patch old metadata, infer a policy from a directory name, substitute a nearby
+checkpoint, or resume into an existing run directory after a partial validation. A clear
+error is safer than an apparently complete result with uncertain lineage.
+
+### Freeze the protocol before outcomes
+
+Before Health&Gait outcome access, create a timestamped, content-addressed protocol
+snapshot. It includes manifests, registry, policies, exposure, checkpoint rule, failure
+rules, GFC-v2 evaluator, completion controls, materiality margins, statistical code, and
+figure templates. Throughput can choose between the two predeclared exposure tiers only by
+the frozen outcome-blind rule.
+
+The snapshot digest makes later changes visible. It does not prove the protocol is good,
+but it separates planned analysis from revisions made after outcome inspection. Any
+approved correction should create a new version with an explicit reason rather than
+overwriting the old protocol state.
 
 ## 6. Remove irrelevant row-order variation
 
@@ -296,6 +378,24 @@ sidecar is not one atomic transaction across both paths. Include a content diges
 identifier in each artifact, or publish a completed directory through a versioned pointer,
 when readers must verify that a bundle belongs together.
 
+### Publish only privacy-safe summaries
+
+The private analysis may use participant identifiers to preserve pairing and detect
+duplicates. Public artifacts must not contain those identifiers, participant-level rows,
+recording paths, embeddings, nearest-neighbor examples, or identity-capable checkpoints.
+Aggregate cell means, replicate-level contrasts, interval endpoints, protocol versions,
+and non-sensitive digests are sufficient for the planned public summary.
+
+Privacy validation should inspect keys and values recursively before the temporary file is
+written. A top-level allowlist is not enough if a nested diagnostics object can carry a
+participant identifier. Use an explicit public schema, reject unknown fields, and test
+that participant-like keys and private path fragments cannot pass serialization.
+
+Atomic publication and privacy checking belong in one transaction boundary. First build
+the public payload in memory. Next validate its schema and privacy constraints. Then write
+and parse the same-directory temporary file. Finally replace the destination. If any step
+fails, keep the previous complete public summary and remove the temporary file.
+
 ## 9. Test the failure path
 
 Happy-path tests are insufficient for artifact code. Begin with a valid destination, force
@@ -341,20 +441,23 @@ interface design requirements.
 
 ## 11. End-to-end invariant ladder
 
-Validate from local to global. First check scalar policies and array shapes. Then check
-cross-field relationships. Next verify fit invariance under irrelevant row permutations.
-Then verify transform determinism on fixed inputs. Finally verify serialized artifacts and
-metadata can be read back and agree.
+Validate from local to global. First check scalar policies and row fields. Then compare the
+registry with the exact 32-cell Cartesian product. Next verify seed equality within block,
+manifest reuse within support level, strict low-within-high nesting, and common exposure.
+Then verify manifest and checkpoint digests, final-step provenance, and frozen stream
+versions. Finally validate the privacy-safe summary, parse the temporary bytes, and publish
+atomically.
 
 This ladder localizes failures. If a read-back digest differs but in-memory results match,
 the bug is in serialization. If row permutation changes fitted bytes but not predictions
 within tolerance, the mathematical result is stable while the serialization contract is
 not. If predictions change materially, the fit itself depends on an unintended ordering.
 
-Property-oriented tests are useful even without a property-testing library. Loop over a
-small set of deterministic permutations, scales, tied spectra, zero-variance columns, and
-invalid shapes. Keep examples small enough to inspect by hand and assertions strong enough
-to state the invariant being taught.
+Property-oriented tests are useful even without a property-testing library. Start from one
+valid synthetic registry and independently delete a cell, duplicate a cell, change one
+seed, swap one manifest, break nesting, alter one digest, lower one completed step, and add
+one participant identifier to the public payload. Every mutation should fail for the
+specific reason being tested.
 
 ## 12. Efficiency notes
 
@@ -366,6 +469,11 @@ to state the invariant being taught.
 - Validate a temporary artifact before replacement when parsing is inexpensive.
 - Use explicit dtypes on sensitive reductions and serialized numeric arrays.
 - Benchmark deterministic conventions, but do not remove them without changing the contract.
+- Generate the 32 expected registry keys once and compare them with a set of observed keys.
+- Cache verified manifest and checkpoint digests by immutable path and file metadata only
+  within one validation process.
+- Validate private inputs before loading participant outcomes, then build a separate
+  allowlisted public payload.
 
 Immutability often improves reasoning more than runtime. A fit that cannot change can be
 shared safely among evaluation functions without defensive copying at every call. Atomic
@@ -385,6 +493,14 @@ be substantial.
 8. **Cleanup only on success:** failed runs accumulate misleading temporary artifacts.
 9. **Several files called one transaction:** readers can observe mismatched generations.
 10. **Canonicalization called interpretation:** deterministic coordinates are mistaken for uniquely identified scientific axes.
+11. **Count-only registry check:** 32 rows pass even though one cell is duplicated and one
+    is missing.
+12. **Filename provenance:** a checkpoint named `final` is accepted without checking its
+    completed step or digest.
+13. **Best-effort resume:** a seed or manifest mismatch produces a warning and training
+    continues.
+14. **Private public summary:** participant identifiers survive inside a nested diagnostics
+    object.
 
 ## 14. Exercises
 
@@ -435,18 +551,52 @@ Design a failure test for `atomic_json`.
 raise before `os.replace`, then assert the original bytes remain and no matching temporary
 file survives.
 
+### Exercise 7
+
+A registry has 32 rows and eight replicate labels. Why must validation still compare the
+complete set of block and cell tuples?
+
+**Brief solution:** the row count can hide one duplicated cell and one missing cell. Set
+equality with the expected $8\times2\times2$ product detects both problems.
+
+### Exercise 8
+
+The low and high manifest digests are both valid, but one low source group is absent from
+the high manifest. Can the block run?
+
+**Brief solution:** no. Each digest only establishes identity for one artifact. The
+scientific design separately requires the low group set to be a strict subset of the high
+group set.
+
+### Exercise 9
+
+A checkpoint matches the model label and manifest digest but stopped one update before the
+frozen final step. Should evaluation use it?
+
+**Brief solution:** no. The final-step rule is part of the estimand and checkpoint
+contract. Evaluation must fail closed.
+
+### Exercise 10
+
+Why should a public summary use an allowlisted schema instead of deleting a known
+`participant_id` column at the end?
+
+**Brief solution:** private identifiers or paths can appear under other names or inside
+nested objects. An allowlist makes every published field intentional and rejects unknown
+content before atomic publication.
+
 ## Recap
 
-A reproducible evaluator makes ownership, mutability, typing, ordering, numeric comparison,
-and publication behavior explicit. Frozen dataclasses become meaningfully immutable only
-when they own read-only arrays. Construction-time validation establishes cross-field
-invariants. Exact hexadecimal float keys can remove irrelevant input-order variation.
-Atomic replacement protects readers from partial artifacts, while failure tests verify the
-guarantee. These techniques do not replace the scientific method; they make the declared
+A reproducible scientific evaluator validates the exact eight-block four-cell registry,
+proves low-within-high nesting, binds manifests and final-step checkpoints to digests, and
+freezes every seed and stream version before outcomes. Resume and evaluation stop on any
+mismatch. Public summaries pass a privacy allowlist before same-directory atomic
+publication and never include participant identifiers. These checks make the declared
 method harder for software behavior to change silently.
 
 ## Continue
 
 - Previous: [15. Exposure, replication, and variance decomposition](15_exposure_and_replication.md)
 - Notebook: [16. Reproducible scientific evaluators](../implementations/16_reproducible_scientific_evaluators.ipynb)
+- Next: [17. Hierarchical support interventions and blocked factorial inference](17_hierarchical_support_and_factorial_inference.md)
 - Curriculum: [Tutorial README](../README.md)

@@ -17,7 +17,8 @@ By the end of this lesson, you will be able to:
 3. encode binary cells as bit vectors and integers;
 4. enumerate factor subsets and complementary assignments;
 5. use exact rational arithmetic for finite probabilities; and
-6. derive a ceiling imposed by partial information.
+6. construct all 16 source-separated GFC-v2 queries for one complete participant;
+7. derive exact retrieval oracles from the number of recovered factors.
 
 ## 1. Motivating scenario: what exactly did we test?
 
@@ -44,6 +45,14 @@ levels in that set is $L_f$. The subscript $f$ is just a factor index from 1 thr
 
 For the motivating example, $F=3$ and every $L_f=2$. One cell has three entries, so its
 shape is naturally a length-3 tuple or a one-dimensional array with shape `(3,)`.
+
+The word **factorial** is used in two related but different ways in this study. A factorial
+outcome state space crosses speed, clothing, and direction to describe the eight recordings
+available for one participant. A factorial experimental design crosses sequence support
+and temporal policy to describe four training conditions. The first organizes evaluation
+outcomes. The second identifies main effects and an interaction across trained models.
+They use the same Cartesian-product idea, but they do not have the same factors, units, or
+scientific purpose.
 
 ## 3. Cartesian products multiply independent choices
 
@@ -260,7 +269,100 @@ usually faster and clearer than looping through every cell in Python.
 For a large state space, do not materialize every query-state pair. Encode queries as
 integer masks and values, or generate compatible cells lazily.
 
-## 9. Constrained state spaces and structural zeros
+## 9. GFC-v2 complementary donors and complete queries
+
+GFC-v2 uses the three binary outcome factors in the fixed order speed, clothing, and
+direction. Let the target cell be $x=(s,c,d)\in\{0,1\}^3$. The focal factor $a$ is speed
+or clothing. Direction is not focal because an opposite-direction recording at fixed
+speed and clothing can share the target's physical source walk.
+
+For one focal factor, define two complementary donors:
+
+$$
+u_a=x_a,
+\qquad
+u_j=1-x_j\quad(j\ne a),
+$$
+
+$$
+v_a=1-x_a,
+\qquad
+v_j=x_j\quad(j\ne a).
+$$
+
+The composed query takes factor block $a$ from $u$ and the other two factor blocks from
+$v$. The target supplies the answer label and identifies the correct gallery row, but it
+supplies no query features. This is the key grounding rule.
+
+```python
+from itertools import product
+
+factor_names = ("speed", "clothing", "direction")
+cells = list(product([0, 1], repeat=3))
+
+def gfc_donors(target, focal):
+    focal_index = factor_names.index(focal)
+    donor_u = tuple(value if j == focal_index else 1 - value
+                    for j, value in enumerate(target))
+    donor_v = tuple(1 - value if j == focal_index else value
+                    for j, value in enumerate(target))
+    return donor_u, donor_v
+
+queries = []
+for target in cells:
+    for focal in ("speed", "clothing"):
+        donor_u, donor_v = gfc_donors(target, focal)
+        sources = tuple("u" if name == focal else "v" for name in factor_names)
+        queries.append((target, focal, donor_u, donor_v, sources))
+
+assert len(queries) == 16
+assert all(source != "target" for *_, sources in queries for source in sources)
+```
+
+Every recording also carries a `source_video_id`. Before constructing a query, require
+both donor source IDs to differ from the target source ID. A transformed copy, another
+window, or a renamed file from the target source does not pass this check. Source
+separation is about lineage, not filenames.
+
+For a realistic synthetic audit, give opposite directions at fixed speed and clothing the
+same source ID. The two allowed focal factors still produce source-separated donors. A
+direction-focal query does not: one donor shares the target's physical source. A negative
+test should require that direction-focal construction to fail. Assigning a unique source
+ID to every cell would make the check vacuous because every different cell would appear
+source-separated by construction.
+
+The gallery still contains all eight participant recordings, including $u$ and $v$.
+Removing the donors would make the gallery depend on the query and would change the task.
+For each of eight targets, the two allowed focal factors give exactly 16 queries. Store the
+target ID, both donor IDs, all three factor-block sources, and all source video IDs so the
+construction can be audited without reconstructing hidden state.
+
+### Exact information oracles
+
+Suppose a synthetic representation recovers exactly $k$ of the three binary factors and
+provides no information about the other factors. In a complete, balanced Cartesian
+gallery, $2^{3-k}$ cells remain tied. Fractional top-1 is therefore
+
+$$
+p_k=\frac{1}{2^{3-k}}.
+$$
+
+The exact values are
+
+| Recovered factors $k$ | Tied gallery cells | Fractional top-1 |
+|---:|---:|---:|
+| 0 | 8 | $1/8$ |
+| 1 | 4 | $1/4$ |
+| 2 | 2 | $1/2$ |
+| 3 | 1 | $1$ |
+
+These are evaluator oracles, not expected empirical effect sizes. An implementation should
+verify all four cases exactly. If an oracle fails, inspect gallery completeness, factor
+weights, tie handling, or accidental target features before trusting model results.
+Lesson 12 runs all four cases through the retrieval evaluator. Merely recreating the four
+fractions from this formula is not an evaluator test.
+
+## 10. Constrained state spaces and structural zeros
 
 A Cartesian product assumes every combination is possible. Scientific designs often have
 **structural zeros**, which are cells that cannot occur by definition. For example, a
@@ -287,7 +389,7 @@ For small spaces, enumerate then filter with a clearly tested predicate. For lar
 generate only feasible branches. Constraint-aware generation avoids spending exponential
 work on cells that will be discarded.
 
-## 10. Exact probabilities with rational arithmetic
+## 11. Exact probabilities with rational arithmetic
 
 Finite combinatorial probabilities are often exact fractions. Floating-point `1/3` is
 only an approximation, which can make equality checks and accumulated counts awkward.
@@ -304,7 +406,7 @@ Use it for small exact enumerations. Convert to `float` only for plotting or API
 require floating-point values. For millions of operations, integer counts followed by one
 final division are usually faster.
 
-## 11. Partial-information ceilings
+## 12. Partial-information ceilings
 
 Suppose the true cell is one of eight binary cells, but a query reveals only the first
 factor. Four cells remain compatible. If those four cells are equally likely conditional
@@ -385,7 +487,7 @@ Under a uniform conditional distribution, exact identification cannot exceed $1/
 Knowing one additional value from the 4-level factor reduces the candidates to 3 and
 raises the ceiling to $1/3$.
 
-## 12. Failure modes and efficiency notes
+## 13. Failure modes and efficiency notes
 
 1. **Changing factor order:** integer and bit encodings silently change meaning.
 2. **Ignoring impossible cells:** a Cartesian product may include combinations ruled out
@@ -394,6 +496,13 @@ raises the ceiling to $1/3$.
 4. **Confusing factor subsets with values:** store both known indices and assignments.
 5. **Materializing huge products:** iterate lazily with `itertools.product` or use masks.
 6. **Using floats for exact counts:** keep integer counts or `Fraction` until the end.
+7. **Confusing two factorial designs:** outcome cells and training cells answer different
+   questions and use different observational units.
+8. **Using target features in a composed query:** the target may identify the answer, but
+   only donor blocks may form the query.
+9. **Dropping donors from the gallery:** GFC-v2 retains all eight recordings.
+10. **Checking filenames instead of source lineage:** compare frozen `source_video_id`
+    values for both donors and the target.
 
 The total number of cells grows exponentially for binary factors. Enumeration is excellent
 for small spaces and for validating formulas. For large $F$, reason symbolically or sample
@@ -427,13 +536,22 @@ Why might a measured accuracy exceed the uniform ceiling without violating mathe
 **Brief solution:** Compatible cells may have unequal conditional probabilities, or the
 model may receive additional information not included in the ceiling calculation.
 
+### Exercise 5
+
+For target $(1,0,1)$ with clothing focal, construct $u$ and $v$. Which donor supplies each
+query block?
+
+**Brief solution:** $u=(0,0,0)$ and $v=(1,1,1)$. Clothing comes from $u$. Speed and
+direction come from $v$. The target contributes no block.
+
 ## Recap
 
 A factorial state space is an address book of complete assignments. Cartesian products
 multiply level choices, binary cells admit useful bit encodings, and subsets describe which
-parts of an address are known. Exact arithmetic keeps finite probabilities honest. A
-partial-information ceiling follows from how many states remain indistinguishable and from
-their conditional probabilities.
+parts of an address are known. GFC-v2 composes donor blocks without target features, keeps
+the complete gallery, and enforces source lineage separation. Exact arithmetic keeps finite
+probabilities honest. A partial-information ceiling follows from how many states remain
+indistinguishable and from their conditional probabilities.
 
 ## Continue
 

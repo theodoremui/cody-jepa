@@ -248,6 +248,14 @@ generation an explicit random generator or documented seed derivation per sample
 epoch. Reusing exactly the same mask forever may reduce task diversity, while uncontrolled
 randomness makes comparisons hard to reproduce.
 
+When two training conditions are meant to differ in only one intervention, use separate
+named random streams for sequence draws, temporal windows, spatial transforms, and
+masks. Pair the nuisance streams across the two conditions. For example, both conditions
+can receive the same ordered sequences, crop parameters, and mask draws while only the
+temporal-window stream changes. A single shared generator is fragile because adding one
+random call to the temporal policy shifts every later crop and mask. Named streams keep
+the intended contrast isolated and make the pairing testable.
+
 ## 7. Minimal training primer: autograd and optimizers
 
 A neural network contains adjustable numbers called **parameters**. In PyTorch, a
@@ -531,6 +539,13 @@ record the feature definition beside the output. Determinism tests do not prove 
 quality, but they do catch active dropout, inconsistent checkpoint restoration, changing
 pooling rules, and unintended dtype or device behavior.
 
+The checkpoint rule also belongs to the design. If the planned final-step checkpoint is
+primary, export that checkpoint for every condition. Do not inspect downstream outcomes
+and then choose the epoch, seed, or rerun that looks best. Training-health checks can
+identify a documented systems failure, but downstream performance cannot turn an
+earlier checkpoint into the primary result. This rule keeps checkpoint selection from
+becoming an unrecorded source of optimization.
+
 ## 14. A simple predictor with target queries
 
 For teaching purposes, summarize context by its mean and combine it with a learned or
@@ -615,6 +630,8 @@ invariances.
 - Update EMA parameters and relevant buffers consistently.
 - A mask that leaks hidden token content makes the prediction problem trivial.
 - A target fraction near zero gives little learning signal; near one leaves insufficient context.
+- A shared random generator can let the intervention shift unrelated crop and mask draws.
+- Choosing a checkpoint from downstream scores turns evaluation into training feedback.
 
 Efficiency and correctness often align here. Encoding the full target once avoids
 duplicate computation and guarantees a consistent target representation before gathering.

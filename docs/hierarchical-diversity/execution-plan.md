@@ -3,7 +3,9 @@
 This plan tracks the implementation and deadline work for the proposed
 [hierarchical-diversity method](method.md). The scientific protocol belongs in the
 methods document. This file records what must change in the current repository before
-that protocol can be called executable.
+that protocol can be called executable. The ordered implementation checklist and agent
+acceptance format appear in the
+[training-start handoff](training-start-handoff.md).
 
 ## Current implementation gap
 
@@ -19,6 +21,34 @@ The repository currently implements the unique-sequence scaling study:
 
 The hierarchical protocol must replace these assumptions prospectively. Outcome data
 cannot influence which changes are completed or which design is launched.
+
+## Immediate support audit
+
+The support audit is the first go or no-go decision, not a task to defer until the
+training code is complete. As of August 8, the aggregate audit command and synthetic
+tests are implemented, but the prepared private `inventory.csv` is not present in the
+local checkout and the corpus result has not been recorded. The hierarchical study
+remains no-go until this report exists and passes.
+
+After the trusted shards have been converted and exact-deduplicated, run on HAIC:
+
+```bash
+uv run --frozen --no-sync cody-jepa-audit-gaitlu-hierarchy \
+  --prepared-root "$GAITLU_PREPARED_ROOT" \
+  > "$GAITLU_PREPARED_ROOT/hierarchical-support-audit.json"
+```
+
+The command applies the two-anchor eligibility rule before reconstructing the common
+holdout and eight nested 2,500 and 250,000 pool pairs. It evaluates all 16 pools at
+4,096,000 draws. It exits with status 2 unless every pool has a median of at least four
+eight-frame anchors and an expected resampled-to-frozen support ratio of at least four.
+The aggregate report also includes non-overlapping anchor counts, a conservative
+non-overlapping support ratio, and mean overlap among distinct anchor pairs. It writes
+no sequence IDs or outcome data.
+
+If the command fails, stop the hierarchical direction. Do not change spacing, pool
+targets, or the gate after reading the report. If it passes, record the immutable code
+revision and private report digest before implementing the 32-model protocol.
 
 ## Required implementation
 
@@ -70,8 +100,9 @@ completion-gap interaction, ceiling sensitivity, and every frozen decision gate.
 Private participant rows remain confined to the existing aggregate boundary.
 
 The renderer must produce a 32-run condition table, eight replicate factorial plots,
-the primary interaction interval, simple-effect intervals, completion-gap decisions,
-and training-health summaries. It must reject ladder-form or mixed-protocol inputs.
+the raw and clipped-logit interaction intervals side by side in the main figure,
+simple-effect intervals, completion-gap decisions, and training-health summaries. It
+must reject ladder-form or mixed-protocol inputs.
 
 ## Verification gates
 
@@ -112,9 +143,10 @@ are opened.
 
 | Date | Required exit condition |
 |---|---|
-| August 8 to 12 | GaitLU inventory complete; global anchor eligibility and support audit pass |
+| August 8 | Start or complete GaitLU conversion and run the support audit before further hierarchy work |
+| August 9 to 12 | Global anchor eligibility and all 16 pool-level support gates pass |
 | August 10 to 14 | Loader, finalizer, 32-row registry, checkpoint contract, inference, and renderer implemented |
-| August 14 to 16 | Four-cell pilot, eight-job throughput probe, sensitivity check, and outcome-blind dry run pass |
+| August 14 to 16 | Four-cell pilot, eight-job throughput probe, margin justification and sensitivity check, and outcome-blind dry run pass |
 | August 16 | Protocol, code, exposure, margins, and GPU reservation frozen |
 | August 17 to 24 | Four primary training waves complete |
 | August 25 to 27 | Exact systems-failure reruns and 32-checkpoint feature export complete |
@@ -125,7 +157,8 @@ are opened.
 
 ## Go or no-go rule
 
-The hierarchical study launches only if every implementation and verification gate
+The hierarchical study proceeds to implementation only if the private support audit
+passes unchanged. It launches only if every later implementation and verification gate
 passes by August 16, all eight H100s are reserved continuously, and concurrent storage
 meets the throughput tier. Otherwise, the project retains the implemented 20-model
 unique-sequence scaling study.

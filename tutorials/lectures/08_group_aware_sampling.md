@@ -18,10 +18,12 @@ By the end of this lesson, you will be able to:
 
 1. Identify the independent group for a generalization claim.
 2. Construct and verify group-disjoint partitions.
-3. Compare deterministic and stochastic temporal windows.
-4. Apply temporally consistent random transformations.
-5. Record lineage from source observation to model tensor.
-6. Diagnose acquisition artifacts and shortcut features.
+3. Construct fixed 16-frame anchor support and measure overlap.
+4. Compare frozen-random and resampled temporal policies.
+5. Derive expected realized support at a fixed exposure.
+6. Isolate an intervention with paired, named random streams.
+7. Record lineage from source observation to model tensor.
+8. Diagnose acquisition artifacts and shortcut features.
 
 ## 1. Begin with the intended generalization
 
@@ -156,74 +158,172 @@ The integer $G$ is the number of groups. This estimates loss for a randomly sele
 
 Neither estimand is universally correct. Group-disjoint splitting prevents overlap, while group-aware weighting prevents prolific groups from silently dominating. State which population draw the metric represents.
 
-## 5. Temporal windows create dependent rows
+## 5. Define temporal support before drawing windows
 
-Consider a sequence with $L$ time steps. A window has length $W$. A valid start index $s$ satisfies
-
-$$
-0\le s\le L-W.
-$$
-
-The Python slice is <code>sequence[s:s + W]</code>. It includes index $s$ and excludes index $s+W$.
-
-With stride $q$, deterministic starts are
+Validation and test windows should remain deterministic so every model receives the same
+evaluation inputs. A training intervention needs an equally exact support definition.
+Let sequence $i$ contain $n_i$ contiguous frames. For the 16-frame training clip length
+$T=16$, the number of valid integer starts is
 
 $$
-S
-{}={}
-\{0,q,2q,\ldots\}
-\cap
-\{0,1,\ldots,L-W\}.
+W_i=n_i-T+1.
 $$
 
-The symbol $S$ is the set of start indices. If $L=11$, $W=4$, and $q=3$, stride-aligned starts are $0,3,6$. The last valid start is $7$. You may append $7$ for endpoint coverage, but then the last spacing is smaller.
-
-## 6. Deterministic and stochastic sampling serve different goals
-
-Deterministic windows give stable coverage and reproducible metrics. Use them for validation and testing.
-
-Stochastic training can draw
+The hierarchical-diversity intervention does not use every valid start. It uses anchors
+spaced by eight frames:
 
 $$
-s
-\sim
-\mathrm{Uniform}\{0,1,\ldots,L-W\}.
+\mathcal A_i=
+\{0,8,16,\ldots,8\lfloor(W_i-1)/8\rfloor\},
+\qquad
+K_i=|\mathcal A_i|.
 $$
 
-The symbol $\sim$ means "is sampled from." Over many epochs, random starts expose more temporal offsets without storing every possible window.
+Here $\mathcal A_i$ is the supported anchor set and $K_i$ is its size. The Python slice
+for anchor $a$ is `sequence[a:a + T]`. It contains 16 frames because the stop index is
+excluded. One global capability rule, $K_i\ge2$, is applied after basic validation and
+before holdout selection or construction of any replicate pool. Applying the same rule
+once prevents conditions from quietly using different eligibility criteria.
 
-Use an explicit random-number generator:
+Adjacent anchors are eight frames apart, so their 16-frame windows share eight frames.
+The overlap fraction is
+
+$$
+\frac{T-8}{T}=\frac{8}{16}=0.5.
+$$
+
+This is 50 percent overlap, not two independent observations. To describe a more
+conservative support scale, also count anchors at 16-frame spacing:
+
+$$
+\mathcal B_i=
+\{0,16,32,\ldots,16\lfloor(W_i-1)/16\rfloor\},
+\qquad
+Q_i=|\mathcal B_i|.
+$$
+
+The count $Q_i$ measures non-overlapping anchored windows that begin on this coarser
+grid. Report both $K_i$ and $Q_i$. Neither count turns windows from the same sequence
+into new participants, sessions, or source videos.
+
+## 6. Frozen-random and resampled policies change temporal support
+
+The frozen-random policy chooses one anchor uniformly for each stable
+`(sequence_id, replicate_seed)` pair. Once selected, that anchor stays fixed across
+epochs and repeated sequence draws. Across randomization, every anchor in $\mathcal A_i$
+has probability $1/K_i$. Within one realized run, however, the sequence always returns
+the same anchor, so its conditional distribution is a point mass.
+
+The word "random" therefore describes how the frozen anchor is assigned, not what
+happens on every training draw. A center window would not be equivalent because gait
+phase or recording quality can vary with temporal position. Uniform frozen assignment
+avoids making one position special in expectation.
+
+Use a versioned stable hash to derive the frozen seed from the sequence ID and replicate
+seed. Python's built-in `hash` is process dependent and must not be used. Manifest row
+position is also unsafe because inserting another sequence would change later anchors.
+The stable identity rule gives **nested-manifest stability**: if a low-support manifest
+is a prefix of a larger manifest, every shared sequence keeps the same frozen anchor.
 
 ~~~python
-def random_start(length, window, rng):
-    if not 0 < window <= length:
-        raise ValueError("require 0 < window <= length")
-    return int(rng.integers(0, length - window + 1))
+import hashlib
+import json
+
+def stable_uint64(namespace, *parts):
+    payload = json.dumps(
+        [namespace, *parts], separators=(",", ":"), ensure_ascii=False
+    ).encode("utf-8")
+    digest = hashlib.blake2b(payload, digest_size=8).digest()
+    return int.from_bytes(digest, "little")
+
+def frozen_anchor(sequence_id, replicate_seed, anchors):
+    seed = stable_uint64("temporal-frozen-v1", sequence_id, replicate_seed)
+    rng = np.random.default_rng(seed)
+    return int(rng.choice(anchors))
 ~~~
 
-An explicit generator makes the source of randomness visible and testable. A fixed seed alone is not a lineage record because call order can still change sampled windows.
+The resampled policy instead selects uniformly from $\mathcal A_i$ on every draw. Its
+versioned seed includes the base seed, virtual epoch, stable sequence or sample identity,
+draw index, and temporal-stream version. Recreating a virtual epoch therefore recreates
+its anchors even when workers finish in a different order.
 
-### Sampling distributions need a definition
+Frozen and resampled policies have the same uniform marginal distribution over anchors.
+They differ in dependence across repeated draws. The frozen condition can realize at
+most one anchor for a given sequence and replicate. The resampled condition can realize
+up to $K_i$. This distinction isolates access to within-sequence temporal support.
 
-Uniform sampling over valid starts gives every start equal probability. It does not give every frame equal probability because middle frames belong to more possible windows than boundary frames.
+## 7. Pair nuisance streams and fix sampled exposure
 
-If uniform frame exposure matters, design a different sampler or weight windows. Event-centered sampling can improve exposure to rare events, but it changes the training distribution. Record the policy so evaluation and later reweighting remain possible.
+A temporal intervention should not accidentally change spatial crops or JEPA masks.
+Create separate named streams for:
 
-Suppose validation uses length-4 windows from a sequence of length 11 at starts $0,3,6,7$. Evaluating these same four windows on every run makes model comparisons paired at the window level. Drawing four new starts each run mixes model change with sampling change.
+- ordered sequence draws,
+- temporal anchors,
+- spatial transformations,
+- prediction masks.
 
-## 7. Overlap is exposure, not independence
+Within a sequence-support pair, frozen and resampled runs share the ordered sequence,
+spatial, and mask streams. Only the temporal stream follows a different policy. They
+also share initialization, optimizer settings, effective batch size, and checkpoint
+rule. Tests should compare the paired records directly rather than assuming that equal
+base seeds produce equal nuisance draws.
 
-Two windows of length $W$ separated by stride $q<W$ share $W-q$ time steps. Their overlap fraction is
+The total sampled-example exposure $C$ is fixed across conditions. A repeated draw still
+counts toward $C$, even when the frozen policy returns the same sequence-window pair.
+This is the point of the comparison: available support changes while optimizer exposure
+does not. Use the final planned checkpoint for every cell. Downstream outcomes cannot
+choose a different epoch, seed, or rerun.
+
+Separate generators prevent call-order coupling. With one global generator, one extra
+temporal draw in the resampled condition would shift every later crop and mask. Named
+streams let the sequence draw and nuisance parameters remain paired even though the
+temporal anchor changes.
+
+## 8. Expected realized support quantifies treatment strength
+
+Suppose a pool contains $U$ sequences and training makes $C$ sequence draws uniformly
+with replacement. The frozen policy supports one sequence-window pair per sequence. Its
+expected number of distinct realized pairs is
 
 $$
-\frac{W-q}{W}.
+E_F(U)=
+U\left[1-\left(1-\frac{1}{U}\right)^C\right].
 $$
 
-For $W=16$ and $q=4$, the overlap fraction is $12/16=0.75$. The windows may help optimization, but they do not supply two independent measurements.
+The expression in brackets is the probability that a particular sequence is drawn at
+least once. For the resampled policy, pair $(i,a)$ has probability $1/(UK_i)$ on each
+draw. Summing its visit probability over all supported pairs gives
 
-Create windows only after group partitioning. Otherwise adjacent windows from one source sequence can cross folds.
+$$
+E_R(U)=
+\sum_{i=1}^{U}
+K_i\left[1-\left(1-\frac{1}{UK_i}\right)^C\right].
+$$
 
-## 8. Transformations should respect time
+These are occupancy expectations, not claims of semantic independence. They quantify
+how many supported `(sequence_id, window_start)` pairs the sampler is expected to visit.
+For numerical stability at large $C$, software can evaluate
+`-expm1(C * log1p(-p))` instead of `1 - (1 - p)**C`.
+
+Before training, reconstruct every nested low and high pool for every replicate from the
+deduplicated inventory. For each pool, report $W_i$, $K_i$, $Q_i$, $E_F$, $E_R$, the
+expected fraction of draws that revisit an already counted sequence-anchor pair, and mean
+overlap among distinct anchor pairs. Evaluate treatment separation at the lower permitted
+exposure, $C=4{,}096{,}000$, so the gate also holds if the larger tier is selected.
+
+If $E$ is the expected number of distinct sequence-anchor pairs after $C$ draws, the
+expected repeated-draw fraction used in this audit is $1-E/C$. Compute it separately with
+$E_F$ and $E_R$. For mean overlap, enumerate unordered pairs of different anchors within
+each sequence, divide their shared-frame count by 16, and average those fractions across
+the pool. These are required diagnostics, not extra launch gates.
+
+The prospective launch gates are median $K_i\ge4$ and $E_R/E_F\ge4$ in every low and
+high pool. These frozen gates show that resampling creates a substantial support
+contrast. They do not prove that additional anchors are independent or useful. If a
+gate fails, revise or cancel the design before examining downstream outcomes rather than
+lowering the threshold afterward.
+
+## 9. Transformations should respect time
 
 Suppose a video window has shape $(T,H,W,C)$:
 
@@ -253,7 +353,7 @@ A crop has coordinates and size measured in pixels. A speed perturbation has uni
 
 Some labels transform with the input. A horizontal flip can swap left and right labels. A temporal reversal can change movement direction. Visual consistency is not sufficient; labels must remain valid under the transformation.
 
-## 9. Data lineage makes every tensor traceable
+## 10. Data lineage makes every tensor traceable
 
 Lineage answers: "Where did this exact model input come from?"
 
@@ -263,9 +363,12 @@ A useful record contains:
 - group identifier,
 - partition name,
 - original sequence length,
+- replicate and sequence-support condition,
 - window start and stop,
-- sampling policy and random seed,
+- temporal policy and stream version,
+- separate sequence, spatial, and mask stream versions,
 - sampled transform parameters,
+- manifest digest and planned exposure,
 - preprocessing version,
 - label source and label version.
 
@@ -294,12 +397,15 @@ Useful assertions check that:
 - every sample's group belongs to its declared partition,
 - start and stop indices are within source bounds,
 - window length matches the model contract,
+- every start belongs to the sequence's fixed anchor set,
+- a shared sequence keeps its frozen anchor across nested manifests,
+- paired conditions share sequence, spatial, and mask draws,
 - preprocessing version is known,
 - no sample identifier appears in more than one partition.
 
 These checks turn provenance from documentation into a tested interface.
 
-## 10. Shortcut learning
+## 11. Shortcut learning
 
 A shortcut is a feature that predicts labels in collected data but does not represent the intended construct.
 
@@ -332,7 +438,7 @@ Shortcuts are relative to a claim. Device identity is a shortcut for a biologica
 
 Removing one known artifact-label correlation does not prove that the model uses the intended mechanism. Other correlated artifacts can remain.
 
-## 11. Shortcut diagnostics
+## 12. Shortcut diagnostics
 
 No single diagnostic proves that shortcuts are absent. Combine several:
 
@@ -351,7 +457,7 @@ Suppose row-split accuracy is 95 percent and participant-disjoint accuracy is 62
 
 Inspect performance by group, device, and site. Averages can hide a model that succeeds only under one acquisition condition.
 
-## 12. Efficiency notes
+## 13. Efficiency notes
 
 - Use <code>np.unique</code> to encode group identifiers once.
 - Use <code>np.isin</code> for vectorized partition masks.
@@ -359,8 +465,10 @@ Inspect performance by group, device, and site. Averages can hide a model that s
 - Use <code>Tensor.unfold</code> for equal-length sliding-window views.
 - Use group-balanced samplers when prolific groups would dominate batches.
 - Copy a window before any in-place transform if it aliases source storage.
+- Precompute anchor arrays and $K_i$ once per immutable inventory.
+- Evaluate occupancy with stable `log1p` and `expm1` operations at large exposure.
 
-## 13. Common failure modes
+## 14. Common failure modes
 
 1. **Grouping too narrowly:** recording splits leak participant identity.
 2. **Preprocessing before splitting:** test statistics influence training.
@@ -369,24 +477,36 @@ Inspect performance by group, device, and site. Averages can hide a model that s
 5. **A seed without a manifest:** source and transform choices remain hidden.
 6. **Row-weighted evaluation:** participants with more repeats dominate.
 7. **Repeated test inspection:** the test set becomes tuning feedback.
+8. **Manifest-row hashing:** nested pools assign different anchors to the same sequence.
+9. **One generator for every draw:** temporal choices shift crop and mask randomness.
+10. **Calling anchors independent:** overlap and shared source causes are ignored.
+11. **Unequal exposure:** the support intervention is mixed with additional optimization.
 
-## 14. Exercises
+## 15. Exercises
 
 1. A dataset has 100 participants and 20 windows per participant. Which count controls participant-level uncertainty?
-2. List starts for $L=10$, $W=4$, and $q=2$.
-3. Why does fitting standardization on all partitions leak information?
-4. Design one lineage record for a transformed window.
+2. Find $\mathcal A_i$, $K_i$, and $\mathcal B_i$ for $n_i=48$ and $T=16$.
+3. Why do frozen-random and resampled policies have the same marginal anchor distribution but different realized support?
+4. Why must spatial transforms and masks use streams separate from the temporal policy?
+5. Design one lineage record for a resampled training window.
 
 ### Brief solutions
 
 1. Under a participant-independence assumption, the nominal independent-unit count is 100. The 2,000 windows are correlated repeats.
-2. The starts are $0,2,4,6$.
-3. Test means and variances influence the transformation used during training.
-4. Include source ID, group ID, split, start, stop, transform parameters, preprocessing version, and label version.
+2. $W_i=33$, so $\mathcal A_i=\{0,8,16,24,32\}$, $K_i=5$, and $\mathcal B_i=\{0,16,32\}$.
+3. Both choose every anchor with probability $1/K_i$ across randomization, but frozen-random repeats one assigned anchor within a run while resampling can visit all $K_i$ anchors.
+4. Separate streams keep nuisance draws paired when the temporal policy makes a different number or pattern of random calls.
+5. Include source and group IDs, split, replicate, policy, stream versions, start, stop, transform parameters, manifest digest, planned exposure, and preprocessing version.
 
 ## Recap
 
-Group-aware sampling aligns evaluation with the intended independent unit. Deterministic windows stabilize evaluation, while stochastic windows broaden training exposure. Temporal transformations need a scientifically plausible scope. Lineage makes every tensor auditable, and shortcut diagnostics test whether performance depends on acquisition artifacts.
+Group-aware sampling aligns evaluation with the intended independent unit. The fixed anchor
+set defines temporal support, while frozen-random and resampled policies change how much
+of that support a run can realize. Occupancy expectations measure the planned contrast
+at fixed exposure. Stable identity hashing, nested-manifest checks, and paired nuisance
+streams isolate the intervention. Temporal transformations still need a scientifically
+plausible scope, lineage makes every tensor auditable, and shortcut diagnostics test
+whether performance depends on acquisition artifacts.
 
 ## Next lesson
 
@@ -394,4 +514,4 @@ Group-aware sampling aligns evaluation with the intended independent unit. Deter
 
 ## Continue in the notebook
 
-[Open the executable lesson 08 notebook](../implementations/08_group_aware_sampling.ipynb) to compare row and group splits, sample windows, and build a lineage record.
+[Open the executable lesson 08 notebook](../implementations/08_group_aware_sampling.ipynb) to compare row and group splits, verify temporal policies, audit expected support, and build a lineage record.

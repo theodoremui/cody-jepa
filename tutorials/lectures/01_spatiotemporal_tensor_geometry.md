@@ -213,6 +213,12 @@ A tubelet is a small block covering time and space. Setting the convolution kern
 equal to its stride partitions the video into non-overlapping tubelets. Each filter
 computes a weighted sum of all channel and voxel values inside a tubelet.
 
+Keep two temporal scales separate. A training window is the complete clip selected from a
+source sequence, such as 16 consecutive frames beginning at one temporal anchor. Tubelets
+are smaller learned blocks inside that selected clip. Overlap between two training windows
+describes data support, while overlap between tubelets describes the encoder computation.
+Neither kind of overlap creates independent source videos.
+
 For output feature $d$ at location $(i,j,k)$,
 
 $$

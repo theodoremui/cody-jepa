@@ -14,11 +14,13 @@ By the end of this lesson, you will be able to:
 
 1. reduce paired repeated measurements to independent participant contrasts;
 2. compute and interpret a paired Student $t$ interval;
-3. distinguish participant and hierarchical bootstraps;
-4. connect interval width to effect resolution;
-5. understand noncentral $t$ power conceptually;
-6. separate superiority from equivalence decisions; and
-7. apply Holm correction to a declared family of hypotheses.
+3. preserve all four cells of a blocked $2\times2$ model experiment;
+4. calculate simple effects, a difference-in-differences interaction, and a direct
+   allocation contrast;
+5. distinguish participant precision from trained-model replication;
+6. compare raw and clipped-logit interactions for a bounded endpoint;
+7. separate superiority, materiality, and equivalence decisions; and
+8. apply an intersection decision gate without turning it into extra confirmatory tests.
 
 ## 1. Motivating scenario: did the intervention help the same people?
 
@@ -180,7 +182,159 @@ With very few units, one extreme participant can control both the mean and stand
 deviation. Report robust summaries and leave-one-participant-out sensitivity alongside the
 primary analysis when such influence is plausible.
 
-## 5. The participant percentile bootstrap
+## 5. Generalize pairing to four-cell trained-model blocks
+
+The hierarchical-diversity study uses a more demanding form of pairing. It crosses
+sequence support $u\in\{L,H\}$ with temporal-window policy $w\in\{F,R\}$. Here $L$ and
+$H$ mean low and high sequence support. $F$ and $R$ mean one frozen-random anchor and a
+resampled-anchor policy. Eight replicate blocks each contain all four cells, so the study
+trains 32 models.
+
+Participant-level GFC-v2 top-1 values can be stored with shape
+`(block, sequence_support, window_policy, participant)`, or `(8, 2, 2, 308)` for the
+planned complete outcome cohort. Average the participant axis within every cell. Let the
+result be $Y_{r,u,w}$, where $r$ identifies the replicate block. The confirmatory analysis
+then has shape `(8, 2, 2)`.
+
+This order of operations separates measurement precision from model replication. The 308
+participants and their 16 queries help estimate each model's participant-average outcome.
+They do not turn eight trained-model blocks into 308 or 4,928 model replicates. The
+Student $t$ interval for the primary model-level contrast uses eight values and therefore
+has seven degrees of freedom.
+
+Within block $r$, define four simple effects:
+
+$$
+T_{L,r}=Y_{r,L,R}-Y_{r,L,F},\qquad
+T_{H,r}=Y_{r,H,R}-Y_{r,H,F},
+$$
+
+$$
+S_{F,r}=Y_{r,H,F}-Y_{r,L,F},\qquad
+S_{R,r}=Y_{r,H,R}-Y_{r,L,R}.
+$$
+
+$T$ measures the temporal-policy effect at a fixed sequence-support level. $S$ measures
+the sequence-support effect at a fixed temporal policy. Every subtraction stays inside
+one block, which preserves the shared initialization, optimization seed, nuisance draws,
+and pool-ordering context built into that block.
+
+The primary difference-in-differences interaction is
+
+$$
+I_r=(Y_{r,H,R}-Y_{r,L,R})-(Y_{r,H,F}-Y_{r,L,F}).
+$$
+
+The same quantity can be written as $I_r=T_{H,r}-T_{L,r}=S_{R,r}-S_{F,r}$. These
+equalities are valuable implementation tests. Under this sign convention, $I_r<0$ means
+that resampling helps more at low sequence support than at high sequence support. A
+negative interaction by itself does not show that either simple effect is beneficial.
+
+The direct allocation contrast is
+
+$$
+A_r=Y_{r,L,R}-Y_{r,H,F}.
+$$
+
+It compares the low-sequence resampled allocation with the high-sequence frozen
+allocation. It is a performance comparison at two specified allocations. It is not an
+equal-information or equal-support comparison.
+
+### Why complete blocks must stay together
+
+Do not pool the 32 model scores and treat them as unrelated rows. Do not resample one cell
+from one block and another cell from a different block. Either operation discards the
+planned covariance. Instead, calculate $I_r$, the four simple effects, and $A_r$ within
+each complete block. This gives eight values for every model-level estimand.
+
+For any replicate-level vector $Q=(Q_1,\ldots,Q_8)$, report
+
+$$
+\bar Q\ \pm\ t_{0.975,7}\frac{s_Q}{\sqrt{8}}.
+$$
+
+The form is the same one-sample Student $t$ interval introduced above, but the independent
+unit is now the paired four-cell model block. Participant-only and crossed block-by-
+participant bootstraps are useful sensitivity analyses. Lesson 15 develops those
+resampling schemes.
+
+## 6. Bounded top-1 can make an interaction scale dependent
+
+Top-1 lies between zero and one. Near a ceiling, the same latent improvement has less room
+to appear as an additive percentage-point gain. The planned robustness analysis therefore
+repeats the interaction after a clipped-logit transform:
+
+$$
+Z_{r,u,w}=\mathrm{logit}
+\left(\mathrm{clip}(Y_{r,u,w},\epsilon,1-\epsilon)\right),
+\qquad
+\epsilon=\frac{1}{2\cdot308\cdot16}.
+$$
+
+The clipping constant is half of one query's contribution to the full participant-query
+average. It prevents infinite logits at zero and one while changing interior values as
+little as the declared resolution permits. Apply the same difference-in-differences
+formula to $Z$.
+
+A synthetic example makes the issue concrete. Suppose the four cells are
+$Y_{L,F}=0.04$, $Y_{L,R}=0.34$, $Y_{H,F}=0.78$, and $Y_{H,R}=0.98$. The temporal gains
+are 0.30 and 0.20, so the raw interaction is $-0.10$. On the logit scale, the interaction
+is about $+0.11$. The sign reversal shows that the apparent substitution pattern depends
+on the chosen scale. It does not reveal which scale is universally correct.
+
+The raw percentage-scale interaction remains the sole confirmatory test because that
+estimand was chosen for direct GFC-v2 interpretation. Report the raw and clipped-logit
+replicate values and intervals together. If a negative raw interaction reverses sign on
+the clipped-logit scale, label it scale dependent and do not use it to support
+substitution.
+
+## 7. Superiority, materiality, and equivalence are different rules
+
+The study freezes margins of $\delta_T=\delta_I=0.0625$ for simple effects and the
+interaction. It separately freezes $\delta_A=0.0625$ for the direct allocation contrast.
+Although all three values equal one of 16 GFC-v2 queries per participant, each margin
+belongs to its own scientific claim.
+
+An effect is materially positive only when both of these conditions hold:
+
+1. its 95 percent interval excludes zero on the positive side; and
+2. its point estimate is at least the relevant margin.
+
+Materially negative is symmetric. This is not the stronger rule that the entire 95
+percent interval must lie beyond the materiality margin. For example, an estimate of
+0.070 with a 95 percent interval `[0.010, 0.130]` is materially positive under the frozen
+rule because the interval excludes zero and the estimate reaches 0.0625.
+
+Equivalence asks a different question. At level 0.05, TOST equivalence within
+$[-\delta,+\delta]$ requires the two-sided 90 percent interval to lie entirely inside
+that band. A nonsignificant difference does not establish equivalence. For a simple
+effect, no material harm is weaker still: its 95 percent lower bound must be greater than
+$-\delta_T$.
+
+## 8. Decision gates organize evidence without multiplying primary tests
+
+The interaction is the only confirmatory test. The other quantities explain the pattern
+and support prespecified descriptive labels. A substitution-compatible result requires
+all of the following components:
+
+- $\bar T_L$ and $\bar S_F$ are materially positive;
+- $\bar T_H$ and $\bar S_R$ show no material harm;
+- $\hat I$ is materially negative; and
+- the clipped-logit ceiling sensitivity has the same negative sign.
+
+Full performance replacement additionally requires the 90 percent interval for $\bar A$
+to lie within $[-\delta_A,+\delta_A]$. If the substitution-compatible gate passes but
+$\bar A$ is materially negative, the label is partial performance replacement. If the
+gate passes and $\bar A$ is materially positive, the temporal allocation exceeds the
+sequence allocation at these two points.
+
+This is an intersection rule. Every required component must pass. The label does not
+create a new test with a separate p-value, and it does not promote each component to a
+co-primary hypothesis. Report every component interval so readers can see why a gate did
+or did not pass. Further secondary hypothesis families can use Holm correction, but the
+raw interaction keeps its role as the sole confirmatory analysis.
+
+## 9. The participant percentile bootstrap
 
 The bootstrap approximates repeated sampling by resampling observed units. For paired
 inference, resample participant differences, not individual condition rows.
@@ -215,7 +369,7 @@ def participant_bootstrap(d, replicates, rng):
 The index array has shape `(B, P)`. This vectorized implementation is fast for moderate
 $B$ and $P$. For large products, generate replicates in chunks to limit memory.
 
-## 6. Hierarchical bootstrap for nested trials
+## 10. Hierarchical bootstrap for nested trials
 
 Participant-level differences already summarize trials. Sometimes we also want uncertainty
 from trial sampling. A hierarchical bootstrap mirrors the sampling structure:
@@ -247,7 +401,7 @@ unit. Add within-participant trial resampling when trials represent a meaningful
 population and trial variability belongs in the target uncertainty. State the target
 explicitly because the two procedures need not produce the same interval.
 
-## 7. Effect resolution and interval half-width
+## 11. Effect resolution and interval half-width
 
 An experiment may be designed to estimate the mean within a desired half-width $h$. Under
 a rough normal approximation,
@@ -270,7 +424,7 @@ true between-participant variation.
 For small planned $P$, replace the normal quantile with a $t$ quantile and solve
 iteratively because the quantile itself depends on $P-1$.
 
-## 8. Power and the noncentral $t$ distribution
+## 12. Power and the noncentral $t$ distribution
 
 Power is the probability that a predeclared test rejects its null hypothesis when a
 specific alternative is true. Let the population mean paired effect be $\delta$ and the
@@ -305,7 +459,7 @@ how narrow the estimate should be regardless of which effect is observed. When s
 interpretation depends on effect size rather than only rejection, planning for precision is
 often more transparent.
 
-## 9. Superiority asks whether the effect is positive
+## 13. Superiority asks whether the effect is positive
 
 For a one-sided level $\alpha$ superiority claim, the null allows nonpositive effects and
 the alternative is positive. A lower confidence bound is
@@ -321,7 +475,7 @@ the inequality consistently.
 Failure to show superiority means the data did not establish a positive effect at the
 chosen threshold. It does not prove that the effect is zero or practically negligible.
 
-## 10. Equivalence asks whether the effect is small enough
+## 14. Equivalence asks whether the effect is small enough
 
 Equivalence begins with a practical margin $\Delta>0$. Effects between $-\Delta$ and
 $+\Delta$ are considered too small to matter for the stated application.
@@ -344,7 +498,7 @@ interval is above zero, so a corresponding one-sided superiority test may succee
 also entirely inside `[-0.20, 0.20]`, so equivalence may succeed. The interpretation is a
 reliably positive effect that is still practically small under the declared margin.
 
-## 11. Holm correction for multiple hypotheses
+## 15. Holm correction for multiple hypotheses
 
 Testing many outcomes increases the chance of at least one false rejection. Holm's method
 controls the family-wise error rate for a declared family of $m$ hypotheses.
@@ -370,7 +524,7 @@ For raw p-values 0.004, 0.018, 0.041, and 0.30 at $\alpha=0.05$, compare them wi
 0.0125, about 0.0167, 0.025, and 0.05. The first passes. The second fails, so Holm stops
 and only the first hypothesis is rejected.
 
-## 12. Efficiency and reproducibility notes
+## 16. Efficiency and reproducibility notes
 
 Compute participant contrasts once and keep participant identifiers beside them. Vectorize
 the simple bootstrap, but use chunks when `B*P` indices would be large. A hierarchical
@@ -381,7 +535,7 @@ count, interval type, direction of improvement, equivalence margin, and multipli
 Monte Carlo endpoints vary slightly across seeds, so use enough replicates for the claimed
 precision and report that simulation error exists.
 
-## 13. Misconceptions and failure modes
+## 17. Misconceptions and failure modes
 
 1. **"Every trial is an independent pair."** Participant-level dependence remains.
 2. **"A nonsignificant result proves no effect."** Absence of evidence is not equivalence.
@@ -424,13 +578,51 @@ A 90 percent interval is `[-0.08, 0.07]` and $\Delta=0.10$. What can be conclude
 **Brief solution:** it lies entirely inside `[-0.10, 0.10]`, so equivalence succeeds at
 the corresponding 0.05 TOST level. It does not show positive superiority.
 
+### Exercise 5
+
+For one block, the cells ordered as $(L,F)$, $(L,R)$, $(H,F)$, and $(H,R)$ are 0.40,
+0.58, 0.70, and 0.76. Compute $T_L$, $T_H$, $S_F$, $S_R$, $I$, and $A$.
+
+**Brief solution:** the four simple effects are 0.18, 0.06, 0.30, and 0.18. The
+interaction is $0.06-0.18=-0.12$, which also equals $0.18-0.30$. The allocation
+contrast is $0.58-0.70=-0.12$.
+
+### Exercise 6
+
+Why does the primary interval have seven degrees of freedom even though 308 participants
+each supply 16 queries to every model?
+
+**Brief solution:** the confirmatory contrast varies across eight paired trained-model
+blocks. Participants and queries are repeated measurements within each model cell. They
+improve cell precision but do not create additional independently trained blocks.
+
+### Exercise 7
+
+An interaction estimate is $-0.070$ with a 95 percent interval `[-0.120, -0.010]` and a
+materiality margin of 0.0625. Is it materially negative under the frozen rule?
+
+**Brief solution:** yes. The interval excludes zero on the negative side and the point
+estimate has magnitude at least 0.0625. The interval does not need to lie entirely below
+-0.0625.
+
+### Exercise 8
+
+What does the fact that a 95 percent interval includes zero establish about equivalence?
+
+**Brief solution:** by itself, nothing. Equivalence requires the 90 percent interval to fit
+entirely inside a predeclared practical band. A 95 percent interval that lies entirely
+inside that band would be conservative evidence of equivalence even if it includes zero.
+Merely including zero only says that a two-sided difference test was inconclusive.
+
 ## Recap
 
-Paired inference begins by creating one contrast per independent unit. The $t$ interval,
-participant bootstrap, and hierarchical bootstrap represent different uncertainty models.
-Interval width expresses resolution, while power describes rejection probability under a
-specified alternative. Superiority compares with zero, equivalence compares with a practical
-band, and Holm correction protects a declared family of decisions.
+Paired inference begins by creating one contrast per independent unit. In the
+hierarchical-diversity experiment, that unit is a complete four-cell trained-model block,
+so the primary interval uses eight difference-in-differences values. Participants sharpen
+each cell estimate but do not increase the model-level sample size. Raw and clipped-logit
+interactions expose scale dependence. Superiority, materiality, and equivalence answer
+different questions, while the substitution labels combine prespecified components without
+creating new confirmatory tests.
 
 ## Continue
 

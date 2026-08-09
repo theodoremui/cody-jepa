@@ -19,8 +19,9 @@ By the end of this lesson, you will be able to:
 5. interpret variance components in nested and crossed designs;
 6. estimate a cluster design effect as an intuition tool;
 7. identify leakage and complete-case selection; and
-8. lock a design prospectively and state its generalization limits.
-9. implement participant-only and crossed participant-by-model bootstraps with an explicit random stream.
+8. preserve four factorial cells when resampling participants and model blocks;
+9. calculate the completion-gap interaction $J_r$; and
+10. plan an eight-block experiment prospectively and state its generalization limits.
 
 ## 1. Motivating scenario: 3,600 windows from 20 people
 
@@ -104,6 +105,27 @@ Changing from 20 to 100 epochs multiplies exposure by five. It leaves participan
 session count, source diversity, and the participant-level standard-error denominator
 unchanged.
 
+### Fixed exposure does not mean fixed support
+
+The hierarchical-diversity experiment fixes sampled-example exposure at either
+8,192,000 examples for every model or, if an outcome-blind throughput rule selects the
+lower tier, 4,096,000 examples for every model. Exposure must not differ across its 32
+cells. This control prevents a model from winning simply because it received more
+optimization examples.
+
+Sequence support and temporal support still differ by design. Low-support models draw
+from roughly 2,500 sequences and high-support models draw from roughly 250,000 sequences.
+Within either sequence pool, the frozen policy can expose only one temporal anchor per
+sequence, while the resampled policy can reach several separated anchors. Fixed exposure
+therefore holds computational opportunity constant while the available source and anchor
+support changes.
+
+Realized support is not the same as independent evidence. Repeatedly drawing an anchor can
+help optimization, and access to more anchors can make the training signal more varied.
+Neither operation turns overlapping windows into independent source videos. Report unique
+sequences, available anchors, expected or realized sequence-anchor pairs, and sampled
+example exposure as separate quantities.
+
 ## 5. Nested sampling pools imply weights
 
 Suppose participant $p$ contributes $n_p$ rows with values $y_{pi}$. A global row mean is
@@ -162,14 +184,14 @@ uncertainty is computed. In a cluster-randomized study that samples clinics, ran
 clinics, and measures patients, the clinic can be all three units while patients remain
 nested outcomes. In other designs the three levels can differ.
 
-## 7. Participant and model replication are different axes
+## 7. Participants and paired model blocks are different replication axes
 
 Machine-learning experiments vary because of sampled participants and because training is
 stochastic. Different random initializations, data orders, and augmentations produce
 different fitted models.
 
-Let $Y_{pm}$ be a score for participant $p$ evaluated with model seed $m$. The score table
-has shape `(P, M)`. A simple crossed random-effects description is
+Let $Y_{pm}$ be a score for participant $p$ evaluated with model seed $m$. A simple
+crossed random-effects description is
 
 $$
 Y_{pm}=\mu+a_p+b_m+e_{pm}.
@@ -179,7 +201,7 @@ $\mu$ is the grand mean. $a_p$ is participant deviation, $b_m$ is model-seed dev
 and $e_{pm}$ is remaining interaction and measurement variation. Participants and model
 seeds are crossed because every model is evaluated on every participant.
 
-Calling model seeds a second replication axis does not make them new data samples. They
+Calling model runs a second replication axis does not make them new data samples. They
 measure variability of the training procedure conditional on the dataset and protocol.
 Each seed should correspond to a genuinely separate training run; merely evaluating the
 same fitted weights twice does not create a model replicate.
@@ -198,7 +220,7 @@ represented by those effects. The residual term includes participant-by-run inte
 With missing cells, dependence among runs, fixed hand-picked models, or additional repeated
 measurements, the formula needs a model that reflects those features.
 
-$P$ is participant count and $M$ is model count. More model seeds reduce the second and
+$P$ is participant count and $M$ is model count. More model runs reduce the second and
 third terms but do not reduce the participant term. More participants reduce the first and
 third terms but do not reduce the model-seed term. Independent replication on both axes is
 needed when both are part of the generalization claim; a balanced crossing makes the
@@ -212,42 +234,40 @@ resample participant rows while carrying every model column for a selected parti
 If the claim averages over both new participants and independently trained models, a
 crossed bootstrap can resample both axes.
 
-Let `scores` have shape `(M,P,R)`, where `M` is model ladders or seeds, `P` is participants,
-and `R` is an ordered set of conditions or data rungs. One crossed replicate draws `M`
-model indices and `P` participant indices with replacement:
+For the hierarchical-diversity analysis, `scores` has shape
+`(block, sequence_support, window_policy, participant)`. One crossed sensitivity replicate
+draws eight complete block indices and $P$ participant indices with replacement:
 
 ```python
 rng = np.random.Generator(np.random.PCG64(seed))
-model_draw = rng.integers(0, M, size=M, endpoint=False)
+block_draw = rng.integers(0, B, size=B, endpoint=False)
 participant_draw = rng.integers(0, P, size=P, endpoint=False)
-sampled = scores[model_draw][:, participant_draw, :]
+sampled = scores[block_draw][..., participant_draw]
 ```
 
-The two indexing operations are intentionally separate. `scores[model_draw]` selects model
-rows and keeps the other axes. Indexing the result with `[:, participant_draw, :]` then
-selects participant columns for every sampled model. Supplying two advanced index arrays in
-one bracket can trigger NumPy's paired advanced-indexing rules and select element pairs
-instead of the Cartesian crossing that the bootstrap requires.
+The two indexing operations are intentionally separate. `scores[block_draw]` selects
+complete four-cell blocks. Indexing the result with `[..., participant_draw]` then selects
+the same participant columns for every cell and block. Supplying two advanced index arrays
+in one bracket can trigger NumPy's paired advanced-indexing rules. More importantly,
+resampling individual models would destroy the four-cell matching that the experiment
+created.
 
-Suppose the primary contrast is the last condition minus the first. Compute that contrast
-inside each sampled model, average sampled participants within model, then average the
-sampled models:
+Compute participant means inside each sampled cell, then calculate one interaction inside
+each sampled block before averaging blocks:
 
 $$
-\Delta^{\ast}
-{}={}
-\frac{1}{M}\sum_{m=1}^{M}
+\hat I^{\ast}=\frac{1}{B}\sum_{r=1}^{B}
 \left[
-\frac{1}{P}\sum_{p=1}^{P}
-(Y^{\ast}_{mpR}-Y^{\ast}_{mp1})
+(\bar Y^{\ast}_{r,H,R}-\bar Y^{\ast}_{r,L,R})
+-(\bar Y^{\ast}_{r,H,F}-\bar Y^{\ast}_{r,L,F})
 \right].
 $$
 
 The order makes the weighting visible: every sampled participant has equal weight within
-every sampled model, and every sampled model has equal weight in the final estimate.
-Changing the reduction order gives the same arithmetic mean in a complete rectangular
-array, but writing the nested estimand explicitly prevents accidental row weighting when
-data become unbalanced.
+every sampled cell, every selected block carries all four cells, and every sampled block
+has equal weight in the final estimate. A participant-only sensitivity omits the block draw
+and resamples only the last axis, while still carrying every participant's complete
+factorial profile.
 
 An explicit bit generator strengthens reproducibility. `np.random.default_rng(seed)` is a
 convenient modern interface, but `np.random.Generator(np.random.PCG64(seed))` records the
@@ -261,11 +281,39 @@ can accidentally synchronize resamples. Conversely, changing loop order while dr
 one stream changes every later draw. Reproducibility means freezing these choices, not
 pretending that one seed makes implementation details irrelevant.
 
-Participant-only, model-only, and crossed intervals answer different questions and should
-usually differ. A crossed interval is not automatically more conservative: its width
-depends on observed variation and the resampling model. With only a few model seeds, the
-empirical model distribution is coarse. Report the number of independent models and treat
-the bootstrap as an approximation rather than as a way to manufacture training runs.
+Participant-only and crossed intervals answer different questions and should usually
+differ. The first conditions on the eight observed blocks. The second approximates
+variation from repeating the block construction and sampling participants. A crossed
+interval is not automatically more conservative. With only eight blocks, the empirical
+block distribution is coarse. Report the number of blocks and treat the bootstrap as a
+sensitivity analysis rather than as a way to manufacture training runs.
+
+### Finite-corpus caveat
+
+The eight blocks reuse one overlapping finite GaitLU corpus. Different pool orderings,
+frozen anchors, and optimization seeds do not create eight independently sampled source
+corpora. Model-level inference measures joint reproducibility over those declared sources
+of randomness, conditional on the available corpus. The crossed bootstrap must preserve
+this limitation in its interpretation.
+
+### Completion-gap interaction
+
+Let $C_{r,u,w,p}$ be independent-factor completion top-1 for the same participant and
+model cell. Define $G_{r,u,w,p}=Y_{r,u,w,p}-C_{r,u,w,p}$, average participants within
+each cell, and calculate
+
+$$
+J_r=(G_{r,H,R}-G_{r,L,R})-(G_{r,H,F}-G_{r,L,F}).
+$$
+
+$J_r$ asks whether the GFC-v2 interaction differs from the interaction already explained
+by independent factor prediction. Resampling must carry $Y$ and $C$ together for the same
+participant, cell, and block. The frozen gap margin is 0.0625. A 95 percent interval that
+excludes zero, together with $|\bar J|\ge0.0625$, defines a resolved gap interaction. A
+90 percent interval entirely within `[-0.0625, 0.0625]` supports gap equivalence. A
+resolved $J$ is necessary but not sufficient evidence for donor-based composition beyond
+independent completion. Gap equivalence supports an independent-completion explanation at
+that resolution. Any other result leaves this representation interpretation unresolved.
 
 ## 8. Variance components explain shared dependence
 
@@ -396,6 +444,26 @@ A versioned file and cryptographic hash make later changes visible. Locking does
 bad design good. It separates confirmatory decisions from exploratory learning and prevents
 quiet outcome-dependent changes.
 
+### Prospective simulation for eight blocks
+
+The study has a fixed primary model-level sample size of eight complete blocks. Before
+outcome access, simulate eight interaction values under a range of plausible means,
+between-block standard deviations, and tail behaviors. For each simulated study, apply the
+exact planned Student $t$ interval and materiality rule. Summarize interval half-width,
+probability of excluding zero, and probability that the estimate reaches the 0.0625 margin.
+
+The simulation should also cover the direct allocation equivalence rule and the
+completion-gap interpretation rule. These are different decisions, so one generic power
+number is not enough. Use only design assumptions, constructed cases, or external pilot
+information. Health&Gait outcome aggregates cannot tune the assumed effects, variance,
+margins, or decision thresholds.
+
+Eight is the number of independent model-level contrasts in every simulated primary
+analysis. Simulating more participant observations can reduce within-cell measurement
+noise if that component is modeled, but it cannot silently turn the design into more than
+eight trained-model blocks. If plausible simulation settings show that eight blocks cannot
+provide useful sensitivity at the frozen margins, the study should not launch.
+
 ## 13. Generalization is multidimensional
 
 "Generalizes" is incomplete without naming what is new. A model can generalize to new
@@ -414,22 +482,23 @@ reveals both what varies and what remains fixed.
 
 ## 14. Worked end-to-end count and uncertainty example
 
-Thirty participants are evaluated with six model seeds. Each participant supplies 100
-windows, so there are 3,000 window rows per model and 18,000 evaluated row exposures across
-models. The score table for crossed inference is still `(30, 6)` after aggregating windows
-to participant-model scores.
+Eight blocks each contain low-frozen, low-resampled, high-frozen, and high-resampled
+models. Every model is evaluated on the same 308 complete participants, with 16 GFC-v2
+queries per participant. The participant-level score tensor has shape `(8, 2, 2, 308)`.
+It contains 9,856 model-participant cell scores, each built from 16 queries, but the primary
+analysis still contains eight block interactions.
 
-Suppose estimated variance components are participant 1.00, model 0.16, and residual 0.36.
-The grand-mean variance is
+Suppose the eight interactions have sample standard deviation 0.08. The model-level
+standard error is
 
 $$
-\frac{1.00}{30}+\frac{0.16}{6}+\frac{0.36}{30\times6}
-=0.062.
+\frac{0.08}{\sqrt{8}}\approx0.028.
 $$
 
-The standard error is $\sqrt{0.062}\approx0.249$. Doubling model seeds reduces the model
-term but leaves $1/30$ unchanged. Doubling participants reduces the participant term but
-leaves $0.16/6$ unchanged. The component formula makes the replication bottleneck visible.
+The 95 percent interval uses $t_{0.975,7}$, not a normal critical value and not a degrees
+of freedom count based on participants or queries. Adding participants could reduce noise
+inside each cell mean. Only additional prospectively matched four-cell training blocks
+would directly increase the model-level replication count.
 
 ## 15. Efficiency and API notes
 
@@ -461,6 +530,10 @@ index tensor would be too large.
    family, draw order, and mapping from draws to sampling axes.
 10. **"Two index arrays create a crossing."** NumPy advanced indexing can pair arrays;
     apply model and participant selections on separate axes when a Cartesian resample is intended.
+11. **"Thirty-two models mean 32 independent factorial replicates."** The four cells in
+    each block are paired, so the primary analysis has eight model-level interactions.
+12. **"Different pool seeds create independent corpora."** All blocks reuse an overlapping
+    finite corpus, so the model-level claim remains conditional on that corpus.
 
 ## Exercises
 
@@ -501,30 +574,37 @@ $E[D_i\mid R_i=1]$.
 
 ### Exercise 6
 
-A score tensor has shape `(5, 30, 4)` for model, participant, and rung. What shape remains
-after drawing five model indices and thirty participant indices with the two-step indexing
-shown above?
+A score tensor has shape `(8, 2, 2, 308)`. What shape remains after drawing eight complete
+block indices and 308 participant indices with the two-step indexing shown above?
 
-**Brief solution:** `(5,30,4)`. Sampling is with replacement, so identifiers may repeat,
-but the bootstrap replicate keeps the original axis sizes.
+**Brief solution:** `(8,2,2,308)`. Sampling is with replacement, so identifiers may repeat,
+but the bootstrap preserves both factorial axes and the original sample sizes.
 
 ### Exercise 7
 
-Why is `scores[model_draw, participant_draw, :]` not the intended crossed bootstrap when
-the two draw arrays have compatible shapes?
+Why is independently resampling the 32 models not the intended crossed bootstrap?
 
-**Brief solution:** NumPy pairs advanced indices element by element. The desired resample
-needs every selected participant column within every selected model row, which requires
-separate axis indexing or an explicit Cartesian indexing helper.
+**Brief solution:** independent model draws can combine factorial cells from unrelated
+blocks. The desired resample selects whole blocks, carrying all four matched cells, and
+then selects the same participant indices across every cell.
+
+### Exercise 8
+
+Why does fixed sampled-example exposure not make low and high sequence support identical?
+
+**Brief solution:** exposure counts optimization draws. Support counts which distinct
+sequences and sequence-anchor pairs are available to those draws. The experiment fixes the
+former and intentionally changes the latter.
 
 ## Recap
 
-Row count, source count, exposure, and replication are different quantities. Nested pools
-encode weighting choices, and independent units come from design rather than file layout.
-Participant and model seeds contribute separate variance components. Leakage, missingness,
-and unsupported extrapolation can invalidate a precise-looking result. A prospective,
-unit-aware plan makes the evidence and its limits auditable. Crossed resampling must name
-its axes, weighting order, random generator, and advanced-indexing semantics explicitly.
+Row count, source count, exposure, support, and replication are different quantities.
+The hierarchical-diversity analysis keeps scores in an `(8, 2, 2, participant)` tensor.
+Participant-only resampling carries every participant's complete profile, while crossed
+resampling also carries every selected block's four cells. The completion-gap interaction
+uses the same pairing. Prospective simulation must keep the primary model-level sample size
+at eight and must not use outcome aggregates. These rules make the evidence and its
+finite-corpus limits auditable.
 
 ## Continue
 

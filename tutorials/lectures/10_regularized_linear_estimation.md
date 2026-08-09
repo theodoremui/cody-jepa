@@ -30,6 +30,7 @@ By the end of this lesson, you will be able to:
 7. Fit a temperature by held-out negative log likelihood and state what that does not prove.
 8. Read `np.einsum` subscripts and implement a multi-output ridge map.
 9. Compute class likelihoods in log space and optimize a positive temperature continuously.
+10. Build the three leakage-safe two-output factor heads used by GFC-v2.
 
 ## 1. Begin with a mixed-feature scenario
 
@@ -354,6 +355,18 @@ Shape reasoning comes before execution. If `centered_x` is `(N,D)` and `centered
 `(N,K)`, then `"ni,nk->ik"` must be `(D,K)`. Predicting that shape by hand catches many
 subscript mistakes before numeric assertions are considered.
 
+For GFC-v2, multi-output means two outputs within one binary factor. It does not mean one
+six-output head for all factors. Fit three separate maps,
+
+$$
+h_f(z)=zW_f+b_f,
+\qquad f\in\{\text{speed},\text{clothing},\text{direction}\},
+$$
+
+where each $W_f$ has shape `(D,2)`. The two columns score the two levels of factor $f$.
+Separate heads make each score block auditable and let the evaluator normalize each block
+with its own development statistics.
+
 ## 8. Logistic regression turns scores into probabilities
 
 For binary classification, compute a logit:
@@ -642,6 +655,73 @@ You can conclude that the selected temperature improved that empirical scoring r
 
 When data are grouped, use group-aware cross-validation for regularization selection.
 
+### The exact GFC-v2 factor-alignment workflow
+
+The study applies the general workflow above in a precise order. A participant belongs to
+one data role. Development-fit participants estimate the ridge maps and every statistic
+used by those maps. A separate development-calibration partition fits the shared
+temperature. Evaluation participants are untouched until the pipeline is frozen.
+
+Before any head is fitted, one recording representation is formed from three distinct,
+deterministic 16-frame windows. The frozen encoder maps each window to one pooled vector.
+Convert those three vectors to float64 and average them along the window axis. The result
+is one row per recording, not three fitting rows. A complete participant therefore
+contributes eight recording rows. The windows improve the measurement of one recording;
+they do not create independent observations.
+
+For each factor $f$, form a two-column one-hot target matrix $Y_f$. On development-fit
+rows only, compute the population mean and standard deviation of every representation
+coordinate. Standardize with `ddof=0`, then fit one two-output ridge system with
+$\alpha=1$. Centering the standardized inputs and $Y_f$ before solving gives
+
+$$
+W_f=(X_c^\mathsf{T}X_c+\alpha I)^{-1}X_c^\mathsf{T}Y_{f,c},
+$$
+
+$$
+b_f=\bar Y_f-\bar XW_f.
+$$
+
+The intercept is recovered from the means and is not penalized. The inverse notation
+describes the solution mathematically. Implement it with `np.linalg.solve`.
+
+The primary penalty is $\alpha=1$. Repeat the complete frozen pipeline with
+$\alpha=0.1$ and $\alpha=10$ as prespecified sensitivities. Each sensitivity refits its
+three heads and development-only post-map normalizers. It does not choose a better
+penalty after evaluation outcomes are known.
+
+Raw mapped scores are $S_f=XW_f+b_f$. The primary post-map normalization is also fitted
+only on development-fit rows. For each of the two score coordinates, compute its
+development mean $m_f$ and population standard deviation $q_f$. Clamp each standard
+deviation to the declared positive floor, then transform every later row by
+
+$$
+\widetilde S_f=\frac{S_f-m_f}{q_f},
+\qquad
+B_f=\frac{\widetilde S_f}{\lVert\widetilde S_f\rVert_2}.
+$$
+
+The last operation is rowwise L2 normalization. It gives each speed, clothing, and
+direction block a comparable directional scale before the three cosine distances are
+averaged. A row whose standardized block has zero or near-zero norm must follow the frozen
+zero-norm policy. It must not receive statistics estimated from evaluation rows.
+
+The independent-factor soft control uses the raw scores $S_f$, not the normalized
+retrieval blocks $B_f$. Fit one positive temperature $T$ on held-out development-
+calibration rows by pooling the three factor negative log likelihoods:
+
+$$
+\frac{1}{3N}\sum_{i=1}^{N}\sum_f
+\left[
+\log\sum_{k=1}^{2}\exp(S_{ifk}/T)-S_{if,y_{if}}/T
+\right].
+$$
+
+Using one $T$ keeps the confidence scale shared across factors. Temperature fitting may
+change probabilities and negative log likelihood, but a positive temperature does not
+change a factor's argmax. After this fit, freeze input standardization, all three ridge
+heads, all three post-map normalizers, and $T$ before evaluation.
+
 ## 16. Efficiency notes
 
 - Use <code>Pipeline</code> and <code>ColumnTransformer</code> to keep preprocessing inside folds.
@@ -669,6 +749,14 @@ When data are grouped, use group-aware cross-validation for regularization selec
     while the configured range contains no meaningful interior optimum.
 11. **Incorrect Einstein subscripts:** the result can have a valid shape while contracting
     the wrong scientific axis.
+12. **One joint factor head:** a six-output map hides the declared three-block structure.
+13. **Normalizing with evaluation rows:** post-map means and scales are fitted parameters.
+14. **Calibrating normalized retrieval blocks:** the soft control requires the raw ridge
+    scores, while retrieval uses the separately normalized blocks.
+15. **Treating windows as fitting rows:** three deterministic windows are averaged into
+    one float64 recording representation before factor-head fitting.
+16. **Choosing ridge strength from outcomes:** $\alpha=1$ is primary and 0.1 and 10 are
+    fixed sensitivities, not outcome-selected alternatives.
 
 ## 18. Exercises
 
@@ -679,6 +767,7 @@ When data are grouped, use group-aware cross-validation for regularization selec
 5. What additional evidence is needed before claiming empirical calibration?
 6. Decode `np.einsum("ni,nk->ik", X, Y)` and state the result shape.
 7. Why optimize $\log T$ instead of sending an unconstrained $T$ directly to an optimizer?
+8. Which quantities may development-calibration rows fit in the GFC-v2 workflow?
 
 ### Brief solutions
 
@@ -691,10 +780,12 @@ When data are grouped, use group-aware cross-validation for regularization selec
    shape `(D,K)`.
 7. Exponentiating the optimizer coordinate guarantees $T>0$, and finite log bounds encode
    a positive search interval without special invalid-value handling.
+8. They fit the one shared temperature. Ridge input statistics, coefficients, intercepts,
+   and post-map normalization statistics come from development-fit rows.
 
 ## Recap
 
-Standardization and one-hot encoding create a meaningful design matrix. Ridge stabilizes weakly constrained directions and normally excludes the intercept. Multi-output contractions can be written with explicit Einstein subscripts. Logistic and softmax models convert linear scores into probabilities, while `logsumexp` preserves likelihood information at extreme scales. Class weights change the fitting population. Temperature scaling changes confidence while preserving class order, but fitting by negative log likelihood is not itself proof of calibration.
+Standardization and one-hot encoding create a meaningful design matrix. Ridge stabilizes weakly constrained directions and normally excludes the intercept. Multi-output contractions can be written with explicit Einstein subscripts. GFC-v2 fits three separate two-output ridge heads, then fits one post-map normalizer per factor block using development data only. Logistic and softmax models convert linear scores into probabilities, while `logsumexp` preserves likelihood information at extreme scales. Class weights change the fitting population. Temperature scaling changes confidence while preserving class order, but fitting by negative log likelihood is not itself proof of calibration.
 
 ## Next lesson
 

@@ -40,6 +40,7 @@ By the end of this lesson, you will be able to:
 4. Identify pseudoreplication and its effect on uncertainty.
 5. Compare row-weighted and group-balanced estimators.
 6. Design a group-aware sampling and analysis strategy.
+7. Separate available support, training exposure, and realized support.
 
 ## 1. Population, sample, and estimand
 
@@ -77,6 +78,27 @@ An estimand must include a target population and a weighting rule. "The average 
 is incomplete if some people contribute many more rows than others. A more precise
 statement is "the mean outcome for a uniformly sampled participant, averaging that
 participant's available clips." That sentence already suggests the estimator.
+
+### Support, exposure, and realized support
+
+These three terms keep a data intervention separate from the number of training draws.
+**Support** is the set of distinct units that a sampling policy could make available.
+For example, support might be a set of sequence IDs, or a finer set of
+`(sequence_id, window_start)` pairs. **Exposure** is the total number of sampled
+presentations, including repeats. If training processes $C$ examples, its exposure is
+$C$ even when many of those examples repeat. **Realized support** is the number of
+distinct supported units that the run actually visits.
+
+Suppose a policy can draw from 100 sequence-window pairs and processes 1,000 examples.
+Its support is 100 pairs and its exposure is 1,000 draws. Its realized support can be at
+most 100 and may be smaller because sampling with replacement repeats pairs. Increasing
+exposure can visit more of the available support, but it does not enlarge the support
+set. Increasing support does not guarantee that a short run will realize all of it.
+
+The level of the support unit must also be named. Ten windows from one sequence can add
+temporal support while still belonging to one sequence and one participant. Those
+windows may improve optimization or measurement, but they are not ten independent
+participants. Support, exposure, and independent evidence answer different questions.
 
 ## 2. Means answer weighted questions
 
@@ -417,6 +439,7 @@ rigorous relative to a stated future-use question.
 4. **Balancing by accidental row counts:** define the target population first.
 5. **Splitting rows randomly:** keep related groups entirely within one partition.
 6. **Using group means without uncertainty:** preserve the number and variability of groups.
+7. **Calling exposure diversity:** repeated draws increase exposure but may leave support unchanged.
 
 Another failure is conditioning on a variable after inspecting the outcome and then
 presenting the subgroup result as planned. Conditional analysis is useful, but its
@@ -467,6 +490,8 @@ Summary statistics always imply a weighting scheme. Hierarchical data add depend
 so the row count can greatly exceed the independent information count. Conditional
 distributions reveal group structure, group-aware splits prevent leakage, and balanced
 estimators align weights with a group-level target population.
+
+Previous: [02. Inner-product geometry and numerical stability](02_inner_product_geometry.md).
 
 Next: [04. Attention and positional representations](04_attention_and_positions.md).
 

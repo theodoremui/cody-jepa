@@ -18,7 +18,8 @@ By the end of this lesson, you will be able to:
 4. build nearest-centroid and cosine-retrieval evaluations;
 5. separate enrollment samples from probes;
 6. distinguish hard and soft factor completion; and
-7. audit construct validity rather than equating invariance with usefulness.
+7. implement the study's independent-factor completion control; and
+8. audit construct validity rather than equating invariance with usefulness.
 
 ## 1. Motivating scenario: identity under a changing background
 
@@ -276,7 +277,11 @@ across gallery columns.
 Centroids reduce noise and storage, while direct retrieval preserves multimodal identity
 structure. Reporting both can reveal whether one centroid poorly summarizes an identity.
 
-## 9. Hard and soft factor completion
+## 9. Generic hard and soft expected-loss completion
+
+This section develops a general decision rule. It is useful beyond this study, but it is
+not the GFC-v2 independent-factor control. The study control is defined in the next
+section and operates on products of factor probabilities over a complete gallery.
 
 A partial query may omit a context factor. Suppose context can be day or night, with
 conditional probabilities $p_{\mathrm{day}}$ and $p_{\mathrm{night}}$ that sum to 1.
@@ -319,7 +324,118 @@ $$
 
 Evaluate each completion and then average its loss when expected performance is the goal.
 
-## 10. Construct validity
+## 10. The GFC-v2 independent-factor completion control
+
+GFC-v2 asks whether donor-supplied factor blocks retrieve a target cell. Its control asks
+how well the same raw ridge score blocks do when the three factors are completed
+independently. For each composed query, let $\ell_f(0)$ and $\ell_f(1)$ be the two raw
+scores for factor $f\in\{s,c,d\}$. These scores come from the same donor assignments as
+the GFC-v2 query. The target still contributes no features. Each complete participant
+therefore contributes the same 16 allowed target and focal-factor queries to GFC-v2 and
+to this control.
+
+Hard independent completion chooses each marginal winner:
+
+$$
+\widehat x_f=\mathop{\mathrm{argmax}}_{k\in\{0,1\}}\ell_f(k),
+\qquad
+\widehat x=(\widehat x_s,\widehat x_c,\widehat x_d).
+$$
+
+The hard control retrieves the gallery recording with tuple $\widehat x$. If a factor has
+a tied maximum, divide its hard mass equally among the tied levels under the frozen score
+tolerance. This avoids making array order a scientific tie breaker.
+
+Soft independent completion applies one positive temperature $T$, fitted on held-out
+development data, to each factor block:
+
+$$
+p_f(k;T)=
+\frac{\exp(\ell_f(k)/T)}
+{\sum_{j=0}^{1}\exp(\ell_f(j)/T)}.
+$$
+
+It assigns a complete gallery cell $x=(s,c,d)$ the product mass
+
+$$
+p(x;T)=p_s(s;T)p_c(c;T)p_d(d;T).
+$$
+
+This product is the independence assumption. It keeps marginal uncertainty, but it does
+not model dependence among speed, clothing, and direction.
+
+Compute this quantity in log space. For each factor, subtract the log-sum-exp of its two
+scaled scores, then add the three selected log probabilities:
+
+$$
+\log p(x;T)=\sum_f\left[\frac{\ell_f(x_f)}{T}
+-\log\sum_{k\in\{0,1\}}\exp\left(\frac{\ell_f(k)}{T}\right)\right].
+$$
+
+This is mathematically equal to multiplying the three probabilities, but it remains
+finite for extreme scores that would underflow in ordinary probability space.
+
+In a complete Cartesian gallery, the product is largest at the tuple of the three marginal
+maxima. A positive temperature preserves each marginal ordering. Hard and soft top-1
+therefore coincide when they use consistent tie handling. This agreement is an invariant
+that the evaluator should test. If the gallery is incomplete, the equivalence need not
+hold because the tuple of marginal winners may be absent.
+
+Consistent tie handling means more than choosing the first array entry. Hard completion
+splits each tied factor's mass across its tied levels. The Cartesian products of those
+levels form a tied set of completed cells. Soft completion at any positive temperature
+has the same tied maximizing set. Both controls give the target fractional top-1 equal
+to one divided by the size of that set when the target is present.
+
+Equal top-1 does not make the controls numerically identical. Soft completion supplies a
+target probability and target negative log likelihood,
+
+$$
+\mathrm{NLL}(x^*)=-\sum_f\log p_f(x_f^*;T).
+$$
+
+Changing $T$ changes these values and the confidence bins used by calibration diagnostics,
+even though it does not change the top-ranked tuple. Report soft NLL and reliability
+separately from the shared hard and soft top-1 control.
+
+### What the completion gap can and cannot say
+
+Let $Y$ be participant-averaged GFC-v2 top-1 and $C$ be participant-averaged independent-
+factor completion top-1 for the same model. The completion gap is
+
+$$
+G=Y-C.
+$$
+
+Pairing the two scores holds participants, queries, and gallery composition constant. A
+resolved difference can show that donor-based block geometry and
+independent marginal prediction behave differently at this evaluation resolution.
+
+The gap does not prove intrinsic compositionality, causal factor binding, or unsupervised
+factor discovery. Both endpoints use supervised ridge alignment. They can share errors,
+and $C$ depends on the quality of the factor heads and the frozen tie rule. The soft
+control's probability and NLL also depend on its temperature fit. Top-1 is bounded,
+so ceiling and floor effects can also compress the gap. The study therefore compares the
+factorial interaction in $G$ across training conditions. Even that interaction is an
+interpretation gate, not a stand-alone proof of a representation mechanism.
+
+Write the completion gap for training condition $h\in\{L,H\}$ and replicate regime
+$r\in\{F,R\}$ as $G_{h,r}$. The prespecified difference of completion-gap interactions is
+
+$$
+J=(G_{H,R}-G_{L,R})-(G_{H,F}-G_{L,F}).
+$$
+
+Use the practical margin $\delta_G=0.0625$, which is 6.25 percentage points of top-1.
+Call $J$ resolved only when its 95% confidence interval excludes zero and its point
+estimate has magnitude at least $\delta_G$. Call it practically equivalent when its 90%
+confidence interval lies completely inside $[-\delta_G,\delta_G]$. All other results are
+inconclusive. A resolved $J$ shows that the completion gap changed differently across the
+two training conditions and replicate regimes at this evaluation resolution. It still
+does not prove a representation mechanism because $Y$ and $C$ share supervised maps,
+bounded scales, tie rules, and possible ceiling effects.
+
+## 11. Construct validity
 
 **Construct validity** asks whether the measurement really captures the concept named in
 the claim. Calling a representation "context invariant" is valid only if the intervention
@@ -352,7 +468,7 @@ A third pattern is deceptively reassuring: geometry error is zero, task loss is 
 identity accuracy is chance. This is compatible with collapse. Invariance claims must
 always include a positive informativeness requirement.
 
-## 11. Efficiency notes
+## 12. Efficiency notes
 
 Normalize embedding rows once and reuse them. Matrix multiplication computes all cosine
 scores efficiently. Use `np.triu_indices(N, k=1)` to select one copy of every unordered
@@ -363,7 +479,7 @@ Store pair indices and the random seed so repeated systems are evaluated on iden
 pairs. Compute centroids with grouped sums rather than Python loops when identity count is
 large.
 
-## 12. Misconceptions and failure modes
+## 13. Misconceptions and failure modes
 
 1. **"No embedding change means success."** A collapsed representation is unchanged too.
 2. **"Synthetic substitution is automatically causal."** Artifacts and unintended changes
@@ -377,6 +493,12 @@ large.
    unstable, so reject it or use a predeclared non-cosine policy.
 8. **"A transformed copy is a new held-out source."** Source lineage crosses file-level
    transformations and must stay within one partition.
+9. **"The study's soft control averages losses over embeddings."** It multiplies calibrated
+   marginal factor probabilities over complete gallery cells.
+10. **"Equal hard and soft top-1 makes temperature irrelevant."** Temperature still changes
+    target probability, NLL, and calibration diagnostics.
+11. **"A positive completion gap proves composition."** It is a paired measurement with
+    supervised alignment and a bounded outcome, not a mechanism proof.
 
 ## Exercises
 
@@ -409,13 +531,26 @@ loss.
 **Brief solution:** hard completion reports 0.1. Soft expected loss is
 $0.8\times0.1+0.2\times2.1=0.5$.
 
+### Exercise 5
+
+Three binary factor heads assign marginal probabilities 0.8, 0.7, and 0.6 to the true
+levels. What mass does soft independent completion assign to the true gallery cell? Does
+changing to another positive temperature necessarily change the top-ranked tuple?
+
+**Brief solution:** the target mass is $0.8\times0.7\times0.6=0.336$. A different positive
+temperature changes the probabilities, but it preserves each factor's score ordering and
+therefore preserves the top-ranked tuple in a complete Cartesian gallery.
+
 ## Recap
 
 A context intervention is a matched, controlled substitution, not merely a comparison of
 two datasets. Loss contrasts measure task change, geometry matching measures relational
 change, and held-out centroid or retrieval tests verify that identity remains informative.
-Hard completion hides uncertainty, while soft completion carries it into expected loss.
-Construct validity depends on controls, separation, and agreement across measurements.
+Generic hard completion hides uncertainty, while generic soft completion carries it into
+expected loss. The GFC-v2 control instead compares marginal argmax completion with the
+product of calibrated marginal factor probabilities. Its hard and soft top-1 agree in a
+complete gallery, while soft NLL and calibration remain informative. Construct validity
+depends on controls, separation, and agreement across measurements.
 
 ## Continue
 

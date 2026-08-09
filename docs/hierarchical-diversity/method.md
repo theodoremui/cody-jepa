@@ -8,8 +8,20 @@ separate [execution plan](execution-plan.md).
 
 ## 1. Study design
 
-The study asks whether temporal-window support within sequences can substitute for
-support across sequences when training exposure is fixed. It crosses two factors:
+At a fixed sampled-clip budget, a video learner can draw from more sequences or from
+more temporal windows within familiar sequences. This study asks whether these sources
+of training support have different effects on donor-based factor-composition retrieval
+after supervised alignment, beyond their effects on independent-factor prediction.
+
+With the encoder, latent-prediction objective, optimization, augmentations, nuisance
+draws, and sampled-clip exposure fixed, the primary question is whether the effect of
+temporal-window resampling depends on sequence-pool size. The interpretation gate asks
+whether this interaction differs from the corresponding independent-factor-completion
+interaction. A direct allocation comparison asks whether the low-sequence resampled
+cell is equivalent to the high-sequence frozen-window cell under a separately justified
+margin.
+
+The experiment crosses two factors:
 
 - sequence support $u\in\{L,H\}$, with $L\approx2{,}500$ and
   $H\approx250{,}000$ exact-content-deduplicated GaitLU sequences;
@@ -71,11 +83,17 @@ $$
 $$
 
 Adjacent anchors are separated by eight frames, so their 16-frame windows overlap by at
-most 50 percent. One global temporal-capability rule, $K_i\ge2$, is applied after basic
-sequence validation and before holdout selection or replicate pool construction. The
-rule does not change across pools or replicates. If the resulting corpus cannot supply
-the common holdout and approximately 250,000 training sequences without splitting
-source groups, the hierarchical study is not launched.
+most 50 percent. This overlap is part of the intervention, not evidence that the anchors
+are independent examples. The experiment asks whether access to partly overlapping
+temporal phases has value after sampled-example exposure is fixed. The treatment audit
+therefore reports both $K_i$ and the conservative non-overlapping count obtained with
+16-frame spacing.
+
+One global temporal-capability rule, $K_i\ge2$, is applied after basic sequence
+validation and before holdout selection or replicate pool construction. The rule does
+not change across pools or replicates. If the resulting corpus cannot supply the common
+holdout and approximately 250,000 training sequences without splitting source groups,
+the hierarchical study is not launched.
 
 ### 3.2 Frozen-random policy
 
@@ -88,6 +106,12 @@ is unchanged when the same sequence appears in a nested manifest.
 A center window is not used because center position could systematically differ in gait
 phase or recording quality. Frozen and resampled starts have the same uniform marginal
 distribution over $\mathcal A_i$.
+
+Frozen-random is a deliberately low-temporal-support information control. It is not
+presented as a practical augmentation policy or a candidate recipe. Its purpose is to
+hold the available temporal location fixed while preserving the same marginal start
+distribution, sequence sampler, spatial transformations, masks, and optimization as the
+resampled condition.
 
 ### 3.3 Resampled policy
 
@@ -119,14 +143,19 @@ $$
 
 for resampled windows.
 
-Before launch, the audit reports $W_i$, $K_i$, $E_F$, $E_R$, the expected fraction of
-repeated anchors, and realized frame overlap. Treatment separation is evaluated at the
-lower possible exposure, $C=4{,}096{,}000$, so the gate also applies if the full tier is
-selected. The study launches only if median $K_i\ge4$ and $E_R/E_F\ge4$ in both
-sequence-support conditions. This requires at least fourfold expected anchor support
-and at least three alternative temporal anchors for the median sequence. It establishes
-a substantial support intervention, not semantic independence. Anchored windows are
-never described as independent video examples.
+Before further hierarchy implementation, the audit reconstructs the common holdout and
+all eight nested low and high pool pairs from the exact-deduplicated inventory. For every
+pool it reports $W_i$, $K_i$, the 16-frame-spaced non-overlapping anchor count, $E_F$,
+$E_R$, the expected non-overlapping support ratio, the expected fraction of repeated
+anchors, and mean overlap among distinct anchor pairs. Treatment separation is evaluated
+at the lower possible exposure, $C=4{,}096{,}000$, so the gate also applies if the full
+tier is selected.
+
+The study launches only if median $K_i\ge4$ and $E_R/E_F\ge4$ in every low and high
+pool. The non-overlapping count and overlap summaries are required diagnostics, not
+additional post hoc gates. This criterion establishes a substantial support
+intervention, not semantic independence. Anchored windows are never described as
+independent video examples.
 
 ## 4. Encoder training and replication
 
@@ -231,6 +260,22 @@ interval over the eight trained-model interactions. All eight interaction values
 all 32 cell outcomes are shown. Participant and crossed bootstraps are sensitivities.
 Participants, recordings, windows, and queries do not increase model-level replication.
 
+Because top-1 is bounded, saturation in a high-support cell can mechanically reduce an
+additive interaction on the percentage scale. The prespecified primary-adjacent
+robustness analysis defines
+
+$$
+Z_{r,u,w}=\operatorname{logit}(\operatorname{clip}(Y_{r,u,w},\epsilon,1-\epsilon)),
+\qquad
+\epsilon=\frac{1}{2\cdot308\cdot16},
+$$
+
+and repeats the interaction on $Z$. The raw and clipped-logit interactions, their eight
+replicate values, and their intervals appear together in the main results table and
+figure. A negative raw interaction that reverses sign on the transformed scale is
+labelled scale-dependent and cannot support substitution. The raw percentage-scale
+interaction remains the sole confirmatory test.
+
 Prespecified replicate-level simple effects are
 
 $$
@@ -253,13 +298,22 @@ $$
 It tests performance replacement at these two allocations. It is not an
 equal-information or equal-support comparison.
 
-The frozen margins are $\delta_T=\delta_I=\delta_A=6.25$ percentage points. For a simple
-or direct effect, this is one correct GFC-v2 query per participant. For the interaction,
-it is a one-query difference between the temporal-policy effects at high and low
-sequence support. A prospective simulation evaluates sensitivity at these substantive
-margins but cannot change them. If eight blocks cannot provide useful sensitivity, the
-hierarchical study is not launched. Health&Gait outcome aggregates cannot enter this
-check. Failure to reject zero is never called equivalence.
+The materiality margins for the simple effects and interaction are
+$\delta_T=\delta_I=6.25$ percentage points. For a simple effect, this is one correct
+GFC-v2 query per participant. For the interaction, it is a one-query difference between
+the temporal-policy effects at high and low sequence support.
+
+The direct allocation equivalence margin is separately set to $\delta_A=6.25$
+percentage points. It is the largest average retrieval loss considered practically
+interchangeable when asking whether the low-sequence resampled allocation recovers the
+high-sequence frozen allocation. It also corresponds to one of the 16 GFC-v2 queries
+per participant, but it is justified for this direct replacement claim rather than
+inherited from the interaction margin.
+
+A prospective simulation evaluates sensitivity at all frozen margins but cannot change
+them. If eight blocks cannot provide useful sensitivity, the hierarchical study is not
+launched. Health&Gait outcome aggregates cannot enter this check. Failure to reject
+zero is never called equivalence.
 
 An effect is materially positive when its 95% interval lies above zero and its estimate
 is at least the relevant margin. Materially negative is defined symmetrically.
@@ -299,17 +353,6 @@ Full performance replacement is an intersection-union claim because every listed
 component must pass. The other labels organize the reported estimates and do not create
 additional confirmatory tests. All component intervals are reported, and Holm
 correction applies within any further secondary families.
-
-Because GFC-v2 is bounded, a prespecified sensitivity repeats the interaction after the
-cell means are transformed by
-
-$$
-\operatorname{logit}(\operatorname{clip}(Y,\epsilon,1-\epsilon)),\qquad
-\epsilon=\frac{1}{2\cdot308\cdot16}.
-$$
-
-A negative raw interaction that reverses sign on this scale is labelled scale-dependent
-and cannot pass the substitution-compatible gate.
 
 Let $C_{r,u,w}$ be independent-factor completion top-1 and
 $G_{r,u,w}=Y_{r,u,w}-C_{r,u,w}$. The replicate-level completion-gap interaction is
@@ -364,7 +407,9 @@ re-identification, participant contact, deployment, or clinical claim is permitt
 
 ## References
 
+- Alssum, L., et al. (2023). [Just a Glimpse: Rethinking Temporal Information for Video Continual Learning](https://arxiv.org/abs/2305.18418). CVPR Workshops.
 - Bardes, A., et al. (2024). [Revisiting Feature Prediction for Learning Visual Representations from Video](https://arxiv.org/abs/2404.08471).
+- Durante, Z., et al. (2026). [VideoWeave: A Data-Centric Approach for Efficient Video Understanding](https://arxiv.org/abs/2601.06309).
 - Fan, C., Hou, S., Huang, Y., and Yu, S. (2022). [Learning Gait Representation from Massive Unlabelled Walking Videos: A Benchmark](https://arxiv.org/abs/2206.13964).
 - Hammoud, H. A. K., et al. (2024). [On Pretraining Data Diversity for Self-Supervised Learning](https://openreview.net/forum?id=SLokff4aKI). ECCV.
 - Qing, Z., et al. (2022). [Learning from Untrimmed Videos: Self-Supervised Video Representation Learning with Hierarchical Consistency](https://arxiv.org/abs/2204.03017).

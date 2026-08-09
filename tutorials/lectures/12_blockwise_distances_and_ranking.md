@@ -16,7 +16,7 @@ By the end of this lesson, you will be able to:
 2. compute cosine similarity and cosine distance safely;
 3. aggregate unequal blocks without silently changing factor weights;
 4. rank candidates while preserving ties;
-5. compute fractional top-1 credit, occupied rank, and mean reciprocal rank; and
+5. compute fractional top-1 credit, average tied rank, and mean reciprocal rank; and
 6. vectorize large batches of comparisons.
 
 ## 1. Motivating scenario: finding a person in a gallery
@@ -298,7 +298,7 @@ absolute rule is easy to audit because cosine distance always lies on the fixed 
 Approximate equality need not be transitive: $a$ can be close to $b$ and $b$ close to $c$
 without $a$ being close to $c$. Therefore do not build ties by chaining neighboring sorted
 values. Define every tie set against one fixed reference, such as the exact minimum for
-top-1 or the correct identity's distance for occupied rank.
+top-1 or the correct identity's distance for average tied rank.
 
 ### Fractional top-1 credit
 
@@ -327,31 +327,37 @@ consistently close. Minimum reduction can favor identities with many gallery row
 they receive more chances for an accidental close match. Balance gallery counts or use a
 predeclared identity-level summary.
 
-## 10. Occupied rank and reciprocal rank
+## 10. Average tied rank and reciprocal rank
 
 Ordinary row rank can penalize a candidate because arbitrary members of its own tie happen
-to appear before it. **Occupied rank** gives every member of a tie the earliest position
-that tie can occupy.
+to appear before it. The study instead assigns every member of a tie the average of the
+positions occupied by that tie.
 
-For correct distance $d_{\ast}$, occupied rank under the same absolute tolerance is
+For correct distance $d_{\ast}$, let $a_{\ast}$ be the number of candidates strictly
+closer than the lower edge of the target's tolerance band, and let $t_{\ast}$ be the
+number tied to the target reference:
 
 $$
-r_*=1+\sum_{m=1}^{M}\mathbf{1}[d_m<d_*-t].
+a_{\ast}=\sum_{m=1}^{M}\mathbf{1}[d_m<d_{\ast}-t],
+\qquad
+t_{\ast}=\sum_{m=1}^{M}\mathbf{1}[|d_m-d_{\ast}|\leq t].
 $$
 
-The indicator $\mathbf{1}[\cdot]$ contributes 1 for each candidate whose distance is
-better than the lower edge of the correct candidate's tolerance band. Candidates tied to
-the correct reference do not count against it. If no candidate is better, occupied rank
-is 1 even when the correct candidate shares a top tie.
+Those tied candidates occupy positions $a_{\ast}+1$ through $a_{\ast}+t_{\ast}$. Their
+average tied rank is
 
-Reciprocal rank is $1/r_{\ast}$. It equals 1 at rank 1, $1/2$ at rank 2, and so on. Mean
-reciprocal rank over $P$ queries is
+$$
+r_{\ast}=a_{\ast}+\frac{t_{\ast}+1}{2}.
+$$
+
+A unique best target has rank 1. A target in a two-way first-place tie has rank 1.5, not
+rank 1. Reciprocal rank is $1/r_{\ast}$. Mean reciprocal rank over $P$ queries is
 
 $$
 \mathrm{MRR}=\frac{1}{P}\sum_{p=1}^{P}\frac{1}{r_p}.
 $$
 
-Here $r_p$ is the correct occupied rank for query $p$. MRR rewards moving the correct
+Here $r_p$ is the correct average tied rank for query $p$. MRR rewards moving the correct
 identity near the top and gives progressively less credit at deeper ranks.
 
 ## 11. Worked gallery example
@@ -363,17 +369,116 @@ One probe has final identity distances:
 - identity C: 0.35;
 - identity D: 0.50.
 
-The minimum tie set is `{A, B}`, so fractional top-1 credit is $1/2$. The correct distance
-has no strictly smaller occupied distance, so occupied rank is 1 and reciprocal rank is 1.
-These metrics differ because they answer different questions. Fractional top-1 asks how a
-random tie break behaves. Occupied rank asks how many candidates lie strictly before the
-correct candidate's tie block.
+The minimum tie set is `{A, B}`, so fractional top-1 credit is $1/2$. The tie occupies
+positions 1 and 2, so its average rank is 1.5 and reciprocal-rank credit is $2/3$.
+Fractional top-1 and reciprocal rank differ because one measures first-place selection
+while the other gives graded credit to the target's average gallery position.
 
-Now change A's distance to 0.35. Identity B is the only strictly better candidate, so A
-has occupied rank 2 and reciprocal rank $1/2$. A ties C at that rank. If two candidates
-had distance 0.20, both would occupy positions before A and its occupied rank would be 3.
+Now change A's distance to 0.35. Identity B is strictly better and A ties C. That tie
+occupies positions 2 and 3, so A has average rank 2.5 and reciprocal rank 0.4. If two
+candidates had distance 0.20, the A-C tie would occupy positions 3 and 4 and have average
+rank 3.5.
 
-## 12. Efficient implementation patterns
+## 12. End-to-end synthetic GFC-v2 retrieval
+
+We can now connect query construction to ranking. One complete participant supplies eight
+gallery recordings indexed by speed, clothing, and direction. All eight stay in the
+gallery for every query, including both donors. Each recording carries a factor block for
+each of the three factors and an independent source lineage identifier.
+
+The following synthetic oracle intentionally recovers clothing and direction but not
+speed. Both speed levels map to the same unit vector. The other factor levels map to
+orthogonal unit vectors.
+
+```python
+from itertools import product
+
+factor_names = ("speed", "clothing", "direction")
+cells = list(product([0, 1], repeat=3))
+unit = {0: np.array([1.0, 0.0]), 1: np.array([0.0, 1.0])}
+recordings = {}
+for cell in cells:
+    recordings[cell] = {
+        "source_video_id": f"source-{cell[0]}-{cell[1]}",
+        "blocks": {
+            "speed": np.array([1.0, 0.0]),
+            "clothing": unit[cell[1]],
+            "direction": unit[cell[2]],
+        },
+    }
+
+def donors(target, focal_index):
+    donor_u = tuple(value if j == focal_index else 1 - value
+                    for j, value in enumerate(target))
+    donor_v = tuple(1 - value if j == focal_index else value
+                    for j, value in enumerate(target))
+    return donor_u, donor_v
+
+def require_source_separation(target, donor_u, donor_v):
+    target_source = recordings[target]["source_video_id"]
+    if any(recordings[donor]["source_video_id"] == target_source
+           for donor in (donor_u, donor_v)):
+        raise ValueError("donor and target source_video_id must differ")
+
+def cosine_distance(q, g):
+    denominator = np.linalg.norm(q) * np.linalg.norm(g)
+    if denominator <= 1e-12:
+        raise ValueError("cosine distance requires nonzero blocks")
+    return 1.0 - np.clip(np.dot(q, g) / denominator, -1.0, 1.0)
+
+def one_query(target, focal_index, tolerance=1e-12):
+    donor_u, donor_v = donors(target, focal_index)
+    require_source_separation(target, donor_u, donor_v)
+
+    query_blocks = {}
+    for j, name in enumerate(factor_names):
+        source_cell = donor_u if j == focal_index else donor_v
+        query_blocks[name] = recordings[source_cell]["blocks"][name]
+
+    distances = []
+    for candidate in cells:  # donors are retained here
+        block_distances = []
+        for name in factor_names:
+            q = query_blocks[name]
+            g = recordings[candidate]["blocks"][name]
+            block_distances.append(cosine_distance(q, g))
+        distances.append(np.mean(block_distances))
+    distances = np.asarray(distances)
+    target_index = cells.index(target)
+    top1 = fractional_top1(distances, target_index, atol=tolerance)
+    rank = average_tied_rank(distances, target_index, atol=tolerance)
+    return top1, rank, donor_u, donor_v
+
+results = [one_query(target, focal_index)
+           for target in cells for focal_index in (0, 1)]
+top1 = np.mean([result[0] for result in results])
+mrr = np.mean([1.0 / result[1] for result in results])
+assert len(results) == 16
+assert top1 == 0.5
+assert np.isclose(mrr, 2.0 / 3.0)
+
+direction_rejections = 0
+for target in cells:
+    try:
+        require_source_separation(target, *donors(target, 2))
+    except ValueError:
+        direction_rejections += 1
+assert direction_rejections == 8
+```
+
+For each candidate, the score is exactly the equal mean of speed, clothing, and direction
+cosine distances. The target ties with the cell that differs only in speed, so each query
+receives fractional top-1 $1/2$. The two-way top tie has average rank 1.5, so MRR is
+$2/3$. This is the exact two-recovered-factor top-1 oracle from Lesson 11. The executable
+notebook repeats the evaluator with zero, one, two, and three recovered factors and checks
+top-1 values $1/8$, $1/4$, $1/2$, and 1.
+
+The code also makes four protocol details visible. The target contributes no query block.
+Both donor source IDs differ from the target source ID. The gallery does not remove either
+donor. The same fixed absolute tolerance controls both fractional top-1 and average tied rank.
+Changing any of these choices changes the evaluator, not merely its implementation.
+
+## 13. Efficient implementation patterns
 
 Normalize embeddings once, not once per pair. Use a matrix product for all cosine scores.
 For factor blocks, store a block-to-measurement mapping and use vectorized segmented sums
@@ -392,7 +497,7 @@ carefully. Keeping only one local winner loses cross-shard ties. Each shard shou
 its minimum and every identity within tolerance of that minimum, after which a global step
 forms the final tie set.
 
-## 13. Misconceptions and failure modes
+## 14. Misconceptions and failure modes
 
 1. **"More measurements deserve more weight."** That is true only if the estimand is a
    measurement-weighted score. Equal-factor evaluation needs two-stage averaging.
@@ -403,6 +508,10 @@ forms the final tie set.
    identity retrieval.
 6. **"Any tiny difference is meaningful."** Floating-point comparisons need a tolerance
    tied to numeric precision and metric scale.
+7. **"Donors should be removed from the gallery."** GFC-v2 ranks all eight recordings.
+8. **"Concatenating blocks is automatically equal weighting."** Unequal block widths can
+   change the score. Compute one cosine distance per factor and average the three values.
+9. **"A different filename proves source separation."** Validate source lineage IDs.
 
 ## Exercises
 
@@ -424,9 +533,9 @@ is 0.525.
 ### Exercise 3
 
 The correct identity is in a four-way minimum tie. What are fractional top-1 credit and
-occupied rank?
+average tied rank?
 
-**Brief solution:** fractional credit is $1/4$ and occupied rank is 1.
+**Brief solution:** fractional credit is $1/4$ and average tied rank is 2.5.
 
 ### Exercise 4
 
@@ -435,12 +544,22 @@ Why can `argpartition` give an incomplete top $k$ result under ties?
 **Brief solution:** it may select only some items equal to the boundary distance. A
 tie-aware result must include all boundary ties.
 
+### Exercise 5
+
+In the synthetic GFC-v2 oracle, change the speed vectors to two orthogonal directions.
+What should happen to top-1 and MRR?
+
+**Brief solution:** all three factors are now recovered. The target becomes the unique
+minimum for every query, so both mean fractional top-1 and MRR equal 1.
+
 ## Recap
 
 Retrieval begins with a declared geometry and weighting policy. Cosine distance compares
 direction after handling zero norms. Blockwise aggregation separates within-factor
 averaging from across-factor weighting. Ranking must treat ties as sets, and fractional
-top-1, occupied rank, and MRR express distinct forms of retrieval success.
+top-1, average tied rank, and MRR express distinct forms of retrieval success. GFC-v2 applies
+these rules to three donor-supplied factor blocks while keeping the complete gallery and
+enforcing source separation.
 
 ## Continue
 

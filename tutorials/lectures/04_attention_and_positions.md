@@ -545,6 +545,8 @@ normalizes scores with softmax, and averages values. Multiple heads learn parall
 relations. Positional representations supply order, while residual connections,
 LayerNorm, and GELU form a trainable deep block around attention.
 
+Previous: [03. Hierarchical observations, weighting, and leakage](03_hierarchical_observations.md).
+
 Next: [05. Masked latent prediction and target updates](05_masked_latent_prediction.md).
 
 ## Continue in the notebook

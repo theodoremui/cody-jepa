@@ -1,6 +1,6 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 875" role="img" aria-labelledby="title desc">
-  <title id="title">Progression through the five tutorial tracks</title>
-  <desc id="desc">A five-stage flow from mathematical foundations through representation learning, evaluation, statistical inference, and reproducible evaluator engineering.</desc>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 1025" role="img" aria-labelledby="title desc">
+  <title id="title">Progression through the six tutorial tracks</title>
+  <desc id="desc">A six-stage flow from mathematical foundations through representation learning, evaluation, statistical inference, reproducible evaluator engineering, and a hierarchical-diversity capstone.</desc>
   <defs>
     <marker id="arrow" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto" markerUnits="strokeWidth">
       <path d="M0,0 L0,6 L9,3 z" fill="#475569"/>
@@ -14,7 +14,7 @@
     </style>
   </defs>
 
-  <rect width="1200" height="875" rx="24" fill="#f8fafc"/>
+  <rect width="1200" height="1025" rx="24" fill="#f8fafc"/>
   <text x="60" y="62" class="title">From arrays to defensible experiments</text>
   <text x="60" y="94" class="subtitle">Each track supplies the language and tools needed by the next.</text>
 
@@ -59,4 +59,11 @@
   <text x="88" y="761" class="track">Track E · Reproducible evaluator engineering</text>
   <text x="700" y="761" class="concept">16 Numerical contracts</text>
   <text x="88" y="801" class="count">Freeze fitted state, control numeric order, test failures, and publish complete artifacts.</text>
+
+  <line x1="600" y1="840" x2="600" y2="874" stroke="#475569" stroke-width="3" marker-end="url(#arrow)"/>
+
+  <rect x="60" y="880" width="1080" height="102" rx="18" fill="#fef3c7" stroke="#d97706" stroke-width="2"/>
+  <text x="88" y="916" class="track">Track F · End-to-end research capstone</text>
+  <text x="700" y="916" class="concept">17 Hierarchical support and factorial inference</text>
+  <text x="88" y="956" class="count">Connect temporal support, blocked models, retrieval, uncertainty, decisions, and provenance.</text>
 </svg>

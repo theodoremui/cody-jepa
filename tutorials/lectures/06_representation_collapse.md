@@ -346,6 +346,20 @@ Do not reduce collapse monitoring to one number. A useful training dashboard inc
 
 Interpret trends together. Rising effective rank is not automatically good if it comes from noisy nuisance directions. A high-rank representation can still ignore task-relevant identity, and a modest-rank representation can be excellent for a low-dimensional task.
 
+### Health metrics diagnose, but do not choose the result
+
+In a prespecified comparison, collapse statistics are training-health diagnostics. They
+can reveal non-finite values, a broken data path, or a failed run that needs a documented
+exact rerun. They do not authorize choosing whichever epoch has the best representation
+geometry or downstream outcome. If the final planned checkpoint is primary, every cell
+uses that checkpoint. Selecting an epoch after viewing the outcome quietly changes the
+estimand from "performance after the planned exposure" to "best observed performance
+along a searched trajectory."
+
+A development-only probe can help diagnose representations while a method is being
+built. A locked outcome cohort cannot be part of that dashboard. Record the boundary
+between health checks, development feedback, and final outcomes before training starts.
+
 ### Worked diagnostic pattern
 
 Suppose prediction loss falls, minimum feature standard deviation approaches zero, and covariance loss also approaches zero. This combination suggests complete collapse: a constant representation has no covariance to penalize.
@@ -383,6 +397,7 @@ Matrix multiplication computes all pairwise covariances in one optimized operati
 5. **Only watching total loss:** prediction can improve while geometry collapses.
 6. **An oversized epsilon:** reported standard deviations look healthy near zero.
 7. **Flattening correlated tokens:** the apparent sample size becomes misleading.
+8. **Selecting by health metrics:** a diagnostic becomes an unplanned checkpoint search.
 
 Useful diagnostics include the distribution of per-feature standard deviations, mean squared off-diagonal covariance, and the eigenspectrum in [Lesson 09](09_eigenspectra_and_effective_rank.md).
 

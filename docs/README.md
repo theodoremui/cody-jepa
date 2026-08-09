@@ -21,12 +21,15 @@ required pre-freeze analysis additions.
 ## Hierarchical-diversity study
 
 This is a proposed replacement that is not yet implemented. It crosses sequence-pool
-size with temporal-window resampling policy to test whether diversity within sequences
-can substitute for diversity across sequences.
+size with temporal-window resampling policy. It asks whether these sources of training
+support have different effects on donor-based factor-composition retrieval than on
+independent-factor prediction, and whether multiple windows from a small pool can match
+one frozen window from a 100×-larger pool.
 
 - [Proposal](hierarchical-diversity/proposal.md)
 - [Methods](hierarchical-diversity/method.md)
 - [Execution plan](hierarchical-diversity/execution-plan.md)
+- [Training-start agent handoff](hierarchical-diversity/training-start-handoff.md)
 
 The hierarchical study requires a new frozen-random window policy, a 32-model registry,
 factorial inference, and new execution tests. Until those changes pass the documented

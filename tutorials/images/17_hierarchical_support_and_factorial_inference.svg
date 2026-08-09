@@ -1,0 +1,65 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 640" role="img" aria-labelledby="title desc">
+  <title id="title">Hierarchical support experiment from sequence pools to blocked inference</title>
+  <desc id="desc">A flow diagram showing nested sequence pools, frozen and resampled temporal support, eight paired four-cell blocks, participant-level retrieval, and block-level inference.</desc>
+  <defs>
+    <marker id="arrow" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto" markerUnits="strokeWidth">
+      <path d="M0,0 L0,6 L9,3 z" fill="#475569"/>
+    </marker>
+    <style>
+      .title { font: 700 28px system-ui, sans-serif; fill: #0f172a; }
+      .label { font: 700 18px system-ui, sans-serif; fill: #0f172a; }
+      .text { font: 500 15px system-ui, sans-serif; fill: #334155; }
+      .small { font: 500 13px system-ui, sans-serif; fill: #475569; }
+    </style>
+  </defs>
+  <rect width="1200" height="640" rx="24" fill="#f8fafc"/>
+  <text x="54" y="58" class="title">One fixed-exposure experiment, five linked contracts</text>
+
+  <rect x="54" y="102" width="200" height="180" rx="18" fill="#e0f2fe" stroke="#0284c7" stroke-width="2"/>
+  <text x="78" y="137" class="label">Sequence support</text>
+  <rect x="78" y="158" width="68" height="76" rx="10" fill="#bae6fd"/>
+  <rect x="157" y="146" width="72" height="100" rx="10" fill="#7dd3fc"/>
+  <text x="95" y="261" class="small">L nested in H</text>
+
+  <line x1="258" y1="192" x2="306" y2="192" stroke="#475569" stroke-width="3" marker-end="url(#arrow)"/>
+
+  <rect x="314" y="102" width="220" height="180" rx="18" fill="#ede9fe" stroke="#7c3aed" stroke-width="2"/>
+  <text x="338" y="137" class="label">Temporal policy</text>
+  <circle cx="369" cy="184" r="14" fill="#a78bfa"/>
+  <text x="394" y="190" class="text">F: one fixed anchor</text>
+  <circle cx="369" cy="226" r="14" fill="#8b5cf6"/>
+  <circle cx="410" cy="226" r="14" fill="#8b5cf6"/>
+  <circle cx="451" cy="226" r="14" fill="#8b5cf6"/>
+  <text x="338" y="263" class="small">R: resample separated anchors</text>
+
+  <line x1="538" y1="192" x2="586" y2="192" stroke="#475569" stroke-width="3" marker-end="url(#arrow)"/>
+
+  <rect x="594" y="102" width="250" height="180" rx="18" fill="#dcfce7" stroke="#16a34a" stroke-width="2"/>
+  <text x="618" y="137" class="label">Eight paired blocks</text>
+  <rect x="632" y="160" width="76" height="44" rx="8" fill="#bbf7d0"/>
+  <rect x="720" y="160" width="76" height="44" rx="8" fill="#86efac"/>
+  <rect x="632" y="216" width="76" height="44" rx="8" fill="#86efac"/>
+  <rect x="720" y="216" width="76" height="44" rx="8" fill="#4ade80"/>
+  <text x="655" y="187" class="small">L,F</text>
+  <text x="743" y="187" class="small">L,R</text>
+  <text x="655" y="243" class="small">H,F</text>
+  <text x="743" y="243" class="small">H,R</text>
+
+  <line x1="848" y1="192" x2="896" y2="192" stroke="#475569" stroke-width="3" marker-end="url(#arrow)"/>
+
+  <rect x="904" y="102" width="242" height="180" rx="18" fill="#ffedd5" stroke="#ea580c" stroke-width="2"/>
+  <text x="928" y="137" class="label">Frozen evaluation</text>
+  <text x="928" y="176" class="text">GFC-v2 top-1</text>
+  <text x="928" y="207" class="text">Independent completion</text>
+  <text x="928" y="238" class="text">Participant averages</text>
+  <text x="928" y="263" class="small">Same cohort for every cell</text>
+
+  <line x1="1025" y1="286" x2="1025" y2="338" stroke="#475569" stroke-width="3" marker-end="url(#arrow)"/>
+
+  <rect x="160" y="348" width="880" height="224" rx="20" fill="#fff7ed" stroke="#c2410c" stroke-width="2"/>
+  <text x="194" y="390" class="label">Block-level scientific conclusions</text>
+  <text x="194" y="430" class="text">Interaction I: Does resampling help more when sequence support is low?</text>
+  <text x="194" y="466" class="text">Direct contrast A: Does low-sequence resampling replace high-sequence frozen support?</text>
+  <text x="194" y="502" class="text">Completion gap J: Does the interaction remain beyond independent factor prediction?</text>
+  <text x="194" y="538" class="text">Raw and clipped-logit scales, materiality, equivalence, and provenance gates</text>
+</svg>

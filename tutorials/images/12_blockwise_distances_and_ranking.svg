@@ -23,11 +23,11 @@
     <line x1="630" y1="220" x2="704" y2="220" stroke="#52606d" stroke-width="3" marker-end="url(#arrow)"/>
     <rect x="716" y="98" width="202" height="244" rx="18" fill="#e8f7ee" stroke="#3d9b67" stroke-width="2"/>
     <text x="817" y="134" text-anchor="middle" font-size="20" font-weight="700" fill="#165b36">Gallery rank</text>
-    <text x="817" y="177" text-anchor="middle" font-size="18" fill="#165b36">A  0.10  rank 1</text>
-    <text x="817" y="213" text-anchor="middle" font-size="18" fill="#165b36">B  0.10  rank 1</text>
+    <text x="817" y="177" text-anchor="middle" font-size="18" fill="#165b36">A  0.10  rank 1.5</text>
+    <text x="817" y="213" text-anchor="middle" font-size="18" fill="#165b36">B  0.10  rank 1.5</text>
     <text x="817" y="249" text-anchor="middle" font-size="18" fill="#165b36">C  0.40  rank 3</text>
     <line x1="746" y1="268" x2="888" y2="268" stroke="#74b38d"/>
-    <text x="817" y="302" text-anchor="middle" font-size="17" fill="#165b36">top tie: 1/2 credit</text>
+    <text x="817" y="302" text-anchor="middle" font-size="17" fill="#165b36">top tie: 1/2 credit, rank 1.5</text>
     <text x="480" y="392" text-anchor="middle" font-size="17" fill="#52606d">Average at the level named by the scientific question, then preserve score ties.</text>
   </g>
 </svg>

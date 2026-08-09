@@ -1,5 +1,9 @@
 # 09. Covariance eigenspectra and effective rank
 
+> **Curriculum role.** This lesson is an optional representation diagnostic. Effective
+> rank is useful for studying feature geometry, but it is not a primary estimand or decision
+> gate in the hierarchical-diversity experiment.
+
 ![Overview of feature geometry, spectrum, and effective rank](../images/09_eigenspectra_and_effective_rank.svg)
 
 ## Why this lesson matters
@@ -617,9 +621,11 @@ Because centering removes one observation-space degree of freedom, sample covari
 
 Covariance measures variance in every direction. Its eigenvectors identify orthogonal principal directions, and its eigenvalues give their variances. SVD reaches the same geometry from the data matrix. PCA projects and reconstructs with leading directions. Effective rank summarizes how evenly variance occupies those directions while respecting the ambiguity of tied eigenspaces. When software requires deterministic coordinates, projector-based canonicalization selects a reproducible basis without giving tied axes scientific uniqueness.
 
-## Next lesson
+## Continue
 
-[10: Regularized linear estimation and calibration](10_regularized_linear_estimation.md) uses feature geometry to build stable predictors and carefully interpret probability scores.
+- Previous: [08. Group-aware sampling and balanced evaluation](08_group_aware_sampling.md)
+
+- Next: [10. Regularized linear estimation and calibration](10_regularized_linear_estimation.md). This lesson uses feature geometry to build stable predictors and carefully interpret probability scores.
 
 ## Continue in the notebook
 
