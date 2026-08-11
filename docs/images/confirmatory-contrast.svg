@@ -1,0 +1,38 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="960" height="550" viewBox="0 0 960 550" role="img" aria-labelledby="fig-title fig-desc" font-family="system-ui, -apple-system, 'Segoe UI', sans-serif">
+  <title id="fig-title">From query margins up to the paired block contrast</title>
+  <desc id="fig-desc">Four aggregation steps. Query margins are averaged within each participant. Participants are weighted equally so each trained model gets a GFC margin G and an independent-completion margin C. Their difference D equals G minus C. The primary contrast subtracts D at breadth from D at phase depth inside each paired block, giving eight values of P sub r for the frozen small-sample test.</desc>
+  <defs>
+    <marker id="ar" markerWidth="10" markerHeight="10" refX="9" refY="5" orient="auto">
+      <path d="M0,0 L10,5 L0,10 Z" fill="#52606d"/>
+    </marker>
+  </defs>
+  <rect width="960" height="550" fill="#fbfaf7"/>
+  <text x="480" y="46" text-anchor="middle" font-size="23" font-weight="700" fill="#172b4d">The paired block contrast is the inference unit</text>
+
+  <rect x="50" y="82" width="860" height="86" rx="14" fill="#dbeafe" stroke="#2563eb" stroke-width="2.5"/>
+  <text x="80" y="132" font-size="17" font-weight="700" fill="#172b4d">1. Query to participant</text>
+  <line x1="350" y1="100" x2="350" y2="150" stroke="#64748b" stroke-width="1.5"/>
+  <text x="378" y="118" font-size="16" fill="#172b4d">Average the query margins inside each participant, so no</text>
+  <text x="378" y="146" font-size="16" fill="#172b4d">participant with more queries counts for more.</text>
+  <path d="M480 172 V194" fill="none" stroke="#52606d" stroke-width="3" marker-end="url(#ar)"/>
+
+  <rect x="50" y="200" width="860" height="86" rx="14" fill="#ede9fe" stroke="#7c3aed" stroke-width="2.5"/>
+  <text x="80" y="250" font-size="17" font-weight="700" fill="#172b4d">2. Participant to model</text>
+  <line x1="350" y1="218" x2="350" y2="268" stroke="#64748b" stroke-width="1.5"/>
+  <text x="378" y="236" font-size="16" fill="#172b4d">Weight participants equally. Each model now has two scores:</text>
+  <text x="378" y="264" font-size="16" fill="#172b4d">G, the GFC margin, and C, the completion margin.</text>
+  <path d="M480 290 V312" fill="none" stroke="#52606d" stroke-width="3" marker-end="url(#ar)"/>
+
+  <rect x="50" y="318" width="860" height="86" rx="14" fill="#fef3c7" stroke="#d97706" stroke-width="2.5"/>
+  <text x="80" y="368" font-size="17" font-weight="700" fill="#172b4d">3. Two scores to one</text>
+  <line x1="350" y1="336" x2="350" y2="386" stroke="#64748b" stroke-width="1.5"/>
+  <text x="378" y="354" font-size="16" fill="#172b4d">D = G minus C for each block and allocation. Subtracting C</text>
+  <text x="378" y="382" font-size="16" fill="#172b4d">removes what independent factor recovery already explains.</text>
+  <path d="M480 408 V430" fill="none" stroke="#52606d" stroke-width="3" marker-end="url(#ar)"/>
+
+  <rect x="50" y="436" width="860" height="86" rx="14" fill="#dcfce7" stroke="#16a34a" stroke-width="2.5"/>
+  <text x="80" y="486" font-size="17" font-weight="700" fill="#172b4d">4. Block to inference</text>
+  <line x1="350" y1="454" x2="350" y2="504" stroke="#64748b" stroke-width="1.5"/>
+  <text x="378" y="472" font-size="16" fill="#172b4d">P at block r = D at phase depth minus D at breadth. Eight</text>
+  <text x="378" y="500" font-size="16" fill="#172b4d">paired values enter the frozen small-sample procedure.</text>
+</svg>

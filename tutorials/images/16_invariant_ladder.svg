@@ -1,0 +1,33 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 510" role="img" aria-labelledby="title desc">
+  <title id="title">The order of checks that makes an evaluation reproducible</title>
+  <desc id="desc">Six stacked rungs climb from local row checks, through set equality on the registry, paired seeds and nesting, digests and checkpoint provenance, deterministic ordering, up to the privacy allowlist and atomic publication.</desc>
+  <defs>
+    <marker id="a16l" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto"><path d="M0 0 L0 6 L9 3 z" fill="#52606d"/></marker>
+  </defs>
+  <rect width="960" height="510" fill="#fbfaf7"/>
+  <g font-family="sans-serif" fill="#172b4d">
+    <text x="480" y="42" text-anchor="middle" font-size="24" font-weight="700">Climb the ladder from local fields to published bytes</text>
+
+    <path d="M36 470 V78" stroke="#52606d" stroke-width="3" marker-end="url(#a16l)"/>
+
+    <rect x="60" y="420" width="620" height="46" rx="10" fill="#f1f5f9" stroke="#64748b" stroke-width="2"/>
+    <text x="80" y="450" font-size="16">1. Check row fields, dtypes, and policy names</text>
+
+    <rect x="84" y="350" width="620" height="46" rx="10" fill="#dbeafe" stroke="#2563eb" stroke-width="2"/>
+    <text x="104" y="380" font-size="16">2. Compare the registry with the exact 28-row set</text>
+
+    <rect x="108" y="280" width="620" height="46" rx="10" fill="#dbeafe" stroke="#2563eb" stroke-width="2"/>
+    <text x="128" y="310" font-size="16">3. Verify paired seeds, shared manifests, and nesting</text>
+
+    <rect x="132" y="210" width="620" height="46" rx="10" fill="#ede9fe" stroke="#7c3aed" stroke-width="2"/>
+    <text x="152" y="240" font-size="16">4. Verify manifest, phase-catalog, and checkpoint digests</text>
+
+    <rect x="156" y="140" width="620" height="46" rx="10" fill="#fef3c7" stroke="#d97706" stroke-width="2"/>
+    <text x="176" y="170" font-size="16">5. Sort rows by an exact key, then compute</text>
+
+    <rect x="180" y="70" width="620" height="46" rx="10" fill="#dcfce7" stroke="#16a34a" stroke-width="2"/>
+    <text x="200" y="100" font-size="16">6. Pass the privacy allowlist, then publish atomically</text>
+
+    <text x="480" y="494" text-anchor="middle" font-size="16" fill="#52606d">Each rung assumes every rung below it has already passed.</text>
+  </g>
+</svg>

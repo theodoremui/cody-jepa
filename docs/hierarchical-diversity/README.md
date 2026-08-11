@@ -1,33 +1,30 @@
-# Hierarchical diversity: active study guide
+# Hierarchical Diversity
 
-## What this study is
+This folder describes the active CoDy-JEPA study design. The study asks whether a fixed
+video-training budget works differently when its sampling opportunities are spread across
+more source sequences or concentrated into phase-separated origins inside fewer sequences.
 
-The active study asks where video diversity should live. With fixed clip exposure and the same nominal catalog of sequence-origin atoms, should training use many sequences with one phase origin each, or fewer sequences with several phase-separated origins?
+## Folder Guide
 
-| Allocation | Sequences | Origins per sequence | Nominal catalog |
-| --- | ---: | ---: | ---: |
-| Breadth | 250,000 | 1 | 250,000 |
-| Balanced | 125,000 | 2 | 250,000 |
-| Phase depth | 62,500 | 4 | 250,000 |
-| Nearby jitter diagnostic | 62,500 | 4 | 250,000 |
+- [proposal.md](proposal.md) explains the research question and the planned contribution.
+- [method.md](method.md) defines the frozen protocol and claim boundary.
+- [execution-plan.md](execution-plan.md) turns the protocol into gates, work packages, and
+  a training-start checklist.
 
-The first three are eight paired allocation blocks. Nearby jitter appears in four blocks and checks whether phase separation matters beyond local temporal variation. The complete experiment has 28 models.
+The shared data-preparation runbook is one level up at
+[docs/gaitlu_training.md](../gaitlu_training.md).
 
-## Which document answers which question
+## What Belongs Here
 
-| Need | Read |
-| --- | --- |
-| Why this is a useful ICLR representation-learning question | [proposal.md](proposal.md) |
-| Exact eligibility, phase construction, registry, outcomes, and claims | [method.md](method.md) |
-| Gates, software work, training checklist, and calendar | [execution-plan.md](execution-plan.md) |
-| How raw GaitLU data become prepared inputs | [GaitLU preparation](../gaitlu_training.md) |
-| Earlier rejected designs and review history | [archive](../archive/hierarchical-diversity/) |
+This folder should stay focused on the active research contribution. It explains the
+allocation idea, the frozen measurement contract, the planned training and analysis path,
+and the limits on what the result can claim.
 
-## Non-negotiable interpretation limits
+Exact allocation counts, registry fields, metric definitions, and gate dates belong in the
+method and execution-plan files, not in this README.
 
-This is a controlled case study in GaitLU silhouettes with one JEPA objective. U times k controls nominal cardinality, not information. GFC measures supervised donor-based factor recombination, not unsupervised disentanglement. Three path points do not establish a universal scaling law. The study makes no clinical or balance-assessment claim.
+## Claim Boundaries
 
-## Status
-
-Do not launch training until the phase, catalog, metric, power, software, and systems gates in [execution-plan.md](execution-plan.md) pass. The experiment and analysis freeze by September 4, 2026, preserving September 5 through September 25 for ICLR writing.
-
+The files in this folder define a narrow representation-learning study, not a universal
+video-scaling claim. Use [method.md](method.md) for the exact claim boundary and
+[execution-plan.md](execution-plan.md) for launch gates.

@@ -1,16 +1,25 @@
 # 06. Representation collapse and variance-covariance regularization
 
-![Overview of collapsed and healthy representation geometry](../images/06_representation_collapse.svg)
+![Overview of collapsed and healthy representation geometry: three panels show complete collapse, redundant varying features, and a healthy spread](../images/06_representation_collapse.svg)
 
 ## Why this lesson matters
 
-Imagine that you train an image encoder for several hours. Its prediction loss falls almost to zero. You then plot the feature vectors for cats, bicycles, trees, and houses, but every point sits in the same tiny region. The model has learned to agree with its training target without preserving useful differences between inputs.
+Imagine you train an image encoder for several hours. Its prediction loss falls almost to
+zero. You then plot the feature vectors for cats, bicycles, trees, and houses, and every
+point sits in the same tiny region. The model has learned to agree with its own training
+target without preserving any useful difference between inputs.
 
-This failure is called **representation collapse**. It matters because a small training loss does not guarantee an informative representation. In this lesson, we build two simple statistical safeguards. Feature variance prevents coordinates from becoming constant. Off-diagonal covariance discourages coordinates from copying one another.
+That failure is called **representation collapse**, and it is the danger Lesson 05 named but
+did not measure. It matters because a small training loss does not guarantee an informative
+representation. This lesson builds two simple statistical safeguards against it. Feature
+variance stops coordinates from becoming constant. Off-diagonal covariance stops coordinates
+from copying one another.
 
 ## Prerequisites
 
-You should be comfortable with two-dimensional arrays, means, and squared differences. Lesson 02 introduces vector geometry, and [Lesson 05](05_masked_latent_prediction.md) explains prediction targets and stop-gradient updates.
+You should be comfortable with two-dimensional arrays, means, and squared differences. Lesson
+02 introduces the vector geometry, and [Lesson 05](05_masked_latent_prediction.md) explains
+the prediction targets and stop-gradient updates that create the risk in the first place.
 
 ## Learning goals
 
@@ -25,7 +34,9 @@ By the end of this lesson, you will be able to:
 
 ## 1. Start with one concrete batch
 
-Suppose an encoder processes $B=4$ images and produces $D=3$ numbers per image. Store the result in a matrix $Z$ with shape $(B,D)=(4,3)$:
+Collapse is easiest to recognize in a matrix you can read by eye, so start there. Suppose an
+encoder processes $B=4$ images and produces $D=3$ numbers per image. Store the result in a
+matrix $Z$ with shape $(B,D)=(4,3)$:
 
 $$
 Z=
@@ -37,9 +48,10 @@ Z=
 \end{bmatrix}.
 $$
 
-Each row represents one image. Each column is one learned feature. Every row is identical, so the representation cannot distinguish any pair of images. This is **complete collapse**.
+Each row is one image and each column is one learned feature. Every row is identical, so the
+representation cannot tell any pair of images apart. This is **complete collapse**.
 
-Now consider:
+The second failure is less obvious because the rows do differ. Consider:
 
 $$
 Z=
@@ -51,19 +63,26 @@ Z=
 \end{bmatrix}.
 $$
 
-The rows differ, so this is not complete collapse. However, column 2 is twice column 1, and column 3 is three times column 1. All variation lies along one direction. This is **dimensional collapse**.
+Column 2 is twice column 1 and column 3 is three times column 1, so all the variation lies
+along a single direction. Three features are being spent to carry one number. This is
+**dimensional collapse**.
 
 ### Mental model
 
-Think of every feature as a measuring instrument:
+Think of every feature as a measuring instrument, and the two failures become two questions
+you would ask of any instrument panel:
 
 - Variance asks whether each instrument moves at all.
 - Covariance asks whether several instruments are reporting the same movement.
 - A healthy representation needs movement and nonredundant directions.
 
+Those two questions become the two loss terms built in sections 4 and 5.
+
 ## 2. Why agreement alone can collapse
 
-Let $P$ be a prediction matrix and $T$ a target matrix, both with shape $(B,D)$. Mean squared prediction loss is
+Before adding new terms, it is worth seeing precisely why the prediction loss permits the
+failure. Let $P$ be a prediction matrix and $T$ a target matrix, both of shape $(B,D)$. Mean
+squared prediction loss is
 
 $$
 \mathcal{L}_{\mathrm{pred}}
@@ -74,13 +93,27 @@ $$
 (P_{ij}-T_{ij})^2.
 $$
 
-Here $i$ indexes observations, $j$ indexes features, and $BD$ is the number of compared scalar values. The loss is small when paired predictions and targets agree.
+Here $i$ indexes the $B$ observations, $j$ indexes the $D$ features, and $BD$ is the number
+of scalar values being compared. The loss is small exactly when paired predictions and
+targets agree.
 
-Agreement does not require different inputs to produce different outputs. If both branches produce the same constant vector $c$, then $P_{i:}=T_{i:}=c$ for every observation $i$. Every squared difference is zero.
+Nothing in that definition requires different inputs to produce different outputs. If both
+branches emit the same constant vector $c$, then $P_{i:}=T_{i:}=c$ for every observation $i$
+and every squared difference is zero. The objective is fully satisfied by a representation
+that has thrown away all its information.
 
-![Prediction agreement can have a constant solution](../images/06_prediction_loss_trap.svg)
+![Prediction agreement can have a constant solution: two branches map different inputs to the same vector and the loss reads zero](../images/06_prediction_loss_trap.svg)
 
-Architectural choices such as stop-gradient targets and slowly updated target encoders can reduce collapse risk. Statistical regularization gives the objective an explicit definition of healthy batch geometry. These safeguards still require measurement because none guarantees an informative representation by itself.
+This does not happen in one step. It happens gradually, which is what makes it hard to catch
+while watching a loss curve.
+
+![Collapse seen as an embedding cloud shrinking during training, from a spread-out cloud to a single point](../images/06_collapse_over_training.svg)
+
+Across those three snapshots the prediction loss can fall the entire way, because agreement
+gets easier as the cloud tightens. Architectural choices such as stop-gradient targets and
+slowly updated target encoders reduce the risk. Statistical regularization goes further and
+gives the objective an explicit definition of healthy batch geometry. Neither guarantees an
+informative representation on its own, which is why both still require measurement.
 
 ### Conceptual checkpoint
 
@@ -90,19 +123,24 @@ You know that paired outputs agree. You do not yet know whether outputs vary acr
 
 ## 3. Center the feature matrix
 
-For feature $j$, compute its batch mean:
+Both safeguards are statements about how the features vary, and variation is measured
+relative to a mean, so the first step is always to subtract that mean. For feature $j$,
 
 $$
 \mu_j=\frac{1}{B}\sum_{i=1}^{B} Z_{ij}.
 $$
 
-The symbol $\mu_j$ is one scalar. Collecting all feature means gives a row vector $\mu$ with shape $(D,)$. Subtract it from every row:
+The symbol $\mu_j$ is one scalar: the average of feature $j$ over the $B$ observations in the
+batch. Collecting all feature means gives a row vector $\mu$ with shape $(D,)$. Subtract it
+from every row:
 
 $$
 X_{ij}=Z_{ij}-\mu_j.
 $$
 
-The centered matrix $X$ has the same shape $(B,D)$ as $Z$. Every column of $X$ has mean zero. Centering separates variation from absolute location.
+The centered matrix $X$ has the same shape $(B,D)$ as $Z$, and every column of $X$ now has
+mean zero. Centering separates variation from absolute location, so that shifting the whole
+representation cannot masquerade as spread.
 
 In NumPy:
 
@@ -112,11 +150,14 @@ x = z - mu
 assert x.shape == z.shape
 ~~~
 
-The argument <code>axis=0</code> averages down the observation axis. The argument <code>keepdims=True</code> preserves shape $(1,D)$, so subtraction broadcasts clearly across rows.
+The argument <code>axis=0</code> averages down the observation axis, so one mean is produced
+per feature. The argument <code>keepdims=True</code> preserves shape $(1,D)$, which makes the
+subtraction broadcast unambiguously across rows.
 
 ## 4. Feature variance prevents constant coordinates
 
-The sample variance of feature $j$ is
+The first safeguard answers the first question from section 1: does each instrument move at
+all? The sample variance of feature $j$ over the batch is
 
 $$
 s_j^2
@@ -126,15 +167,20 @@ s_j^2
 X_{ij}^2.
 $$
 
-The value $s_j^2$ has squared feature units. Its square root $s_j$ has the same units as the feature:
+The value $s_j^2$ has squared feature units, so it is easier to reason about its square root
+$s_j$, which has the same units as the feature itself:
 
 $$
 s_j=\sqrt{s_j^2+\varepsilon}.
 $$
 
-The small positive number $\varepsilon$ prevents an undefined derivative at exactly zero. It should be large enough for numerical stability and small enough not to disguise collapse.
+The small positive number $\varepsilon$ prevents an undefined derivative at exactly zero. It
+should be large enough for numerical stability and small enough that it does not disguise
+collapse, because a generous $\varepsilon$ makes a dead feature report a healthy-looking
+standard deviation.
 
-Choose a target standard deviation $\gamma$, often $\gamma=1$. Penalize only features below that target:
+Now choose a target standard deviation $\gamma$, often $\gamma=1$, and penalize only the
+features that fall below it:
 
 $$
 \mathcal{L}_{\mathrm{var}}
@@ -144,7 +190,13 @@ $$
 \max(0,\gamma-s_j).
 $$
 
-The maximum creates a hinge. A feature with $s_j\ge\gamma$ receives no further pressure to grow. A constant feature has $s_j$ near zero and receives a large penalty.
+![The variance hinge penalizes only features below the target spread, falling to zero at gamma and staying flat above it](../images/06_variance_hinge.svg)
+
+The maximum creates a hinge, which the figure draws directly. To the left of $\gamma$ the
+penalty grows as the feature gets flatter, so the gradient pushes that feature to spread out.
+At and beyond $\gamma$ the curve is flat, so a feature that is already varying enough
+receives no pressure to vary more. A constant feature has $s_j$ near zero and sits at the far
+left, where the penalty is largest.
 
 ~~~python
 def variance_loss(z, target_std=1.0, eps=1e-4):
@@ -152,11 +204,14 @@ def variance_loss(z, target_std=1.0, eps=1e-4):
     return np.maximum(0.0, target_std - std).mean()
 ~~~
 
-The argument <code>ddof=1</code> uses denominator $B-1$, matching sample variance.
+The argument <code>ddof=1</code> uses the denominator $B-1$, matching the sample variance
+written above.
 
 ## 5. Covariance detects copied features
 
-Variance alone is not enough. Every column could copy one varying signal and still have large standard deviation.
+Variance alone cannot catch the second failure from section 1. Every column could copy one
+varying signal and still report a large standard deviation, which is exactly what the
+dimensional-collapse matrix does. Detecting that requires looking at pairs of features.
 
 The sample covariance matrix is
 
@@ -164,9 +219,9 @@ $$
 C=\frac{1}{B-1}X^\mathsf{T}X.
 $$
 
-The matrix $X^\mathsf{T}$ has shape $(D,B)$. Multiplying it by $X$, which has shape $(B,D)$, produces $C$ with shape $(D,D)$.
-
-Entry $C_{jk}$ measures how features $j$ and $k$ move together:
+Check the shapes: $X^\mathsf{T}$ has shape $(D,B)$ and $X$ has shape $(B,D)$, so $C$ has
+shape $(D,D)$, one entry for every ordered pair of features. Entry $C_{jk}$ measures how
+features $j$ and $k$ move together across the batch:
 
 $$
 C_{jk}
@@ -176,9 +231,9 @@ C_{jk}
 X_{ij}X_{ik}.
 $$
 
-Diagonal entry $C_{jj}$ is the variance of feature $j$. Off-diagonal entries describe linear redundancy between different features.
-
-Penalize squared off-diagonal entries:
+The two kinds of entry mean different things. A diagonal entry $C_{jj}$ is just the variance
+of feature $j$, which section 4 already handles. Off-diagonal entries describe linear
+redundancy between two different features, which is what we want to remove:
 
 $$
 \mathcal{L}_{\mathrm{cov}}
@@ -187,11 +242,16 @@ $$
 \sum_{j\ne k} C_{jk}^2.
 $$
 
-Squaring prevents positive and negative dependencies from canceling. The division by $D$ is one common scaling convention. State the convention because implementations differ.
+![The covariance term penalizes the off-diagonal entries only, leaving the green diagonal of per-feature variances untouched](../images/06_covariance_offdiagonal.svg)
+
+The figure shows which cells are in the sum. Squaring each off-diagonal entry stops positive
+and negative dependencies from cancelling out. The division by $D$ is one common scaling
+convention; state whichever one you use, because implementations differ and the coefficient
+you tune depends on it.
 
 ### Worked numerical example
 
-For the three observations
+For three observations of two features,
 
 $$
 Z=
@@ -222,11 +282,20 @@ C
 \end{bmatrix}.
 $$
 
-Both diagonal entries are positive, so both features vary. The large off-diagonal value reveals that the features are redundant.
+Both diagonal entries are positive, so both features vary and the variance term is content.
+The large off-diagonal value is what reveals that the second feature is simply twice the
+first. This is the smallest possible demonstration that you need both terms.
+
+### Why both signs of covariance matter
+
+Suppose feature 2 is the negative of feature 1. Their covariance is large and negative, yet
+the features still carry identical information, because one is recovered from the other by
+multiplying by $-1$. Squaring $C_{12}$ penalizes copying and sign-flipped copying equally,
+which is the behavior you want.
 
 ## 6. Combine complementary safeguards
 
-A common objective is
+With both terms defined, the full objective is a weighted sum:
 
 $$
 \mathcal{L}
@@ -236,53 +305,74 @@ $$
 +\lambda_c\mathcal{L}_{\mathrm{cov}}.
 $$
 
-The coefficients $\lambda_p$, $\lambda_v$, and $\lambda_c$ control the influence of prediction, variance, and covariance. They are dimensionless hyperparameters only if the three losses have already been defined with compatible scaling.
+The coefficients $\lambda_p$, $\lambda_v$, and $\lambda_c$ control how much influence
+prediction, variance, and covariance each have. They are dimensionless hyperparameters only
+if the three losses have already been defined with compatible scaling, which is not automatic.
 
-Interpret the terms as a negotiation:
+Interpret the three terms as a negotiation:
 
 - Prediction says paired views should agree.
 - Variance says different observations must remain distinguishable.
-- Covariance says distinguishability should use more than one copied direction.
+- Covariance says that distinguishability should use more than one copied direction.
 
-Log every unweighted term before tuning the coefficients. A stable total loss can hide one exploding component and one shrinking component.
+Log every unweighted term before you tune the coefficients. A stable total loss can easily
+hide one component exploding while another shrinks.
 
 ### How the regularizers push the representation
 
-The variance hinge acts only on low-spread features. If feature $j$ is constant, increasing the difference between some observations lowers its variance penalty. Once its standard deviation reaches $\gamma$, the hinge becomes flat and stops demanding more spread.
+It is worth being precise about where each gradient acts. The variance hinge acts only on
+low-spread features: if feature $j$ is constant, increasing the difference between some
+observations lowers its penalty, and once $s_j$ reaches $\gamma$ the hinge is flat and stops
+asking for more.
 
-The covariance penalty acts on pairs of features. If two centered columns point in nearly the same direction across the batch, their inner product is large. Lowering the penalty encourages one column to carry variation that the other does not already carry.
+The covariance penalty acts on pairs instead. If two centered columns point in nearly the
+same direction across the batch, their inner product is large, so lowering the penalty
+encourages one column to carry variation the other does not already carry.
 
-These forces do not assign semantic meaning to coordinates. They only shape batch statistics. Prediction or reconstruction objectives must still connect the representation to input content.
-
-### Why both signs of covariance matter
-
-Suppose feature 2 is the negative of feature 1. Their covariance is large and negative. The features still contain the same information because one can be recovered by multiplying the other by $-1$. Squaring $C_{12}$ correctly penalizes both positive copying and negative copying.
+Neither force assigns any semantic meaning to a coordinate. They shape batch statistics and
+nothing more. Prediction or reconstruction objectives are still what connect the
+representation to the actual content of the input.
 
 ### Loss scale checkpoint
 
-Assume prediction loss is about $0.02$, variance loss is about $0.6$, and covariance loss is about $12$. Adding them with equal coefficients would make covariance dominate. This does not mean covariance is more important. It means the three definitions produce different numerical scales.
+Suppose prediction loss is about $0.02$, variance loss is about $0.6$, and covariance loss is
+about $12$. Adding them with equal coefficients would let covariance dominate the gradient
+completely. That is not evidence that covariance is more important. It is evidence that the
+three definitions produce different numerical scales.
 
-Inspect typical magnitudes and gradient norms before choosing $\lambda_p$, $\lambda_v$, and $\lambda_c$. Recheck them if batch size, feature dimension, or pooling policy changes.
+Inspect typical magnitudes and gradient norms before choosing $\lambda_p$, $\lambda_v$, and
+$\lambda_c$, and recheck them whenever batch size, feature dimension, or pooling policy
+changes, because all three shift the scales.
 
 ## 7. Raw covariance or correlation?
 
-Covariance depends on scale. A feature with standard deviation 10 can dominate a feature with standard deviation 0.1.
+The covariance term as written depends on scale, and sometimes that is not what you want. A
+feature with standard deviation 10 can dominate the penalty over a feature with standard
+deviation 0.1 even when the second one is more redundant.
 
-If the question is scale-free dependence, standardize centered features:
+If the question is scale-free dependence, standardize the centered features first:
 
 $$
 \widetilde{X}_{ij}=\frac{X_{ij}}{s_j}.
 $$
 
-The stabilized standard deviation $s_j=\sqrt{s_j^2+\varepsilon}$ is already positive. Covariance of $\widetilde{X}$ is approximately a correlation matrix. Its off-diagonal entries compare dependence after removing feature scale.
+The stabilized standard deviation $s_j=\sqrt{s_j^2+\varepsilon}$ is already positive, so the
+division is safe. The covariance of $\widetilde{X}$ is then approximately a correlation
+matrix, whose off-diagonal entries compare dependence after feature scale has been removed.
 
-Use raw covariance when absolute scale is part of the representation design. Use correlation-style penalties when only redundancy matters. Never standardize before computing the variance penalty, because standardization would force the measured standard deviations toward one by construction.
+Choose deliberately. Use raw covariance when absolute scale is part of the representation
+design. Use correlation-style penalties when only redundancy matters. Never standardize
+before computing the variance penalty, because standardization forces the measured standard
+deviations toward one by construction and the variance term would then be measuring nothing.
 
 ## 8. Tokens and pooled examples answer different questions
 
-A sequence encoder often returns token features with shape $(B,T,D)$, where $T$ is the number of time or spatial tokens.
+So far the matrix $Z$ has had one row per example. A sequence encoder does not hand you that
+directly: it returns token features with shape $(B,T,D)$, where $T$ is the number of time or
+spatial tokens. You have to decide what counts as an observation.
 
-Token-level regularization reshapes to $(BT,D)$. Pooled regularization first averages tokens and produces $(B,D)$:
+Token-level regularization reshapes to $(BT,D)$ and treats every token as a row. Pooled
+regularization first averages the tokens of each example:
 
 $$
 \bar z_{ij}
@@ -292,49 +382,79 @@ $$
 Z_{itj}.
 $$
 
-The index $t$ selects a token. The pooled feature $\bar z_{ij}$ describes feature $j$ for example $i$.
+The index $t$ selects a token within one example, and the pooled feature $\bar z_{ij}$
+describes feature $j$ for example $i$.
 
-![Token-level and pooled regularization observe different collapse](../images/06_token_vs_pooled.svg)
+![Token-level and pooled regularization observe different collapse: one path flattens tokens for local statistics, the other averages them for example-level statistics](../images/06_token_vs_pooled.svg)
 
-Token-level statistics can catch local collapse that pooling hides. Pooled statistics protect example-level information. However, tokens from one example are correlated, so $BT$ rows do not equal $BT$ independent observations.
+The two paths catch different failures. Token-level statistics can reveal local collapse that
+pooling would hide, because a pooled average can look varied while the tokens inside each
+example are identical. Pooled statistics protect example-level information, which is usually
+what downstream tasks consume. The caveat is that tokens from one example are correlated, so
+$BT$ rows are not $BT$ independent observations.
 
 ### Misconception
 
 **More tokens always make covariance reliable.**
 
-No. More correlated tokens improve numerical averaging but do not create the same information as more independent examples.
+No. More correlated tokens improve numerical averaging but do not supply the same information
+as more independent examples.
 
 ## 9. Batch statistics are estimates
 
-The losses use a minibatch to estimate representation geometry. A batch is not the complete data distribution. Two consequences follow.
+That caveat about independence generalizes. Every loss in this lesson uses a minibatch to
+estimate representation geometry, and a batch is not the data distribution. Two consequences
+follow.
 
-First, a small batch gives a noisy covariance estimate. With $B$ centered rows, covariance rank cannot exceed $B-1$. If $B=32$ and $D=512$, at most 31 sample directions can have positive variance, even when the population representation is much richer.
+First, a small batch gives a noisy covariance estimate, and the noise has structure. With $B$
+centered rows, the covariance rank cannot exceed $B-1$. If $B=32$ and $D=512$, at most 31
+sample directions can have positive variance, even when the population representation is far
+richer than that.
 
-Second, batch composition matters. A batch containing only one class, one participant, or one context can have low variance for scientifically valid reasons. The regularizer might then push nuisance differences merely to satisfy a target standard deviation.
+Second, batch composition matters. A batch containing only one class, one participant, or one
+context can have low variance for entirely valid scientific reasons. The regularizer cannot
+tell the difference, so it may push nuisance differences apart merely to satisfy a target
+standard deviation.
 
-Use sampling that exposes relevant diversity inside an effective batch. Gradient accumulation does not automatically fix this issue, because computing the regularizer separately on each microbatch is not the same as computing it on the concatenated effective batch.
+The practical response is to use sampling that exposes the relevant diversity inside one
+effective batch. Note that gradient accumulation does not fix this automatically, because
+computing the regularizer separately on each microbatch is not the same as computing it on
+the concatenated effective batch.
 
 ### Microbatch example
 
-Suppose microbatch 1 contains only class A and microbatch 2 contains only class B. Each microbatch can have low within-class variance, while the combined batch has a large between-class difference. Averaging two separately computed variance losses misses the combined geometry.
+Suppose microbatch 1 contains only class A and microbatch 2 contains only class B. Each
+microbatch can show low within-class variance while the combined batch has a large
+between-class difference. Averaging two separately computed variance losses misses that
+combined geometry entirely.
 
-If global batch statistics are important, gather features across microbatches or distributed workers before computing the regularizer. This increases memory and communication cost, so the choice should be explicit.
+If global batch statistics matter for your setup, gather features across microbatches or
+across distributed workers before computing the regularizer. That costs memory and
+communication, so make the choice explicit rather than inheriting it from a default.
 
 ## 10. Standardization is not whitening
 
-Featurewise standardization divides each coordinate by its standard deviation. It makes diagonal covariance entries approximately one, but off-diagonal correlations can remain.
+Two nearby ideas are easy to confuse, and the difference explains what these penalties can
+and cannot achieve. Featurewise standardization divides each coordinate by its standard
+deviation. It makes the diagonal covariance entries approximately one, and it leaves the
+off-diagonal correlations exactly where they were.
 
-Whitening applies a full linear transformation so the transformed covariance is approximately the identity matrix. Whitening removes both scale differences and linear correlations:
+Whitening applies a full linear transformation so that the transformed covariance is
+approximately the identity matrix, removing scale differences and linear correlations
+together:
 
 $$
 C_{\mathrm{white}}\approx I.
 $$
 
-Explicit whitening can be expensive and unstable when covariance has tiny eigenvalues. Variance-covariance penalties encourage similar properties gradually through optimization rather than exactly transforming every batch.
+Explicit whitening can be expensive and numerically unstable when the covariance has tiny
+eigenvalues. The variance and covariance penalties aim at similar properties but reach them
+gradually through optimization, rather than transforming every batch exactly.
 
 ## 11. A practical monitoring dashboard
 
-Do not reduce collapse monitoring to one number. A useful training dashboard includes:
+Since neither penalty guarantees a good representation, the last piece is measurement. Do not
+reduce collapse monitoring to a single number. A useful training dashboard includes:
 
 - prediction loss,
 - variance and covariance losses before weighting,
@@ -344,27 +464,35 @@ Do not reduce collapse monitoring to one number. A useful training dashboard inc
 - effective rank of pooled features,
 - downstream probe or retrieval performance.
 
-Interpret trends together. Rising effective rank is not automatically good if it comes from noisy nuisance directions. A high-rank representation can still ignore task-relevant identity, and a modest-rank representation can be excellent for a low-dimensional task.
+Interpret these trends together rather than one at a time. Rising effective rank is not
+automatically good if the new directions are noise. A high-rank representation can still
+ignore task-relevant identity, and a modest-rank representation can be excellent for a
+genuinely low-dimensional task.
 
 ### Health metrics diagnose, but do not choose the result
 
-In a prespecified comparison, collapse statistics are training-health diagnostics. They
-can reveal non-finite values, a broken data path, or a failed run that needs a documented
-exact rerun. They do not authorize choosing whichever epoch has the best representation
-geometry or downstream outcome. If the final planned checkpoint is primary, every cell
-uses that checkpoint. Selecting an epoch after viewing the outcome quietly changes the
-estimand from "performance after the planned exposure" to "best observed performance
-along a searched trajectory."
+In a prespecified comparison, collapse statistics are training-health diagnostics. They can
+reveal non-finite values, a broken data path, or a failed run that needs a documented exact
+rerun. They do not authorize choosing whichever epoch has the best representation geometry or
+downstream outcome. If the final planned checkpoint is primary, every cell uses that
+checkpoint. Selecting an epoch after viewing the outcome quietly changes the estimand from
+"performance after the planned exposure" to "best observed performance along a searched
+trajectory."
 
-A development-only probe can help diagnose representations while a method is being
-built. A locked outcome cohort cannot be part of that dashboard. Record the boundary
-between health checks, development feedback, and final outcomes before training starts.
+A development-only probe can help diagnose representations while a method is being built. A
+locked outcome cohort cannot be part of that dashboard. Record the boundary between health
+checks, development feedback, and final outcomes before training starts, not after.
 
 ### Worked diagnostic pattern
 
-Suppose prediction loss falls, minimum feature standard deviation approaches zero, and covariance loss also approaches zero. This combination suggests complete collapse: a constant representation has no covariance to penalize.
+Reading the dashboard is a skill, so here are the two signatures worth memorizing. Suppose
+prediction loss falls, the minimum feature standard deviation approaches zero, and the
+covariance loss also approaches zero. That combination points to complete collapse: a
+constant representation has no covariance left to penalize.
 
-Suppose standard deviations remain healthy but effective rank falls from 40 to 3 and covariance grows. This suggests dimensional collapse: features still vary, but they increasingly share a few directions.
+Now suppose the standard deviations stay healthy but effective rank falls from 40 to 3 while
+covariance grows. That points to dimensional collapse: the features still vary, but they
+increasingly share a few directions.
 
 ## 12. Efficient PyTorch implementation
 
@@ -386,7 +514,10 @@ def var_cov_loss(z, target_std=1.0, eps=1e-4):
     return var_term, cov_term
 ~~~
 
-Matrix multiplication computes all pairwise covariances in one optimized operation. The full covariance costs roughly $O(BD^2)$ arithmetic and $O(D^2)$ memory. For very large $D$, use feature blocks or sample feature pairs, then verify that the approximation preserves training behavior.
+One matrix multiplication computes every pairwise covariance, which is why this is cheap
+enough to run every step. The full covariance costs roughly $O(BD^2)$ arithmetic and $O(D^2)$
+memory. For very large $D$, use feature blocks or sample feature pairs, then verify that the
+approximation preserves training behavior before trusting it.
 
 ## 13. Failure modes and diagnostics
 
@@ -399,7 +530,10 @@ Matrix multiplication computes all pairwise covariances in one optimized operati
 7. **Flattening correlated tokens:** the apparent sample size becomes misleading.
 8. **Selecting by health metrics:** a diagnostic becomes an unplanned checkpoint search.
 
-Useful diagnostics include the distribution of per-feature standard deviations, mean squared off-diagonal covariance, and the eigenspectrum in [Lesson 09](09_eigenspectra_and_effective_rank.md).
+Items 3 and 4 are the reason both terms exist, and the others are all ways the measurement
+itself can mislead you. Useful additional diagnostics include the distribution of per-feature
+standard deviations, the mean squared off-diagonal covariance, and the eigenspectrum
+developed in [Lesson 09](09_eigenspectra_and_effective_rank.md).
 
 ## 14. Exercises
 
@@ -417,11 +551,17 @@ Useful diagnostics include the distribution of per-feature standard deviations, 
 
 ## Recap
 
-A low prediction loss proves agreement, not information preservation. Variance prevents constant features. Off-diagonal covariance discourages copied directions. Token-level and pooled regularization inspect different representation scales. Together, these ideas provide a practical geometric defense against collapse.
+A low prediction loss proves agreement, not information preservation. The variance hinge
+prevents constant features, and the squared off-diagonal covariance discourages copied
+directions. Token-level and pooled regularization inspect different scales of the same
+representation, and every one of these numbers is a batch estimate rather than a population
+truth. Together they give you a practical geometric defense against collapse and, just as
+importantly, a way to notice it.
 
 ## Next lesson
 
-[07: Gradient updates and parameter schedules](07_gradient_updates_and_schedules.md) explains how loss gradients become stable parameter changes.
+[07: Gradient updates and parameter schedules](07_gradient_updates_and_schedules.md) explains
+how loss gradients, including the two new terms added here, become stable parameter changes.
 
 ## Continue in the notebook
 

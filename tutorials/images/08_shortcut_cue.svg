@@ -1,0 +1,36 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 520" role="img" aria-labelledby="title desc">
+  <title id="title">A shortcut rule that fits the training data</title>
+  <desc id="desc">When every positive clip comes from one device and every negative clip from another, reading the device fits the training data exactly as well as reading the movement, and crossing devices with labels is the fix.</desc>
+  <defs>
+    <marker id="a08c" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto">
+      <path d="M0 0 L10 5 L0 10 z" fill="#52606d"/>
+    </marker>
+  </defs>
+  <rect width="960" height="520" rx="18" fill="#fbfaf7"/>
+  <g font-family="Arial, sans-serif">
+    <text x="480" y="46" text-anchor="middle" font-size="24" font-weight="700" fill="#172b4d">Two rules fit. Only one is the signal.</text>
+
+    <rect x="280" y="84" width="400" height="110" rx="14" fill="#f1f5f9" stroke="#64748b" stroke-width="2"/>
+    <text x="480" y="124" text-anchor="middle" font-size="18" font-weight="700" fill="#172b4d">What you collected</text>
+    <text x="480" y="162" text-anchor="middle" font-size="16" fill="#172b4d">positives: device A. negatives: device B</text>
+
+    <line x1="400" y1="198" x2="400" y2="234" stroke="#52606d" stroke-width="3" marker-end="url(#a08c)"/>
+    <line x1="560" y1="198" x2="560" y2="234" stroke="#52606d" stroke-width="3" marker-end="url(#a08c)"/>
+
+    <rect x="120" y="240" width="340" height="150" rx="14" fill="#fee2e2" stroke="#dc2626" stroke-width="2"/>
+    <text x="290" y="284" text-anchor="middle" font-size="18" font-weight="700" fill="#172b4d">Shortcut rule</text>
+    <text x="290" y="328" text-anchor="middle" font-size="16" fill="#172b4d">read the device</text>
+    <text x="290" y="360" text-anchor="middle" font-size="16" fill="#172b4d">fits the training data</text>
+
+    <rect x="500" y="240" width="340" height="150" rx="14" fill="#dcfce7" stroke="#16a34a" stroke-width="2"/>
+    <text x="670" y="284" text-anchor="middle" font-size="18" font-weight="700" fill="#172b4d">Intended rule</text>
+    <text x="670" y="328" text-anchor="middle" font-size="16" fill="#172b4d">read the movement</text>
+    <text x="670" y="360" text-anchor="middle" font-size="16" fill="#172b4d">fits the training data</text>
+
+    <line x1="290" y1="394" x2="350" y2="414" stroke="#52606d" stroke-width="3" marker-end="url(#a08c)"/>
+    <line x1="670" y1="394" x2="610" y2="414" stroke="#52606d" stroke-width="3" marker-end="url(#a08c)"/>
+
+    <rect x="280" y="420" width="400" height="76" rx="14" fill="#dbeafe" stroke="#2563eb" stroke-width="2"/>
+    <text x="480" y="466" text-anchor="middle" font-size="17" fill="#172b4d">Fix: both devices in both labels</text>
+  </g>
+</svg>

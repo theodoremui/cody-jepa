@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 420" role="img" aria-labelledby="title desc">
+  <title id="title">Queries sharpen a cell mean while blocks set the model-level sample size</title>
+  <desc id="desc">Two panels contrast evaluation replication with training replication: more queries and participants reduce noise inside one trained model, while only more paired blocks increase the number of independent model-level contrasts.</desc>
+  <rect width="960" height="420" fill="#fbfaf7"/>
+  <g font-family="sans-serif" fill="#172b4d">
+    <text x="480" y="42" text-anchor="middle" font-size="24" font-weight="700">Two different sample sizes live in the same table</text>
+
+    <rect x="50" y="86" width="400" height="250" rx="16" fill="#dbeafe" stroke="#2563eb" stroke-width="2"/>
+    <text x="250" y="126" text-anchor="middle" font-size="18" font-weight="700">Inside one trained model</text>
+    <text x="250" y="166" text-anchor="middle" font-size="15">308 participants</text>
+    <text x="250" y="194" text-anchor="middle" font-size="15">16 queries per participant</text>
+    <text x="250" y="222" text-anchor="middle" font-size="15">averaging cuts measurement noise</text>
+    <text x="250" y="250" text-anchor="middle" font-size="15">the cell mean becomes precise</text>
+    <text x="250" y="300" text-anchor="middle" font-size="16" font-weight="700">the model count is still one</text>
+
+    <rect x="510" y="86" width="400" height="250" rx="16" fill="#fef3c7" stroke="#d97706" stroke-width="2"/>
+    <text x="710" y="126" text-anchor="middle" font-size="18" font-weight="700">Across trained models</text>
+    <text x="710" y="166" text-anchor="middle" font-size="15">8 paired blocks</text>
+    <text x="710" y="194" text-anchor="middle" font-size="15">one contrast per block</text>
+    <text x="710" y="222" text-anchor="middle" font-size="15">the interval uses 7 degrees of freedom</text>
+    <text x="710" y="250" text-anchor="middle" font-size="15">no query count changes that</text>
+    <text x="710" y="300" text-anchor="middle" font-size="16" font-weight="700">only new blocks raise this n</text>
+
+    <text x="480" y="378" text-anchor="middle" font-size="16" fill="#52606d">A narrow query interval and a wide block interval can both be right, so report both.</text>
+  </g>
+</svg>

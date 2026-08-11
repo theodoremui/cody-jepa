@@ -1,43 +1,38 @@
-# Research documentation
+# Research Documentation
 
-## Start here
+This folder is the navigation point for the active CoDy-JEPA research direction. It keeps
+the current method, execution path, and data-preparation workflow in one place.
 
-The active research direction is the **iso-catalog phase-allocation study**. It asks whether, under fixed training exposure and fixed nominal sequence-origin catalog size, representation learning differs when video diversity is placed across more sequences or across phase-separated views of fewer sequences.
+## Where to Start
 
-Read in this order:
+- [Hierarchical-diversity guide](hierarchical-diversity/README.md) gives the top-level
+  picture and routes readers to the detailed files.
+- [Research proposal](hierarchical-diversity/proposal.md) explains the scientific question
+  and why the allocation contrast matters.
+- [Method](hierarchical-diversity/method.md) fixes the treatment, evaluator, estimand,
+  interpretation rules, and privacy boundary.
+- [Execution plan](hierarchical-diversity/execution-plan.md) lists the gates, work
+  packages, training-start checklist, and schedule.
+- [GaitLU preparation](gaitlu_training.md) explains the current private-corpus preparation
+  workflow used by this study instance.
 
-1. [Revised study overview](hierarchical-diversity/README.md)
-2. [Research proposal](hierarchical-diversity/proposal.md)
-3. [Frozen method](hierarchical-diversity/method.md)
-4. [Execution plan](hierarchical-diversity/execution-plan.md)
+## How the Documents Fit Together
 
-The active study has 28 models: eight paired blocks of breadth, balanced, and phase-depth allocation, plus a nearby-jitter diagnostic in four prespecified blocks. It supersedes the earlier low/high support by frozen/resampled-anchor design.
+The proposal explains why the study exists. The method says exactly what result would be
+allowed to mean. The execution plan says what must pass before training and analysis can
+begin. The preparation runbook covers the shared data conversion path before any
+study-specific registry is frozen.
 
-## Shared GaitLU operations
+The technical tutorials live outside this folder in [tutorials](../tutorials/README.md).
+They are the best entry point for readers who want to learn the mathematical, statistical,
+and engineering concepts before reading the protocol.
 
-[GaitLU preparation](gaitlu_training.md) explains the shared path from the private raw release to validated, indexed, deduplicated prepared data. It deliberately stops before constructing an experiment-specific training registry.
+## Shared Boundaries
 
-## Legacy fallback: unique-sequence scaling
+The research contribution is the controlled hierarchical-diversity approach and its
+factorial evaluation logic. GaitLU and Health&Gait name the current implementation
+instance, not the whole idea.
 
-The repository retains an earlier unique-sequence-scaling study as a fallback and reusable baseline. It is not the active ICLR framing.
-
-- [Data roles and preprocessing](unique-sequence-scaling/data.md)
-- [Method](unique-sequence-scaling/method.md)
-- [Original proposal and evidence record](archive/unique-sequence-scaling/)
-
-## Archive
-
-The archive preserves reasoning and results that informed the revised direction. These files are not active protocol sources.
-
-- [Hierarchical-diversity design reviews and handoff](archive/hierarchical-diversity/)
-- [Legacy unique-sequence study materials](archive/unique-sequence-scaling/)
-- [Stage B preliminary results](archive/stage-b-results.md)
-- [GFC-v2 adversarial review record](archive/gfc-v2-adversarial-review.md)
-
-## Future translation
-
-[Future clinical applications](future-clinical-applications.md) describes possible ambient-intelligence, biomechanics, and balance-assessment follow-on work. It does not make clinical claims for the active representation study.
-
-## Shared boundaries
-
-GaitLU trains encoders. Health&Gait fits evaluation heads and scores frozen encoders. No Health&Gait recording updates a primary encoder. Public documentation contains only aggregate, non-identifying evidence. Raw data, participant tables, embeddings, participant-level results, and identity-capable checkpoints remain private.
+Private data, participant-level artifacts, feature exports, and identity-capable
+checkpoints stay outside Git. Public documentation should explain aggregate evidence,
+reproducible protocols, and claim limits.

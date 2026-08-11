@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 450" role="img" aria-labelledby="title desc">
+  <title id="title">A partial-information ceiling shown as a bound on attainable accuracy</title>
+  <desc id="desc">A vertical accuracy scale runs from zero to one. A red band above one quarter is marked impossible because four gallery cells stay tied, and a green band below one quarter is marked attainable. A measured accuracy bar stops beneath the ceiling line.</desc>
+  <rect width="960" height="450" rx="18" fill="#fbfaf7"/>
+  <g font-family="Arial, Helvetica, sans-serif">
+    <text x="480" y="44" text-anchor="middle" font-size="24" font-weight="700" fill="#172b4d">A partial query sets a ceiling no model can pass</text>
+
+    <rect x="200" y="100" width="260" height="180" rx="8" fill="#fee2e2" stroke="#dc2626" stroke-width="3"/>
+    <rect x="200" y="280" width="260" height="60" rx="8" fill="#dcfce7" stroke="#16a34a" stroke-width="3"/>
+    <rect x="290" y="290" width="80" height="50" fill="#2563eb" stroke="#1d4ed8" stroke-width="2"/>
+
+    <line x1="188" y1="280" x2="472" y2="280" stroke="#dc2626" stroke-width="5" stroke-linecap="round"/>
+
+    <text x="190" y="106" text-anchor="end" font-size="15" fill="#52606d">1.0</text>
+    <text x="180" y="285" text-anchor="end" font-size="15" font-weight="700" fill="#991b1b">0.25</text>
+    <text x="190" y="346" text-anchor="end" font-size="15" fill="#52606d">0.0</text>
+    <text x="330" y="368" text-anchor="middle" font-size="15" fill="#52606d">measured accuracy</text>
+
+    <text x="500" y="180" font-size="17" font-weight="700" fill="#991b1b">impossible</text>
+    <text x="500" y="208" font-size="15" fill="#52606d">four states stay tied</text>
+    <text x="500" y="300" font-size="17" font-weight="700" fill="#166534">attainable</text>
+    <text x="500" y="328" font-size="15" fill="#52606d">at most one cell in four</text>
+
+    <text x="480" y="404" text-anchor="middle" font-size="15" fill="#52606d">The query reveals one of three binary factors, so four of the eight cells remain compatible.</text>
+    <text x="480" y="428" text-anchor="middle" font-size="15" fill="#52606d">This ceiling assumes the four compatible cells are equally likely.</text>
+  </g>
+</svg>

@@ -17,7 +17,7 @@
     <path d="M386 205 H426" stroke="#475569" stroke-width="3" marker-end="url(#arrow)"/>
     <rect x="434" y="110" width="145" height="190" rx="16" fill="#dcfce7" stroke="#16a34a" stroke-width="2"/>
     <text x="506" y="145" text-anchor="middle" font-size="19" font-weight="700">Time T</text>
-    <rect x="463" y="174" width="60" height="48" fill="#86efac"/><rect x="476" y="187" width="60" height="48" fill="#bbf7d0" stroke="#16a34a"/><rect x="489" y="200" width="60" height="48" fill="#f0fdf4" stroke="#16a34a"/>
+    <rect x="463" y="174" width="60" height="48" fill="#86efac"/><rect x="476" y="187" width="60" height="48" fill="#bbf7d0"/><rect x="489" y="200" width="60" height="48" fill="#f0fdf4" stroke="#16a34a"/>
     <text x="506" y="270" text-anchor="middle" font-size="15">ordered frames</text>
     <path d="M584 205 H624" stroke="#475569" stroke-width="3" marker-end="url(#arrow)"/>
     <rect x="632" y="110" width="290" height="190" rx="16" fill="#fef3c7" stroke="#d97706" stroke-width="2"/>

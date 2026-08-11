@@ -1,0 +1,37 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 440" role="img" aria-labelledby="title desc">
+  <title id="title">A decaying eigenvalue spectrum with its effective rank marked</title>
+  <desc id="desc">Three bars of height six, three, and one show a decaying eigenvalue spectrum. A dashed vertical line between the second and third bars marks an effective rank of about 2.45, which lies below the algebraic rank of three.</desc>
+  <rect width="960" height="440" rx="18" fill="#fbfaf7"/>
+  <g font-family="Arial, Helvetica, sans-serif">
+    <text x="480" y="44" text-anchor="middle" font-size="24" font-weight="700" fill="#172b4d">Effective rank marks where the spectrum has decayed</text>
+
+    <text x="150" y="82" font-size="15" fill="#52606d">eigenvalue</text>
+    <g stroke="#52606d" stroke-width="3" stroke-linecap="round">
+      <line x1="150" y1="100" x2="150" y2="340"/>
+      <line x1="150" y1="340" x2="640" y2="340"/>
+    </g>
+
+    <rect x="180" y="120" width="90" height="220" rx="6" fill="#dbeafe" stroke="#2563eb" stroke-width="3"/>
+    <rect x="330" y="230" width="90" height="110" rx="6" fill="#dbeafe" stroke="#2563eb" stroke-width="3"/>
+    <rect x="480" y="303" width="90" height="37" rx="6" fill="#dbeafe" stroke="#2563eb" stroke-width="3"/>
+
+    <text x="225" y="110" text-anchor="middle" font-size="16" font-weight="700" fill="#172b4d">6</text>
+    <text x="375" y="220" text-anchor="middle" font-size="16" font-weight="700" fill="#172b4d">3</text>
+    <text x="525" y="293" text-anchor="middle" font-size="16" font-weight="700" fill="#172b4d">1</text>
+
+    <line x1="442" y1="96" x2="442" y2="340" stroke="#d97706" stroke-width="3" stroke-dasharray="9 7"/>
+    <text x="442" y="86" text-anchor="middle" font-size="16" font-weight="700" fill="#b45309">effective rank 2.45</text>
+
+    <text x="225" y="368" text-anchor="middle" font-size="15" fill="#52606d">component 1</text>
+    <text x="375" y="368" text-anchor="middle" font-size="15" fill="#52606d">component 2</text>
+    <text x="525" y="368" text-anchor="middle" font-size="15" fill="#52606d">component 3</text>
+
+    <rect x="700" y="140" width="232" height="160" rx="14" fill="#f1f5f9" stroke="#64748b" stroke-width="2"/>
+    <text x="720" y="176" font-size="17" font-weight="700" fill="#172b4d">Reading the plot</text>
+    <text x="720" y="210" font-size="15" fill="#52606d">bar height: variance</text>
+    <text x="720" y="240" font-size="15" fill="#52606d">dashed: effective rank</text>
+    <text x="720" y="270" font-size="15" fill="#52606d">algebraic rank: 3</text>
+
+    <text x="480" y="408" text-anchor="middle" font-size="15" fill="#52606d">Three eigenvalues are positive, but their unevenness makes the spectrum act like 2.45 equal directions.</text>
+  </g>
+</svg>

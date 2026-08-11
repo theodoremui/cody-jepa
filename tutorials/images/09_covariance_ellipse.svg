@@ -1,0 +1,55 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 440" role="img" aria-labelledby="title desc">
+  <title id="title">A covariance matrix drawn as an ellipse with principal axes</title>
+  <desc id="desc">A tilted cloud of observations sits inside an elliptical contour centred on the feature mean. Two arrows leave the centre: a long one along the direction of greatest spread and a short perpendicular one along the direction of least spread. A key names the dots, the mean, and the two axis directions.</desc>
+  <defs>
+    <marker id="a09e" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto">
+      <path d="M0 0 L10 5 L0 10 z" fill="#52606d"/>
+    </marker>
+  </defs>
+  <rect width="960" height="440" rx="18" fill="#fbfaf7"/>
+  <g font-family="Arial, Helvetica, sans-serif">
+    <text x="480" y="44" text-anchor="middle" font-size="24" font-weight="700" fill="#172b4d">The covariance matrix is an ellipse</text>
+
+    <path d="M212.2 339.2 A190 80 -28 0 1 547.8 160.8 A190 80 -28 0 1 212.2 339.2 Z"
+          fill="#dbeafe" fill-opacity="0.55" stroke="#2563eb" stroke-width="3"/>
+
+    <g fill="#2563eb">
+      <circle cx="241" cy="333" r="7"/>
+      <circle cx="264" cy="275" r="7"/>
+      <circle cx="323" cy="325" r="7"/>
+      <circle cx="317" cy="234" r="7"/>
+      <circle cx="369" cy="270" r="7"/>
+      <circle cx="377" cy="224" r="7"/>
+      <circle cx="431" cy="264" r="7"/>
+      <circle cx="433" cy="208" r="7"/>
+      <circle cx="473" cy="223" r="7"/>
+      <circle cx="476" cy="167" r="7"/>
+      <circle cx="522" cy="193" r="7"/>
+      <circle cx="527" cy="163" r="7"/>
+      <circle cx="280" cy="344" r="7"/>
+      <circle cx="428" cy="279" r="7"/>
+    </g>
+
+    <g stroke="#172b4d" stroke-width="3" stroke-linecap="round">
+      <line x1="368" y1="250" x2="392" y2="250"/>
+      <line x1="380" y1="238" x2="380" y2="262"/>
+    </g>
+
+    <g stroke="#52606d" stroke-width="3" marker-end="url(#a09e)">
+      <line x1="380" y1="250" x2="538" y2="166"/>
+      <line x1="380" y1="250" x2="414" y2="314"/>
+    </g>
+    <text x="552" y="152" font-size="16" font-weight="700" fill="#172b4d">v1</text>
+    <text x="424" y="340" font-size="16" font-weight="700" fill="#172b4d">v2</text>
+
+    <rect x="612" y="140" width="322" height="200" rx="14" fill="#f1f5f9" stroke="#64748b" stroke-width="2"/>
+    <text x="632" y="174" font-size="17" font-weight="700" fill="#172b4d">What the drawing shows</text>
+    <text x="632" y="204" font-size="16" fill="#52606d">dot: one observation</text>
+    <text x="632" y="230" font-size="16" fill="#52606d">cross: the feature mean</text>
+    <text x="632" y="256" font-size="16" fill="#52606d">v1: direction of most spread</text>
+    <text x="632" y="282" font-size="16" fill="#52606d">v2: direction of least spread</text>
+    <text x="632" y="312" font-size="16" fill="#52606d">half length: sqrt of eigenvalue</text>
+
+    <text x="480" y="400" text-anchor="middle" font-size="15" fill="#52606d">The ellipse is one contour of equal distance from the mean.</text>
+  </g>
+</svg>

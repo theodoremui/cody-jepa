@@ -1,0 +1,31 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 460" role="img" aria-labelledby="title desc">
+  <title id="title">Fixed exposure with a catalog that changes shape</title>
+  <desc id="desc">Three shaded blocks of equal area show that breadth, balanced, and phase-depth allocations all hold 250,000 sequence-origin atoms while trading sequence count against origins per sequence, and a band underneath states that every model still receives the same clip exposure.</desc>
+  <rect width="960" height="460" fill="#fbfaf7"/>
+  <g font-family="sans-serif" fill="#172b4d">
+    <text x="480" y="42" text-anchor="middle" font-size="24" font-weight="700">Same exposure, same catalog size, three catalog shapes</text>
+
+    <text x="240" y="110" text-anchor="middle" font-size="18" font-weight="700">Breadth</text>
+    <rect x="120" y="190" width="240" height="60" rx="10" fill="#dbeafe" stroke="#2563eb" stroke-width="2"/>
+    <text x="240" y="226" text-anchor="middle" font-size="16" font-weight="700">250,000</text>
+    <text x="240" y="286" text-anchor="middle" font-size="15">250,000 sequences</text>
+    <text x="240" y="310" text-anchor="middle" font-size="15">1 origin each</text>
+
+    <text x="515" y="110" text-anchor="middle" font-size="18" font-weight="700">Balanced</text>
+    <rect x="430" y="165" width="170" height="85" rx="10" fill="#dcfce7" stroke="#16a34a" stroke-width="2"/>
+    <text x="515" y="213" text-anchor="middle" font-size="16" font-weight="700">250,000</text>
+    <text x="515" y="286" text-anchor="middle" font-size="15">125,000 sequences</text>
+    <text x="515" y="310" text-anchor="middle" font-size="15">2 origins each</text>
+
+    <text x="760" y="110" text-anchor="middle" font-size="18" font-weight="700">Phase depth</text>
+    <rect x="700" y="130" width="120" height="120" rx="10" fill="#ede9fe" stroke="#7c3aed" stroke-width="2"/>
+    <text x="760" y="196" text-anchor="middle" font-size="16" font-weight="700">250,000</text>
+    <text x="760" y="286" text-anchor="middle" font-size="15">62,500 sequences</text>
+    <text x="760" y="310" text-anchor="middle" font-size="15">4 origins each</text>
+
+    <text x="480" y="346" text-anchor="middle" font-size="16" fill="#52606d">Width counts sequences, height counts origins per sequence, area is the catalog.</text>
+
+    <rect x="150" y="376" width="660" height="56" rx="16" fill="#f1f5f9" stroke="#64748b" stroke-width="2"/>
+    <text x="480" y="410" text-anchor="middle" font-size="17" font-weight="700">Every model still receives the same 4,096,000 sampled clips</text>
+  </g>
+</svg>

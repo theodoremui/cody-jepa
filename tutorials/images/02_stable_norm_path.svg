@@ -1,0 +1,35 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 430" role="img" aria-labelledby="title desc">
+  <title id="title">Naive and scaled paths to the same vector norm</title>
+  <desc id="desc">Squaring first overflows to infinity in float32, while dividing by the largest coordinate first keeps every intermediate value representable and rescales at the end.</desc>
+  <defs><marker id="arrow" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto"><path d="M0,0 L0,6 L9,3 z" fill="#52606d"/></marker></defs>
+  <rect width="960" height="430" fill="#fbfaf7"/>
+  <text x="480" y="40" text-anchor="middle" font-family="sans-serif" font-size="24" font-weight="700" fill="#172b4d">One formula, two computation paths</text>
+  <g font-family="sans-serif" fill="#172b4d">
+    <text x="55" y="88" font-size="17" font-weight="700">Naive path in float32</text>
+    <g fill="#fee2e2" stroke="#dc2626" stroke-width="2">
+      <rect x="55" y="100" width="186" height="92" rx="14"/><rect x="285" y="100" width="186" height="92" rx="14"/>
+      <rect x="515" y="100" width="186" height="92" rx="14"/><rect x="745" y="100" width="186" height="92" rx="14"/>
+    </g>
+    <g text-anchor="middle">
+      <g font-size="17" font-weight="700"><text x="148" y="138">input</text><text x="378" y="138">square</text><text x="608" y="138">sum</text><text x="838" y="138">square root</text></g>
+      <g font-size="16"><text x="148" y="166">1e20, 1e20</text><text x="378" y="166">1e40 overflows</text><text x="608" y="166">inf</text><text x="838" y="166">inf</text></g>
+    </g>
+    <g stroke="#52606d" stroke-width="3" marker-end="url(#arrow)">
+      <path d="M241 146 H281"/><path d="M471 146 H511"/><path d="M701 146 H741"/>
+    </g>
+
+    <text x="55" y="250" font-size="17" font-weight="700">Scaled path stays in range</text>
+    <g fill="#dcfce7" stroke="#16a34a" stroke-width="2">
+      <rect x="55" y="262" width="186" height="92" rx="14"/><rect x="285" y="262" width="186" height="92" rx="14"/>
+      <rect x="515" y="262" width="186" height="92" rx="14"/><rect x="745" y="262" width="186" height="92" rx="14"/>
+    </g>
+    <g text-anchor="middle">
+      <g font-size="17" font-weight="700"><text x="148" y="300">divide by max</text><text x="378" y="300">square and sum</text><text x="608" y="300">square root</text><text x="838" y="300">multiply by max</text></g>
+      <g font-size="16"><text x="148" y="328">1.0, 1.0</text><text x="378" y="328">2.0</text><text x="608" y="328">1.414</text><text x="838" y="328">1.414e20</text></g>
+    </g>
+    <g stroke="#52606d" stroke-width="3" marker-end="url(#arrow)">
+      <path d="M241 308 H281"/><path d="M471 308 H511"/><path d="M701 308 H741"/>
+    </g>
+    <text x="480" y="400" text-anchor="middle" font-size="16">both paths compute the same norm; only one keeps every intermediate representable</text>
+  </g>
+</svg>

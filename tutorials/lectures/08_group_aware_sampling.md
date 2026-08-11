@@ -1,16 +1,16 @@
-# 08. Group-aware sampling and shortcut learning
+# 08. Group-aware sampling and semantic phase origins
 
-![Overview of a group-aware sampling pipeline](../images/08_group_aware_sampling.svg)
+![A group-aware sampling pipeline from source groups through a disjoint split to windows, transforms, and a lineage record](../images/08_group_aware_sampling.svg)
 
 ## Why this lesson matters
 
-Imagine a video dataset with 40 participants and 100 clips per participant. A random row split produces 4,000 clip rows and may report excellent test accuracy. Yet clips from the same participant share body shape, room background, camera, and recording session. If each participant appears in both training and test sets, the model can recognize participants or acquisition conditions instead of learning the intended task.
+Picture a video dataset with 40 participants and 100 clips each. Split the 4,000 clip rows at random, train, and the test score may look excellent. It is also close to meaningless. Clips from one participant share a body shape, a room, a camera, and a recording session, so if that participant appears in both halves of the split, the model can win by recognizing the person or the room instead of the movement.
 
-This lesson asks a simple question before any model is trained: **Which observations are genuinely new evidence?** The answer determines data partitions, temporal sampling, transformation policy, lineage records, and the meaning of evaluation.
+Lesson 07 fixed how much optimization each model receives. This lesson fixes what each model receives it from. One question runs through everything below: **which observations are genuinely new evidence?** The answer decides how you split data, where you sample windows in time, which control condition you build, what you record about every tensor, and what a test score is allowed to mean.
 
 ## Prerequisites
 
-You should know training, validation, and test splits, basic probability, and Python indexing. [Lesson 07](07_gradient_updates_and_schedules.md) explains how sampled batches drive parameter updates.
+You should know training, validation, and test splits, basic probability, and Python indexing. [Lesson 07](07_gradient_updates_and_schedules.md) explains how sampled batches drive parameter updates and why every condition in a study gets the same exposure.
 
 ## Learning goals
 
@@ -18,23 +18,24 @@ By the end of this lesson, you will be able to:
 
 1. Identify the independent group for a generalization claim.
 2. Construct and verify group-disjoint partitions.
-3. Construct fixed 16-frame anchor support and measure overlap.
-4. Compare frozen-random and resampled temporal policies.
-5. Derive expected realized support at a fixed exposure.
-6. Isolate an intervention with paired, named random streams.
-7. Record lineage from source observation to model tensor.
-8. Diagnose acquisition artifacts and shortcut features.
+3. Turn frames into 16-frame windows and measure their overlap.
+4. Place nested phase-separated origins in one gait cycle.
+5. Build a nearby-jitter control that changes only the thing you meant to change.
+6. Explain what nominal catalog size does and does not equalize.
+7. Isolate an intervention with paired, named random streams.
+8. Record lineage from source observation to model tensor.
+9. Diagnose acquisition artifacts and shortcut features.
 
 ## 1. Begin with the intended generalization
 
-The correct group key depends on what "new" means.
+There is no universally correct grouping. The right group key falls out of the sentence you want to be able to say at the end of the study, because "new" means different things in different sentences.
 
 - To generalize to unseen people, group by participant.
 - To generalize to unseen recording sessions, group by session.
 - To generalize to unseen hospitals, group by hospital or site.
 - To generalize to new households, participant grouping may be too narrow.
 
-Let $G(i)$ be the group identifier of observation row $i$. A train-test split is group-disjoint when
+Write $G(i)$ for the group identifier of row $i$, for example the participant that row came from. Let $I_{\mathrm{train}}$ be the set of training-row indices and $I_{\mathrm{test}}$ the set of test-row indices. A split is group-disjoint when the two sets of groups share nothing:
 
 $$
 \{G(i): i\in I_{\mathrm{train}}\}
@@ -44,19 +45,19 @@ $$
 \varnothing.
 $$
 
-The set $I_{\mathrm{train}}$ contains training-row indices. The set $I_{\mathrm{test}}$ contains test-row indices. The empty intersection means no group identifier appears in both partitions.
+The empty intersection is the whole content of the definition: no group identifier may appear on both sides.
 
 ### Mental model
 
-Rows are containers. Groups are evidence units. Splitting containers is safe only when containers from the same evidence unit stay together.
+Rows are containers, and groups are evidence units. You are allowed to divide containers between partitions only when all the containers belonging to one evidence unit travel together.
 
 ### Group keys are design metadata
 
-The group identifier is usually metadata, not a model feature. A participant ID can be essential for safe splitting even when it must never enter the predictor.
+Note that the group key is usually not a model input. A participant ID can be essential for splitting safely and still be forbidden inside the predictor, and those two facts do not conflict.
 
-Keep dependency identifiers through preprocessing. A window tensor may no longer contain a filename, but its manifest should still identify participant, session, and source sequence. Losing these identifiers makes leakage difficult to audit.
+That means the identifiers have to survive preprocessing even though the model never sees them. A window tensor no longer carries a filename, but its manifest row should still name the participant, session, and source sequence. Once those links are gone, leakage becomes unauditable rather than absent.
 
-Real datasets often contain nested dependencies:
+Real datasets nest dependencies several levels deep:
 
 $$
 \text{site}
@@ -70,11 +71,13 @@ $$
 \text{window}.
 $$
 
-A participant-disjoint split blocks participant and lower-level overlap. It does not test unseen sites when every site appears in all partitions. Choose the highest dependency level required by the claim.
+Splitting at one level blocks that level and everything below it. A participant-disjoint split prevents participant, session, sequence, and window overlap, but it says nothing about unseen sites if every site appears in every partition. Pick the highest level your claim requires.
 
 ## 2. Why row-level random splits leak
 
-Let $x_{g,r}$ be repeat $r$ from group $g$. A simple decomposition is
+The previous section defined the rule. This section explains the mechanism it protects against, using the simplest model of a recording that captures the problem.
+
+Let $x_{g,r}$ be repeat $r$ from group $g$, and decompose it into three parts:
 
 $$
 x_{g,r}
@@ -82,20 +85,20 @@ x_{g,r}
 s_{g,r}+a_g+\varepsilon_{g,r}.
 $$
 
-The term $s_{g,r}$ is intended signal. The vector $a_g$ is a stable group-specific artifact, such as background or device response. The residual $\varepsilon_{g,r}$ is observation noise.
+The term $s_{g,r}$ is the intended signal, the part you want the model to learn. The vector $a_g$ is a stable artifact of the group itself: the background, the body shape, the response of one camera. It carries the subscript $g$ and no subscript $r$ because it is the same in every repeat from that group. The residual $\varepsilon_{g,r}$ is observation noise.
 
-If training and test sets contain the same group $g$, both contain $a_g$. A flexible model can use that artifact to recognize the group. The test score then measures performance on new repeats from known groups, not performance on unseen groups.
+Now suppose group $g$ has rows in both partitions. Then $a_g$ is in both partitions too, and a flexible model can use it to identify the group and look up what that group usually does. The test score still measures something real, but that something is performance on new repeats from known groups, which is a much weaker claim than performance on unseen groups.
 
-![Row splitting leaks group artifacts while group splitting blocks them](../images/08_group_split_leakage.svg)
+![Row splitting puts clips from the same person in training and test, while group splitting keeps each person in one partition](../images/08_group_split_leakage.svg)
 
-This problem does not require duplicate files. Two videos can differ in every frame and still share recognizable participant or acquisition information.
+None of this requires duplicate files. Two videos can differ in every single frame and still share the participant and acquisition information that makes $a_g$ predictive.
 
 ## 3. Split groups first
 
-The safest workflow is:
+The mechanism above suggests an order of operations, and the order matters more than any individual step in it:
 
 1. Define the group key from the scientific claim.
-2. Deduplicate and audit group identifiers.
+2. Deduplicate and audit the group identifiers themselves.
 3. Assign whole groups to train, validation, or test.
 4. Create clips, windows, and augmentations inside each partition.
 5. Fit data-dependent preprocessing on training groups only.
@@ -118,19 +121,21 @@ assert train_groups.isdisjoint(test_groups)
 assert valid_groups.isdisjoint(test_groups)
 ~~~
 
-After assigning groups, <code>np.isin</code> creates vectorized row masks. Store the group assignments so a later run cannot silently reshuffle the evaluation set.
+Once groups are assigned, <code>np.isin</code> turns them into vectorized row masks in one call. Persist the assignment to disk. A split that is recomputed from a seed at each run is one library upgrade away from silently reshuffling your evaluation set.
 
 ## 4. Stratification happens at group level
 
-Class balance can be difficult when groups have different labels or sizes. Row-level stratification can violate group disjointness.
+Splitting by group makes class balance harder, because you can no longer move individual rows to even out the classes. Row-level stratification would fix the balance and break disjointness, so it is not available.
 
-If every group has one label, stratify group identifiers by that label. If a group contains several labels, define a group-level summary or use a constrained assignment algorithm. State the rule before examining test performance.
+Work at the group level instead. If every group carries one label, stratify the group identifiers by that label. If a group contains several labels, define a group-level summary such as the majority label, or use a constrained assignment algorithm. Whichever you choose, state the rule before looking at test performance.
 
-No split can guarantee perfect balance when the number of groups is small. Report group counts and row counts separately.
+With few groups, no method guarantees good balance. Report group counts and row counts separately so a reader can see which one is small.
 
 ### Weighting defines the population average
 
-Suppose group $g$ contributes $n_g$ windows with losses $\ell_{g,1},\ldots,\ell_{g,n_g}$. A global row average is
+Balance is one half of the story; weighting is the other. Once the split is fixed, you still have to decide what a reported average is an average over.
+
+Suppose group $g$ contributes $n_g$ windows with losses $\ell_{g,1},\ldots,\ell_{g,n_g}$. The global row average is
 
 $$
 R_{\mathrm{row}}
@@ -139,9 +144,9 @@ R_{\mathrm{row}}
 {\sum_g n_g}.
 $$
 
-This estimates loss for a randomly selected row. Groups with long recordings receive more weight.
+This estimates the loss for a randomly selected row, so a participant who was recorded for an hour counts far more than one recorded for a minute.
 
-An equal-group average is
+The equal-group average instead gives every group the same weight:
 
 $$
 R_{\mathrm{group}}
@@ -154,76 +159,64 @@ R_{\mathrm{group}}
 \right).
 $$
 
-The integer $G$ is the number of groups. This estimates loss for a randomly selected group followed by an observation within that group.
+Here $G$ is the number of groups. This estimates the loss for a randomly selected group followed by a randomly selected observation inside it.
 
-Neither estimand is universally correct. Group-disjoint splitting prevents overlap, while group-aware weighting prevents prolific groups from silently dominating. State which population draw the metric represents.
+Neither estimand is universally right. They answer different questions, and the point is to say which question you asked. Group-disjoint splitting stops overlap; group-aware weighting stops prolific groups from quietly setting the score.
 
-## 5. Define temporal support before drawing windows
+## 5. From frames to windows
 
-Validation and test windows should remain deterministic so every model receives the same
-evaluation inputs. A training intervention needs an equally exact support definition.
-Let sequence $i$ contain $n_i$ contiguous frames. For the 16-frame training clip length
-$T=16$, the number of valid integer starts is
+Splitting decides which sequences a model may use. The next four sections decide what it draws from inside a sequence, which is where this curriculum's active study lives.
+
+Start with the arithmetic of a window. Let sequence $i$ contain $n_i$ contiguous frames, and let the training clip length be $T=16$ frames. A window is identified by its start frame, and the number of valid integer starts is
 
 $$
 W_i=n_i-T+1.
 $$
 
-The hierarchical-diversity intervention does not use every valid start. It uses anchors
-spaced by eight frames:
+The Python slice for start $a$ is `sequence[a:a + T]`, which contains 16 frames because the stop index is excluded. For $n_i=48$ there are $48-16+1=33$ valid starts, namely 0 through 32.
+
+![A twelve-frame sequence supplies overlapping windows, and one selected window draws a single crop and flip shared by all its frames](../images/08_windows_and_transforms.svg)
+
+Two windows from one sequence are not two independent observations, and it is worth being precise about how far from independent they are. Two starts that differ by $d$ frames share $T-d$ frames when $d<T$, so their overlap fraction is $(T-d)/T$. Starts eight frames apart share
 
 $$
-\mathcal A_i=
-\{0,8,16,\ldots,8\lfloor(W_i-1)/8\rfloor\},
-\qquad
-K_i=|\mathcal A_i|.
+\frac{T-8}{T}=\frac{8}{16}=0.5,
 $$
 
-Here $\mathcal A_i$ is the supported anchor set and $K_i$ is its size. The Python slice
-for anchor $a$ is `sequence[a:a + T]`. It contains 16 frames because the stop index is
-excluded. One global capability rule, $K_i\ge2$, is applied after basic validation and
-before holdout selection or construction of any replicate pool. Applying the same rule
-once prevents conditions from quietly using different eligibility criteria.
+that is, half their content. Starts 16 or more frames apart share no frames at all, though they still share the participant, the session, and the recording conditions. No spacing rule turns windows from one sequence into new participants or new sessions.
 
-Adjacent anchors are eight frames apart, so their 16-frame windows share eight frames.
-The overlap fraction is
+## 6. Phase origins put windows where the pose is different
 
-$$
-\frac{T-8}{T}=\frac{8}{16}=0.5.
-$$
+Frame spacing is a proxy for what we actually care about, which is whether two windows show the body in different parts of its movement. Walking is periodic, so the natural coordinate is not the frame index but the position within a stride.
 
-This is 50 percent overlap, not two independent observations. To describe a more
-conservative support scale, also count anchors at 16-frame spacing:
+Call that position the phase, a number in $[0,1)$ where 0 and 1 are the same point of the gait cycle. For each eligible sequence, a frozen estimator computes the stride period and a confidence value from a documented silhouette signal such as width or area autocorrelation. A stable hash of the sequence identifier and the replicate block then picks a base phase $b_{i,r}$ uniformly in $[0,1)$, where $i$ indexes the sequence and $r$ indexes the replicate block.
+
+The semantic origin sets are nested and quarter-cycle separated:
 
 $$
-\mathcal B_i=
-\{0,16,32,\ldots,16\lfloor(W_i-1)/16\rfloor\},
-\qquad
-Q_i=|\mathcal B_i|.
+O_{i,r}^{(1)}=\{b_{i,r}\},\qquad
+O_{i,r}^{(2)}=\{b_{i,r},b_{i,r}+1/2\},
 $$
 
-The count $Q_i$ measures non-overlapping anchored windows that begin on this coarser
-grid. Report both $K_i$ and $Q_i$. Neither count turns windows from the same sequence
-into new participants, sessions, or source videos.
+$$
+O_{i,r}^{(4)}=\{b_{i,r},b_{i,r}+1/4,b_{i,r}+1/2,b_{i,r}+3/4\}\pmod 1.
+$$
 
-## 6. Frozen-random and resampled policies change temporal support
+Nesting is deliberate: $O^{(1)}\subset O^{(2)}\subset O^{(4)}$, so moving from one origin to four adds views without moving the first one. The modulo keeps every origin inside one cycle.
 
-The frozen-random policy chooses one anchor uniformly for each stable
-`(sequence_id, replicate_seed)` pair. Once selected, that anchor stays fixed across
-epochs and repeated sequence draws. Across randomization, every anchor in $\mathcal A_i$
-has probability $1/K_i$. Within one realized run, however, the sequence always returns
-the same anchor, so its conditional distribution is a point mass.
+### Worked example
 
-The word "random" therefore describes how the frozen anchor is assigned, not what
-happens on every training draw. A center window would not be equivalent because gait
-phase or recording quality can vary with temporal position. Uniform frozen assignment
-avoids making one position special in expectation.
+Take a sequence of $n_i=48$ frames with an estimated stride period of $P=32$ frames and base phase $b=0.1$. The four semantic origins are the phases $0.1$, $0.35$, $0.6$, and $0.85$. Multiplying by the period and rounding gives start frames
 
-Use a versioned stable hash to derive the frozen seed from the sequence ID and replicate
-seed. Python's built-in `hash` is process dependent and must not be used. Manifest row
-position is also unsafe because inserting another sequence would change later anchors.
-The stable identity rule gives **nested-manifest stability**: if a low-support manifest
-is a prefix of a larger manifest, every shared sequence keeps the same frozen anchor.
+$$
+3,\quad 11,\quad 19,\quad 27.
+$$
+
+All four are at most 32, so all four are valid starts for this sequence. Consecutive starts are eight frames apart, so consecutive windows overlap by 50 percent by the formula in section 5, while being half a stride apart in pose. That is the intended situation: the pixels are related, and the body configuration is not.
+
+### Stable identity, not row position
+
+The base phase must come from the sequence's identity, never from where the sequence happens to sit in a manifest. Insert one new row at the top of a manifest and every downstream base phase would change, which would make two pools incomparable for no scientific reason.
 
 ~~~python
 import hashlib
@@ -236,102 +229,93 @@ def stable_uint64(namespace, *parts):
     digest = hashlib.blake2b(payload, digest_size=8).digest()
     return int.from_bytes(digest, "little")
 
-def frozen_anchor(sequence_id, replicate_seed, anchors):
-    seed = stable_uint64("temporal-frozen-v1", sequence_id, replicate_seed)
-    rng = np.random.default_rng(seed)
-    return int(rng.choice(anchors))
+def base_phase(sequence_id, replicate_seed):
+    seed = stable_uint64("phase-v1", sequence_id, replicate_seed)
+    return np.random.default_rng(seed).random()
 ~~~
 
-The resampled policy instead selects uniformly from $\mathcal A_i$ on every draw. Its
-versioned seed includes the base seed, virtual epoch, stable sequence or sample identity,
-draw index, and temporal-stream version. Recreating a virtual epoch therefore recreates
-its anchors even when workers finish in a different order.
+Python's built-in `hash` is randomized per process and must not be used here. A versioned namespace string such as `"phase-v1"` is what lets you change the rule later without pretending the old catalog and the new one are the same. Deriving the phase from identity buys **nested-pool stability**: when a smaller pool of sequences is a subset of a larger one, every shared sequence keeps the same base phase and the same origins in both.
 
-Frozen and resampled policies have the same uniform marginal distribution over anchors.
-They differ in dependence across repeated draws. The frozen condition can realize at
-most one anchor for a given sequence and replicate. The resampled condition can realize
-up to $K_i$. This distinction isolates access to within-sequence temporal support.
+## 7. Nearby jitter is the matched control
 
-## 7. Pair nuisance streams and fix sampled exposure
+Four origins per sequence differ from one origin in two ways at once: there are more windows, and the windows show different parts of the stride. A control condition separates those two effects by keeping the count and removing the separation.
 
-A temporal intervention should not accidentally change spatial crops or JEPA masks.
-Create separate named streams for:
+Nearby jitter does exactly that. It places four distinct origins at small symmetric offsets around the same base phase, for example at $-0.04$, $-0.04/3$, $+0.04/3$, and $+0.04$ cycles. The count is four in both conditions, the base phase distribution is identical, and only the spread changes.
+
+![Four quarter-cycle origins spread around one gait cycle beside four jittered origins clustered at one base phase](../images/08_phase_origins_vs_jitter.svg)
+
+Continue the worked example with $P=32$ and $b=0.1$. The jittered phases are $0.06$, $0.0867$, $0.1133$, and $0.14$, and multiplying by 32 and rounding gives starts $2$, $3$, $4$, and $4$. Two of them collide after rounding, and the widest pair is two frames apart, so those windows share 14 of their 16 frames. This is why the jitter radius, the rounding rule, the boundary handling, and the weighting are all chosen by an outcome-blind audit and then frozen before any training run.
+
+The audit is what turns "the origins are semantically separated" from an assumption into evidence. On a stratified sample, report phase confidence, origin coverage, realized starts, window overlap, pose-trajectory separation, the nominal sequence count, and the effective near-duplicate cluster count, and validate a subset manually while blinded to condition. If separated origins do not measurably differ from jittered ones, the phase branch stops rather than continuing with a weaker claim.
+
+## 8. Nominal catalog size equalizes counting, not information
+
+With origins defined, we can state the design of the study these lessons support. It compares three ways of reaching the same number of sequence-origin pairs.
+
+Let $U$ be the number of unique sequences in a cell and $k$ the number of origins per sequence. The nominal catalog size is their product:
+
+$$
+N=U\,k.
+$$
+
+The word nominal is doing real work in that sentence. $N$ counts distinct `(sequence_id, origin)` pairs the sampler is allowed to draw. It does not count independent observations, and it makes no claim that one new sequence and one extra origin carry the same information.
+
+![Three allocations reaching the same nominal catalog of 250,000 sequence-origin pairs with different unique sequence counts](../images/08_iso_catalog_allocation.svg)
+
+The allocation table has four entries. Three of them are path points that move diversity from across sequences to within sequences at constant $N$, and the fourth is the jitter control:
+
+| Allocation | $U$ | $k$ | Origin policy | Purpose |
+| --- | ---: | ---: | --- | --- |
+| breadth | 250,000 | 1 | base phase | New-sequence extreme |
+| balanced | 125,000 | 2 | phase separated | Intermediate path point |
+| phase depth | 62,500 | 4 | phase separated | Phase-separated extreme |
+| nearby jitter | 62,500 | 4 | nearby jitter | Mechanism diagnostic |
+
+Every row has $U\,k=250{,}000$. Where the frozen source-group rule permits, the pools are nested inside a replicate block, so the 62,500 sequences are a subset of the 125,000, which are a subset of the 250,000. Nesting means a difference between allocations cannot be blamed on one allocation drawing luckier sequences.
+
+### Recurrence is the number to report beside the catalog
+
+Equal catalog size does not mean equal repetition, so report how often the sampler is expected to come back to the same atom. Fixed exposure $C$ is the number of sampled clips from lesson 07, and planned recurrence is
+
+$$
+\frac{C}{N}.
+$$
+
+With $N=250{,}000$ and the two permitted exposure tiers, recurrence is $8{,}192{,}000/250{,}000=32.77$ or $4{,}096{,}000/250{,}000=16.38$ draws per nominal atom. Every cell in the study gets the same number because $N$ and $C$ are the same in every cell.
+
+A related quantity answers a different question: after $C$ draws made uniformly with replacement from $N$ atoms, how many distinct atoms is the sampler expected to have touched? Each atom is missed on a single draw with probability $1-1/N$, so
+
+$$
+E(N)=
+N\left[1-\left(1-\frac{1}{N}\right)^{C}\right].
+$$
+
+This is an occupancy expectation and nothing more. At these exposure levels $E(N)$ is very close to $N$, which is another way of saying the sampler visits essentially the whole catalog many times over. For numerical stability at large $C$, evaluate the bracket as `-expm1(C * log1p(-1.0 / N))` rather than as `1 - (1 - 1/N)**C`, because the naive form loses all its significant digits when $1/N$ is tiny.
+
+State the interpretation limits as plainly as the numbers. Equal $U\,k$ does not equalize information, phase origins are not independent examples, and three correlated path points do not establish a general law or an exchange rate between sequences and clips.
+
+## 9. Pair nuisance streams and fix sampled exposure
+
+The comparison in section 8 is only about where diversity sits if nothing else differs between cells. That requires deliberate control over randomness, because random number generators couple everything that draws from them.
+
+Give each kind of draw its own named stream:
 
 - ordered sequence draws,
-- temporal anchors,
+- phase origins,
 - spatial transformations,
 - prediction masks.
 
-Within a sequence-support pair, frozen and resampled runs share the ordered sequence,
-spatial, and mask streams. Only the temporal stream follows a different policy. They
-also share initialization, optimizer settings, effective batch size, and checkpoint
-rule. Tests should compare the paired records directly rather than assuming that equal
-base seeds produce equal nuisance draws.
+Within a matched pair such as phase depth against nearby jitter, the sequence, spatial, and mask streams are shared. Only the origin construction differs. The pair also shares initialization, optimizer settings, effective batch size, exposure, and the final-checkpoint rule, so a test should compare the recorded draws directly instead of assuming that equal base seeds imply equal nuisance values.
 
-The total sampled-example exposure $C$ is fixed across conditions. A repeated draw still
-counts toward $C$, even when the frozen policy returns the same sequence-window pair.
-This is the point of the comparison: available support changes while optimizer exposure
-does not. Use the final planned checkpoint for every cell. Downstream outcomes cannot
-choose a different epoch, seed, or rerun.
+Separate generators are what make that sharing possible. With one global generator, a condition that makes one extra call for its origins would shift every later crop and mask, and the two runs would differ in ways nobody chose. Named streams keep the sequence draw and the nuisance parameters aligned even when the origin policy consumes different amounts of randomness.
 
-Separate generators prevent call-order coupling. With one global generator, one extra
-temporal draw in the resampled condition would shift every later crop and mask. Named
-streams let the sequence draw and nuisance parameters remain paired even though the
-temporal anchor changes.
+Total sampled-clip exposure $C$ is fixed across cells, and a repeated draw still counts toward it. That is the point of the design rather than a flaw in it: the available support changes while optimizer exposure does not. Use the final planned checkpoint everywhere, and never let a downstream outcome choose a different epoch, seed, or rerun.
 
-## 8. Expected realized support quantifies treatment strength
+## 10. Transformations should respect time
 
-Suppose a pool contains $U$ sequences and training makes $C$ sequence draws uniformly
-with replacement. The frozen policy supports one sequence-window pair per sequence. Its
-expected number of distinct realized pairs is
+Origins choose where a window starts. Transformations decide what happens to it afterward, and they need their own scope rule.
 
-$$
-E_F(U)=
-U\left[1-\left(1-\frac{1}{U}\right)^C\right].
-$$
-
-The expression in brackets is the probability that a particular sequence is drawn at
-least once. For the resampled policy, pair $(i,a)$ has probability $1/(UK_i)$ on each
-draw. Summing its visit probability over all supported pairs gives
-
-$$
-E_R(U)=
-\sum_{i=1}^{U}
-K_i\left[1-\left(1-\frac{1}{UK_i}\right)^C\right].
-$$
-
-These are occupancy expectations, not claims of semantic independence. They quantify
-how many supported `(sequence_id, window_start)` pairs the sampler is expected to visit.
-For numerical stability at large $C$, software can evaluate
-`-expm1(C * log1p(-p))` instead of `1 - (1 - p)**C`.
-
-Before training, reconstruct every nested low and high pool for every replicate from the
-deduplicated inventory. For each pool, report $W_i$, $K_i$, $Q_i$, $E_F$, $E_R$, the
-expected fraction of draws that revisit an already counted sequence-anchor pair, and mean
-overlap among distinct anchor pairs. Evaluate treatment separation at the lower permitted
-exposure, $C=4{,}096{,}000$, so the gate also holds if the larger tier is selected.
-
-If $E$ is the expected number of distinct sequence-anchor pairs after $C$ draws, the
-expected repeated-draw fraction used in this audit is $1-E/C$. Compute it separately with
-$E_F$ and $E_R$. For mean overlap, enumerate unordered pairs of different anchors within
-each sequence, divide their shared-frame count by 16, and average those fractions across
-the pool. These are required diagnostics, not extra launch gates.
-
-The prospective launch gates are median $K_i\ge4$ and $E_R/E_F\ge4$ in every low and
-high pool. These frozen gates show that resampling creates a substantial support
-contrast. They do not prove that additional anchors are independent or useful. If a
-gate fails, revise or cancel the design before examining downstream outcomes rather than
-lowering the threshold afterward.
-
-## 9. Transformations should respect time
-
-Suppose a video window has shape $(T,H,W,C)$:
-
-- $T$ is the number of frames.
-- $H$ and $W$ are image height and width.
-- $C$ is the number of color channels.
-
-A random horizontal flip should normally draw one Boolean value for the whole window. Drawing a new flip per frame creates artificial flicker.
+A video window has shape $(T,H,W,C)$, where $T$ is the number of frames, $H$ and $W$ are the image height and width in pixels, and $C$ is the number of color channels. A random horizontal flip should normally draw one Boolean for the whole window. Drawing a new flip per frame would create a flicker that exists in no real recording.
 
 ~~~python
 def consistent_flip(window, rng):
@@ -341,75 +325,21 @@ def consistent_flip(window, rng):
     return window.copy(), flip
 ~~~
 
-The call to <code>np.flip</code> can return a negative-stride view. The copy creates contiguous storage that <code>torch.from_numpy</code> can safely consume.
+The call to <code>np.flip</code> returns a view with a negative stride. The copy makes contiguous storage that <code>torch.from_numpy</code> can consume safely, and it also protects the source array from any later in-place operation.
 
-![Window starts and transform parameters have different sampling scopes](../images/08_windows_and_transforms.svg)
-
-Consistency is not a universal rule. Independent sensor noise per frame can be appropriate if it reflects the real data-generating process. The transformation scope should match plausible variation.
+Per-window is not a universal rule, though. Independent sensor noise per frame is realistic and belongs at frame scope. Match the scope of a transformation to the scale at which the real world varies.
 
 ### Transform units and label validity
 
-A crop has coordinates and size measured in pixels. A speed perturbation has units of frames or seconds. A color transform acts on channels. Recording these parameters makes augmentation scientifically interpretable.
+Recording a transformation means recording it in its own units. A crop has pixel coordinates and a pixel size. A speed perturbation has units of frames or seconds. A color transform acts on channels. Parameters stored with their units are what let someone reconstruct or reason about the augmentation later.
 
-Some labels transform with the input. A horizontal flip can swap left and right labels. A temporal reversal can change movement direction. Visual consistency is not sufficient; labels must remain valid under the transformation.
-
-## 10. Data lineage makes every tensor traceable
-
-Lineage answers: "Where did this exact model input come from?"
-
-A useful record contains:
-
-- immutable source identifier,
-- group identifier,
-- partition name,
-- original sequence length,
-- replicate and sequence-support condition,
-- window start and stop,
-- temporal policy and stream version,
-- separate sequence, spatial, and mask stream versions,
-- sampled transform parameters,
-- manifest digest and planned exposure,
-- preprocessing version,
-- label source and label version.
-
-The workflow is
-
-$$
-\text{source}
-\rightarrow
-\text{group partition}
-\rightarrow
-\text{window}
-\rightarrow
-\text{transform}
-\rightarrow
-\text{tensor}.
-$$
-
-Store decisions as structured data, not only in filenames. CSV, JSON Lines, or Parquet is sufficient. A stable sample identifier can hash canonical lineage fields.
-
-### Lineage as an executable contract
-
-Given a lineage record and source-data version, a deterministic loader should reconstruct the same pre-transform window. For random transforms, store sampled parameters or a stable per-sample seed.
-
-Useful assertions check that:
-
-- every sample's group belongs to its declared partition,
-- start and stop indices are within source bounds,
-- window length matches the model contract,
-- every start belongs to the sequence's fixed anchor set,
-- a shared sequence keeps its frozen anchor across nested manifests,
-- paired conditions share sequence, spatial, and mask draws,
-- preprocessing version is known,
-- no sample identifier appears in more than one partition.
-
-These checks turn provenance from documentation into a tested interface.
+Some labels transform along with the input, and forgetting that produces silently wrong data. A horizontal flip swaps left and right leg labels. A temporal reversal changes the direction of movement. A window that looks plausible can still carry a label that is no longer true of it.
 
 ## 11. Shortcut learning
 
-A shortcut is a feature that predicts labels in collected data but does not represent the intended construct.
+Everything so far protects the inputs. This section is about what the model does with them, because a correctly split dataset can still be won for the wrong reason.
 
-Let $Y$ be the target label and $A$ a suspected artifact. In training data, the artifact can be predictive:
+A shortcut is a feature that predicts the label in the collected data without representing the construct you care about. Let $Y$ be the target label and $A$ a suspected artifact such as the recording device. In the training data the artifact is predictive when
 
 $$
 P_{\mathrm{train}}(Y\mid A)
@@ -417,7 +347,9 @@ P_{\mathrm{train}}(Y\mid A)
 P_{\mathrm{train}}(Y).
 $$
 
-At deployment, the association may weaken or reverse. The model follows the easiest reliable signal available to its objective, even when that signal is scientifically irrelevant.
+The left side is the label distribution once you know the artifact, and the right side is the label distribution overall. When they differ, reading $A$ tells you something about $Y$, and gradient descent has no reason to prefer the harder signal you intended.
+
+![A confound in the collected data lets a shortcut rule fit training as well as the intended rule](../images/08_shortcut_cue.svg)
 
 Common shortcuts include:
 
@@ -432,15 +364,15 @@ Common shortcuts include:
 
 ### Worked scenario
 
-Suppose all positive-class videos were captured on device A and all negative-class videos on device B. A device classifier can achieve perfect label accuracy without reading motion. A random row split preserves the device-label association. Testing on both devices for both labels breaks it.
+Suppose every positive-class video was captured on device A and every negative-class video on device B. A model that only classifies the device reaches perfect label accuracy without ever looking at motion. A random row split preserves the association, so the test set rewards the shortcut too. Recording both labels on both devices breaks it, and only then does the score depend on movement.
 
-Shortcuts are relative to a claim. Device identity is a shortcut for a biological movement claim, but it may be the intended signal in device-quality monitoring. Name the intended construct before labeling a feature spurious.
+Shortcuts are defined relative to a claim, not in the abstract. Device identity is a shortcut for a claim about biological movement and is the intended signal for a claim about device quality. Name the construct first, then decide what counts as spurious.
 
-Removing one known artifact-label correlation does not prove that the model uses the intended mechanism. Other correlated artifacts can remain.
+Removing one artifact-label correlation also does not prove the model now uses the intended mechanism. Other correlated artifacts can remain, which is why the next section combines several diagnostics instead of trusting one.
 
 ## 12. Shortcut diagnostics
 
-No single diagnostic proves that shortcuts are absent. Combine several:
+No single test proves shortcuts are absent, so run a set of them and read the pattern:
 
 1. Compare row-level and group-disjoint scores.
 2. Train an artifact-only baseline from site, device, duration, or missingness.
@@ -449,15 +381,70 @@ No single diagnostic proves that shortcuts are absent. Combine several:
 5. Inspect nearest neighbors for shared background rather than shared semantics.
 6. Permute labels within groups to test what group identity alone supports.
 
-A counterfactual perturbation is useful only when it changes the suspected artifact without accidentally changing the intended signal.
+A counterfactual perturbation earns its keep only when it changes the suspected artifact and leaves the intended signal intact. If your background swap also blurs the walker, a drop in accuracy proves nothing.
 
 ### Interpreting a split gap
 
-Suppose row-split accuracy is 95 percent and participant-disjoint accuracy is 62 percent. The gap is evidence that row-level evaluation benefited from participant-linked information. It does not prove that all 33 percentage points came from one specific artifact.
+Suppose row-split accuracy is 95 percent and participant-disjoint accuracy is 62 percent. The 33 point gap is evidence that row-level evaluation was benefiting from participant-linked information, which is exactly what section 2 predicts. It does not identify which artifact supplied it or prove that a single artifact supplied all of it.
 
-Inspect performance by group, device, and site. Averages can hide a model that succeeds only under one acquisition condition.
+Follow the gap with per-group, per-device, and per-site reporting. An average can hide a model that works under one acquisition condition and fails everywhere else.
 
-## 13. Efficiency notes
+## 13. Data lineage makes every tensor traceable
+
+Every decision in this lesson is only auditable if it was written down next to the data it affected. Lineage answers one question: where did this exact model input come from?
+
+A useful record contains:
+
+- immutable source identifier,
+- group identifier,
+- partition name,
+- original sequence length,
+- replicate block and allocation cell,
+- window start and stop,
+- base phase, origin phase, and origin policy,
+- phase-catalog digest and manifest digest,
+- separate sequence, phase, spatial, and mask stream versions,
+- sampled transform parameters,
+- planned exposure and effective batch size,
+- preprocessing version,
+- label source and label version.
+
+The path it describes is short and worth memorizing:
+
+$$
+\text{source}
+\rightarrow
+\text{group partition}
+\rightarrow
+\text{origin}
+\rightarrow
+\text{window}
+\rightarrow
+\text{transform}
+\rightarrow
+\text{tensor}.
+$$
+
+Store these as structured data rather than encoding them in filenames. CSV, JSON Lines, or Parquet all work. A stable sample identifier can be a hash of the canonical lineage fields, which gives you a name that changes exactly when the content changes.
+
+### Lineage as an executable contract
+
+The test of a lineage record is mechanical: given the record and the source-data version, a deterministic loader should reconstruct the same pre-transform window. For random transforms, store either the sampled parameters or a stable per-sample seed that regenerates them.
+
+Assert the properties you rely on, one assertion per property:
+
+- every sample's group belongs to its declared partition,
+- start and stop indices are within source bounds,
+- window length matches the model contract,
+- every start comes from the sequence's catalogued origin set,
+- a shared sequence keeps its base phase across nested pools,
+- paired cells share sequence, spatial, and mask draws,
+- the treatment audit record carries the phase-catalog digest and its measurements,
+- no sample identifier appears in more than one partition.
+
+Together these turn provenance from documentation, which drifts, into an interface, which fails loudly.
+
+## 14. Efficiency notes
 
 - Use <code>np.unique</code> to encode group identifiers once.
 - Use <code>np.isin</code> for vectorized partition masks.
@@ -465,53 +452,48 @@ Inspect performance by group, device, and site. Averages can hide a model that s
 - Use <code>Tensor.unfold</code> for equal-length sliding-window views.
 - Use group-balanced samplers when prolific groups would dominate batches.
 - Copy a window before any in-place transform if it aliases source storage.
-- Precompute anchor arrays and $K_i$ once per immutable inventory.
+- Precompute each sequence's period, base phase, and origin starts once per immutable catalog.
 - Evaluate occupancy with stable `log1p` and `expm1` operations at large exposure.
 
-## 14. Common failure modes
+## 15. Common failure modes
 
-1. **Grouping too narrowly:** recording splits leak participant identity.
+1. **Grouping too narrowly:** splitting by recording leaks participant identity.
 2. **Preprocessing before splitting:** test statistics influence training.
-3. **Random evaluation windows:** metric noise obscures model changes.
+3. **Random evaluation windows:** metric noise obscures real model changes.
 4. **Framewise random crops:** augmentation jitter replaces motion.
 5. **A seed without a manifest:** source and transform choices remain hidden.
-6. **Row-weighted evaluation:** participants with more repeats dominate.
+6. **Row-weighted evaluation:** participants with more repeats set the score.
 7. **Repeated test inspection:** the test set becomes tuning feedback.
-8. **Manifest-row hashing:** nested pools assign different anchors to the same sequence.
-9. **One generator for every draw:** temporal choices shift crop and mask randomness.
-10. **Calling anchors independent:** overlap and shared source causes are ignored.
-11. **Unequal exposure:** the support intervention is mixed with additional optimization.
+8. **Manifest-row hashing:** nested pools give the same sequence different base phases.
+9. **One generator for every draw:** origin choices shift crop and mask randomness.
+10. **Calling origins independent:** shared source causes and window overlap are ignored.
+11. **Reading iso-catalog as iso-information:** equal $U\,k$ is treated as equal evidence.
+12. **Unequal exposure:** the origin intervention is mixed with extra optimization.
 
-## 15. Exercises
+## 16. Exercises
 
 1. A dataset has 100 participants and 20 windows per participant. Which count controls participant-level uncertainty?
-2. Find $\mathcal A_i$, $K_i$, and $\mathcal B_i$ for $n_i=48$ and $T=16$.
-3. Why do frozen-random and resampled policies have the same marginal anchor distribution but different realized support?
-4. Why must spatial transforms and masks use streams separate from the temporal policy?
-5. Design one lineage record for a resampled training window.
+2. For $n_i=48$, $T=16$, period $P=32$, and base phase $b=0.1$, find the four semantic origin phases and their start frames.
+3. Why do the phase-depth and nearby-jitter cells have the same nominal catalog size but different treatment strength?
+4. Why must spatial transforms and masks use streams separate from the phase origins?
+5. Design one lineage record for a phase-separated training window.
 
 ### Brief solutions
 
-1. Under a participant-independence assumption, the nominal independent-unit count is 100. The 2,000 windows are correlated repeats.
-2. $W_i=33$, so $\mathcal A_i=\{0,8,16,24,32\}$, $K_i=5$, and $\mathcal B_i=\{0,16,32\}$.
-3. Both choose every anchor with probability $1/K_i$ across randomization, but frozen-random repeats one assigned anchor within a run while resampling can visit all $K_i$ anchors.
-4. Separate streams keep nuisance draws paired when the temporal policy makes a different number or pattern of random calls.
-5. Include source and group IDs, split, replicate, policy, stream versions, start, stop, transform parameters, manifest digest, planned exposure, and preprocessing version.
+1. Under a participant-independence assumption, the nominal independent-unit count is 100. The 2,000 windows are correlated repeats of those 100 units.
+2. The phases are $0.1$, $0.35$, $0.6$, and $0.85$, giving starts $3$, $11$, $19$, and $27$. All are at most $W_i-1=32$, so all four windows fit.
+3. Both have $U=62{,}500$ and $k=4$, so both have $N=250{,}000$. Only the phase-separated cell places its four origins a quarter cycle apart, so only it changes which parts of the stride the model sees.
+4. Separate streams keep the nuisance draws paired even when the two origin policies consume different amounts of randomness.
+5. Include source and group IDs, partition, replicate block, allocation, origin policy, base and origin phase, stream versions, start, stop, transform parameters, manifest and phase-catalog digests, planned exposure, and preprocessing version.
 
 ## Recap
 
-Group-aware sampling aligns evaluation with the intended independent unit. The fixed anchor
-set defines temporal support, while frozen-random and resampled policies change how much
-of that support a run can realize. Occupancy expectations measure the planned contrast
-at fixed exposure. Stable identity hashing, nested-manifest checks, and paired nuisance
-streams isolate the intervention. Temporal transformations still need a scientifically
-plausible scope, lineage makes every tensor auditable, and shortcut diagnostics test
-whether performance depends on acquisition artifacts.
+Group-aware sampling lines the evaluation up with the independent unit the claim is about. Inside a sequence, phase gives a coordinate that frame spacing only approximates: nested semantic origins spread four views across one gait cycle, and nearby jitter holds the count fixed while collapsing the spread, which is what makes it a control. Nominal catalog size $N=U\,k$ equalizes counting across cells and nothing else, so recurrence and the semantic audit are reported next to it. Stable identity hashing, nested pools, and paired nuisance streams keep the intervention isolated, lineage keeps every tensor traceable, and shortcut diagnostics test whether a score depends on acquisition artifacts instead of movement.
 
 ## Next lesson
 
-[09: Eigenspectra and effective rank](09_eigenspectra_and_effective_rank.md) studies the geometry of the representations produced by this pipeline.
+[09: Eigenspectra and effective rank](09_eigenspectra_and_effective_rank.md) studies the geometry of the representations this pipeline produces.
 
 ## Continue in the notebook
 
-[Open the executable lesson 08 notebook](../implementations/08_group_aware_sampling.ipynb) to compare row and group splits, verify temporal policies, audit expected support, and build a lineage record.
+[Open the executable lesson 08 notebook](../implementations/08_group_aware_sampling.ipynb) to split groups, build nested semantic origins and their matched jitter control, check the iso-catalog arithmetic, and assemble the treatment-audit record.

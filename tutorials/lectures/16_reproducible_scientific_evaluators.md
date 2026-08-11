@@ -1,27 +1,28 @@
 # 16. Reproducible scientific evaluators and numerical contracts
 
-> **Current-study note.** The software contracts in this lecture apply directly to the revised study. The older 32-row low/high registry described in its worked example is superseded. The active contract validates a 28-row iso-catalog registry with `breadth`, `balanced`, `phase_depth`, and four prespecified `nearby_jitter` rows, including a phase-catalog digest and origin policy. The executable current example is in [the Lesson 16 notebook](../implementations/16_reproducible_scientific_evaluators.ipynb), and the full study design is in [Lesson 17](17_hierarchical_support_and_factorial_inference.md).
-
 ![A reproducible evaluator validates inputs, freezes fitted state, computes deterministically, and publishes atomically](../images/16_reproducible_scientific_evaluators.svg)
 
 ## Why this lesson matters
 
+The previous lesson decided what an honest interval means. This lesson makes sure the
+software that produces it cannot change the answer behind your back.
+
 A scientific evaluator is more than a formula. It receives arrays and metadata, fits
 parameters on an allowed population, freezes those parameters, transforms new data,
-aggregates scores, and writes artifacts that other programs will trust. Each boundary can
-silently change the result even when the central equation is correct.
+aggregates scores, and writes artifacts that other programs will trust. Each of those
+boundaries can silently change the result even when the central equation is correct.
 
-Imagine a fitted linear adapter stored in a frozen Python dataclass. The object appears
-immutable, yet its NumPy coefficient array can still be modified in place. Imagine a fit
-whose result changes in low-order bits when input rows arrive in a different order. Imagine
-a process that crashes halfway through writing a result file and leaves a valid filename
-containing invalid JSON. These are not cosmetic software defects. They undermine the claim
-that the same declared analysis produces the same auditable result.
+Three concrete failures set the agenda. A fitted linear adapter is stored in a frozen
+Python dataclass, the object looks immutable, and its NumPy coefficient array is still
+modified in place. A fit returns different low-order bits when identical input rows arrive
+in a different order. A process crashes halfway through writing a result file and leaves a
+valid filename holding invalid JSON. None of these is a cosmetic defect. Each one breaks
+the claim that the same declared analysis produces the same auditable result.
 
-This lesson develops a small engineering vocabulary for trustworthy numerical pipelines.
-The aim is not bitwise identity across every processor and library build. The aim is to
-make mutability, ordering, typing, validation, serialization, and failure behavior explicit
-enough that a result can be reproduced and discrepancies can be localized.
+This lesson builds a small engineering vocabulary against those failures. The aim is not
+bitwise identity across every processor and library build. The aim is to make mutability,
+ordering, typing, validation, serialization, and failure behavior explicit enough that a
+result can be reproduced and that any discrepancy can be traced to one boundary.
 
 ## Prerequisites
 
@@ -42,7 +43,7 @@ By the end of this lesson, you will be able to:
 6. explain when exact-byte comparison is appropriate and when tolerance is appropriate;
 7. publish an artifact with a same-directory temporary file and `os.replace()`;
 8. test failure behavior without corrupting the previous valid artifact; and
-9. validate an exact eight-block by four-cell training registry;
+9. validate the exact 28-row allocation registry;
 10. bind manifests and final-step checkpoints to cryptographic digests; and
 11. publish privacy-safe summaries without exposing participant identifiers.
 
@@ -60,18 +61,24 @@ layer. Assertions about shape, finiteness, and row-order invariance address the 
 layer. Temporary files, atomic replacement, schema versions, and metadata sidecars address
 the artifact layer. Passing one layer does not imply the others are correct.
 
-Suppose a fitted adapter maps a row $x$ to $K$ outputs:
+One small example shows how much of a "result" lives outside the equation. Suppose a fitted
+adapter maps a row $x$, a vector of $D$ features, to $K$ outputs:
 
 $$
 f(x)=(x-\mu)S^{-1}W+b.
 $$
 
-$\mu$ is the training mean, $S$ is a diagonal scale matrix, $W$ is a coefficient matrix,
-and $b$ is an intercept. Reproducing this map requires more than remembering $W$. The fit
-must store the feature order, mean, scale, intercept, dtype convention, regularization
-policy, and any rule used for zero-variance features.
+$\mu$ is the per-feature training mean, $S$ is a diagonal matrix whose entries are the
+per-feature scales, $W$ is a coefficient matrix with one row per feature and one column per
+output, and $b$ is an intercept vector of length $K$. Reproducing this map requires more
+than remembering $W$. The fit must store the feature order, mean, scale, intercept, dtype
+convention, regularization policy, and any rule used for zero-variance features. Lose the
+feature order alone and every number above still reproduces while the map does not.
 
 ## 2. A frozen dataclass is only shallowly frozen
+
+The first boundary to harden is the fitted object itself, because Python's most obvious
+immutability tool does less than its name suggests.
 
 `@dataclass(frozen=True)` prevents rebinding an attribute through normal assignment. It
 does not recursively freeze objects referenced by that attribute. A NumPy array owns or
@@ -104,6 +111,9 @@ an executable boundary.
 
 ## 3. Defensive copies and read-only arrays
 
+That boundary is built from two ordinary NumPy calls, one for ownership and one for
+mutability. Neither is sufficient alone.
+
 Use `np.array(..., copy=True)` when ownership matters. `np.asarray` may return the caller's
 existing array without copying, which is efficient but inappropriate for a durable fitted
 parameter. After conversion and validation, disable writes:
@@ -133,6 +143,9 @@ fit objects should prefer owned contiguous copies unless a documented zero-copy 
 necessary and thoroughly tested.
 
 ## 4. Validate frozen objects in `__post_init__`
+
+Copying and locking arrays protects them from later mutation. It says nothing about whether
+they were consistent when they arrived, which is a check that belongs at construction time.
 
 A frozen dataclass cannot assign attributes normally during `__post_init__`. Python
 provides `object.__setattr__` for controlled construction-time initialization. Use it only
@@ -170,78 +183,70 @@ construction is clearer than discovering the inconsistency during the tenth tran
 
 ## 5. Type hints state policy families
 
-Scientific pipelines often accept strings that select policies. A bare `str` hides the
-allowed vocabulary. `Literal` makes the active $2\times2$ protocol visible to readers and
-type checkers:
+Numbers are now safe. The other half of an evaluator's input is metadata, and a misspelled policy string can steer an analysis just as effectively as a corrupted coefficient.
+
+Scientific pipelines often accept strings that select policies. A bare `str` hides the allowed vocabulary. `Literal` writes the allowed vocabulary into the signature, where both a reader and a type checker can see it. The active registry uses allocation and origin-policy names as part of the scientific contract:
 
 ```python
 from collections.abc import Mapping, Sequence
 from typing import Literal
 
-SequenceSupport = Literal["low", "high"]
-WindowPolicy = Literal["frozen_random", "resampled_anchor"]
+Allocation = Literal["breadth", "balanced", "phase_depth", "nearby_jitter"]
+OriginPolicy = Literal["base_phase", "phase_separated", "nearby_jitter"]
 
-def select_cell(*, support: SequenceSupport, policy: WindowPolicy):
+def select_cell(*, allocation: Allocation, origin_policy: OriginPolicy):
     ...
 
 def score(distances: Mapping[str, float], target_id: str):
     ...
 ```
 
-`Sequence` accepts ordered list-like inputs without promising mutation. `Mapping` accepts
-dictionary-like key-value inputs without requiring a concrete `dict`. These abstract types
-state what the function needs. Runtime validation is still required because Python does
-not enforce annotations automatically and external data can bypass static checking.
+`Sequence` accepts ordered list-like inputs without promising mutation. `Mapping` accepts dictionary-like key-value inputs without requiring a concrete `dict`. These abstract types state what the function needs. Runtime validation is still required because Python does not enforce annotations automatically and external data can bypass static checking.
 
-Policy names should also be validated against configuration schemas. A type hint helps a
-developer, while a runtime check protects the actual analysis. The registry must reject
-old rung labels and close spelling variants. Keeping one canonical set of names prevents
-code, documentation, and serialized metadata from drifting apart.
+Policy names should also be validated against configuration schemas. A type hint helps a developer, while a runtime check protects the actual analysis. The registry must reject spelling variants, unexpected allocations, and unknown origin policies. Keeping one canonical set of names prevents code, documentation, and serialized metadata from drifting apart.
 
-### Validate the exact $2\times2\times8$ registry
+### Validate the exact 28-row registry
 
-The hierarchical-diversity registry is a scientific object, not just a job list. It must
-contain exactly 32 unique model rows. Replicate blocks are numbered 0 through 7. Every
-block must contain exactly these four cells:
+Policy names are per-row facts. The registry that lists every training job is a fact about the whole study, and it needs a different kind of check.
+
+The hierarchical-diversity registry is a scientific object, not just a job list. It must contain exactly 28 unique model rows. Blocks are numbered 0 through 7. Every block contains exactly these three primary allocations:
 
 ```text
-low,  frozen_random
-low,  resampled_anchor
-high, frozen_random
-high, resampled_anchor
+breadth
+balanced
+phase_depth
 ```
 
-Validation should compare the observed set of `(replicate, sequence_support,
-window_policy)` tuples with the complete expected Cartesian product. Counting 32 rows is
-not enough because a duplicate can hide a missing cell. Model labels must also be unique.
-Reject extra cells, incomplete blocks, duplicate cells, unknown policy names, and old
-scaling-study registries.
+Four prespecified blocks also contain one `nearby_jitter` row. Validation should compare the observed set of `(block, allocation)` tuples with the complete expected set:
 
-Within one block, all four cells share the optimization and replicate seeds. The two low
-cells share one low manifest, and the two high cells share one high manifest. Every row
-uses the same frozen training exposure and anchor spacing. The low sequence count must be
-smaller than the high count, and each recorded count must equal the number of sequences in
-its verified manifest. Window, temporal, spatial, and mask stream versions must match the
-frozen protocol across all rows. These are cross-row invariants, so a schema that checks
-each row separately cannot establish them.
+```text
+{0..7} x {breadth, balanced, phase_depth}
+plus
+{0..3} x {nearby_jitter}
+```
+
+Counting 28 rows is not enough because a duplicate can hide a missing cell. Model labels must also be unique. Reject extra cells, incomplete blocks, duplicate cells, unknown allocation names, unknown origin policies, and any registry whose row set differs from the frozen contract.
+
+Every row must record the allocation name, sequence count, origins per sequence, nominal catalog size, origin policy, train and validation manifest digests, phase-catalog digest, source-group digest, near-duplicate summary digest, exposure tier, optimization seed, replicate seed, stream versions, and checkpoint rule. The nominal catalog must equal `unique_sequences * origins_per_sequence`, and the nominal catalog must be the same for every row.
+
+Within one primary block, the declared pairing fields must agree according to the protocol. The three primary rows share the paired nuisance streams that the analysis expects to cancel. The phase-depth and nearby-jitter rows in a diagnostic block share sequence draw, base phase, masks, spatial transforms, exposure, optimization seed, replicate seed, and phase-catalog digest. Only the origin policy may differ. These are cross-row invariants, so a schema that checks each row separately cannot establish them.
 
 ### Validate nested pools, not only manifest filenames
 
-For each block, the low source-group set must be a strict subset of the high source-group
-set. The high manifest must contain every low sequence with the same scientific identity.
-The same sequence must map to the same frozen anchor in both manifests. A shared filename
-or equal sequence count does not prove any of these relationships.
+Set equality on the registry proves that the right jobs exist. It says nothing about the data those jobs will read, and the design makes a claim about that data too.
 
-Store a canonical digest of each manifest after sorting by stable scientific identifiers
-and serializing with a fixed encoding and field order. Validate both the digest and the
-nested-pool relationship. A digest proves byte identity with the frozen artifact. The
-explicit nesting check proves the scientific relationship between two different artifacts.
+For each primary block, the source groups should be nested whenever the frozen source-group rule permits it: phase depth is inside balanced, and balanced is inside breadth. The smaller manifest must contain source groups that are present in the larger manifest with the same scientific identity. The same sequence must map to the same base phase wherever it appears. A shared filename or equal sequence count does not prove any of these relationships.
+
+Store a canonical digest of each manifest after sorting by stable scientific identifiers and serializing with a fixed encoding and field order. Validate both the digest and the nested-pool relationship. A digest proves byte identity with the frozen artifact. The explicit nesting check proves the scientific relationship between two different artifacts.
 
 ### Bind evaluation to the final-step checkpoint
 
-Checkpoint provenance should include model label, block, cell, optimization seed, training
-exposure, completed step, configuration digest, manifest digest, window-policy version,
-temporal-stream version, spatial-stream version, mask-stream version, and checkpoint
+Manifests describe what went into training. The checkpoint is what came out, and it needs
+the same treatment: an identity check on its bytes and a separate check on its meaning.
+
+Checkpoint provenance should include model label, block, allocation, origin policy, optimization seed, training
+exposure, completed step, configuration digest, manifest digest, phase-catalog digest,
+sequence-stream version, phase-stream version, spatial-stream version, mask-stream version, and checkpoint
 content digest. Evaluation accepts only the checkpoint whose completed step equals the
 frozen final step.
 
@@ -251,6 +256,11 @@ checks are necessary. A file named `final.pt` is not evidence that training reac
 declared final step.
 
 ### Resume and evaluation must fail closed
+
+All of those checks are only useful if a failure stops the job. The default behavior of
+most pipelines is the opposite: warn and continue. Reverse it.
+
+![A saved run state compared with its registry row, resuming on agreement and stopping on any difference](../images/16_fail_closed_resume.svg)
 
 A resume operation may proceed only when every frozen field in the saved run state agrees
 with the selected registry row and current protocol. Evaluation applies the same rule to
@@ -265,11 +275,22 @@ error is safer than an apparently complete result with uncertain lineage.
 
 ### Freeze the protocol before outcomes
 
-Before Health&Gait outcome access, create a timestamped, content-addressed protocol
+Fail-closed checks compare a run against something. That something is the protocol
+snapshot, and it has to exist before the first outcome is opened or there is nothing to
+compare against.
+
+Before locked evaluation outcome access, create a timestamped, content-addressed protocol
 snapshot. It includes manifests, registry, policies, exposure, checkpoint rule, failure
 rules, GFC-v2 evaluator, completion controls, materiality margins, statistical code, and
 figure templates. Throughput can choose between the two predeclared exposure tiers only by
 the frozen outcome-blind rule.
+
+![What the protocol snapshot fixes, what it still allows, and the one action it forbids](../images/16_frozen_boundary.svg)
+
+The figure sorts the whole protocol into three piles. On the left is everything the
+snapshot fixes. On the right is what may still change afterwards, which is real work but
+always arrives as a new numbered version with a written reason. At the bottom is the single
+forbidden move: editing a frozen field in place after seeing an outcome.
 
 The snapshot digest makes later changes visible. It does not prove the protocol is good,
 but it separates planned analysis from revisions made after outcome inspection. Any
@@ -277,6 +298,9 @@ approved correction should create a new version with an explicit reason rather t
 overwriting the old protocol state.
 
 ## 6. Remove irrelevant row-order variation
+
+Validation and freezing settle what goes into a computation. The computation itself can
+still be nondeterministic, and the usual culprit is the order in which rows arrive.
 
 Mathematical sums are order independent over real numbers. Floating-point sums are not
 perfectly associative. A matrix fit can therefore differ in low-order bits when identical
@@ -286,7 +310,8 @@ order-sensitive reduction.
 
 Text conversion with ordinary decimal formatting can collapse distinct floats or depend
 on formatting choices. Python's `float.hex()` gives an exact hexadecimal representation
-of a finite binary float. One deterministic numeric row key is
+of a finite binary float. Writing $x_i$ for row $i$ and $x_{ij}$ for its $j$-th of $D$
+feature values, one deterministic row key is the tuple of exact hex strings
 
 $$
 k(x_i)=\bigl(\mathrm{hex}(x_{i1}),\ldots,\mathrm{hex}(x_{iD})\bigr).
@@ -314,15 +339,25 @@ when the science concerns geometry rather than coordinate orientation.
 
 ## 7. Exact equality and tolerance answer different questions
 
+Deterministic ordering removes one source of variation. What remains has to be compared,
+and the choice between exact and approximate comparison is a scientific choice rather than
+a stylistic one.
+
 Use exact equality for discrete protocol structure, identifiers, counts, schema versions,
 and values produced by exact rational enumeration. Use tolerance for numerical values whose
 derivation includes floating-point operations and whose acceptable scale is specified.
 
-A common comparison is
+A common comparison of a computed value $a$ against a reference value $b$ is
 
 $$
 |a-b|\leq t_{\mathrm{abs}}+t_{\mathrm{rel}}|b|.
 $$
+
+Here $t_{\mathrm{abs}}$ is an absolute tolerance in the units of the quantity itself, and
+$t_{\mathrm{rel}}$ is a dimensionless fraction of the reference magnitude. With
+$t_{\mathrm{abs}}=10^{-8}$ and $t_{\mathrm{rel}}=10^{-6}$, a reference of 2.0 accepts a
+difference up to about $2\times10^{-6}$, while a reference of 0.0 accepts only
+$10^{-8}$.
 
 Absolute tolerance controls behavior near zero. Relative tolerance scales with a reference
 magnitude. For a bounded distance with a declared protocol tie rule, an absolute tolerance
@@ -335,6 +370,9 @@ Write down whether a check protects protocol identity, serialized determinism, o
 agreement before choosing the comparison.
 
 ## 8. Publish artifacts atomically
+
+A correct, deterministic, well-compared number is still worthless if the file carrying it
+can be observed half written. The last boundary is publication.
 
 Writing directly to the final destination exposes partial content if the process fails.
 Instead, create a temporary file in the destination directory, write and validate it, then
@@ -382,6 +420,10 @@ when readers must verify that a bundle belongs together.
 
 ### Publish only privacy-safe summaries
 
+Atomic replacement controls *when* readers see a file. A second rule controls *what* is in
+it, because the analysis that produced the number was allowed to see much more than the
+public release may contain.
+
 The private analysis may use participant identifiers to preserve pairing and detect
 duplicates. Public artifacts must not contain those identifiers, participant-level rows,
 recording paths, embeddings, nearest-neighbor examples, or identity-capable checkpoints.
@@ -400,6 +442,9 @@ fails, keep the previous complete public summary and remove the temporary file.
 
 ## 9. Test the failure path
 
+Everything above is a promise about what happens when something goes wrong, and an untested
+promise about failure is just a comment.
+
 Happy-path tests are insufficient for artifact code. Begin with a valid destination, force
 an exception after writing the temporary file but before replacement, and assert that the
 old destination remains unchanged. Also assert that temporary files are removed.
@@ -414,6 +459,9 @@ stored array and expect a `ValueError`. Transform the same rows after permuting 
 order and compare outputs under the declared exact or tolerance policy.
 
 ## 10. Build an auditable fit-transform interface
+
+Tests protect the boundaries you have. A good public interface reduces the number of
+boundaries a caller can reach at all.
 
 A fitted object should expose behavior and diagnostics, not writable internals. A
 `transform` method validates shape and finiteness, performs the declared dtype conversion,
@@ -443,12 +491,16 @@ interface design requirements.
 
 ## 11. End-to-end invariant ladder
 
+The lesson has now covered every boundary once. Running them in the right order is what
+turns a pile of checks into a diagnosis, because a check that fires early tells you far
+more than the same check firing at the end.
+
+![Six rungs climbing from row fields through registry set equality and digests to deterministic ordering and atomic publication](../images/16_invariant_ladder.svg)
+
 Validate from local to global. First check scalar policies and row fields. Then compare the
-registry with the exact 32-cell Cartesian product. Next verify seed equality within block,
-manifest reuse within support level, strict low-within-high nesting, and common exposure.
-Then verify manifest and checkpoint digests, final-step provenance, and frozen stream
-versions. Finally validate the privacy-safe summary, parse the temporary bytes, and publish
-atomically.
+registry with the exact 28-row iso-catalog product. Next verify seed equality within block, manifest reuse within paired blocks, nested source-group relationships, phase-catalog pairing, and common exposure. Then verify manifest and
+checkpoint digests, final-step provenance, and frozen stream versions. Finally validate the
+privacy-safe summary, parse the temporary bytes, and publish atomically.
 
 This ladder localizes failures. If a read-back digest differs but in-memory results match,
 the bug is in serialization. If row permutation changes fitted bytes but not predictions
@@ -463,6 +515,9 @@ specific reason being tested.
 
 ## 12. Efficiency notes
 
+None of this discipline needs to be slow. Most of the cost is paid once, at a boundary,
+rather than on every call.
+
 - Copy fitted parameters once at construction, not on every transform.
 - Mark stored arrays read-only after all construction-time calculations finish.
 - Sort only at fit boundaries where reduction order matters.
@@ -471,7 +526,7 @@ specific reason being tested.
 - Validate a temporary artifact before replacement when parsing is inexpensive.
 - Use explicit dtypes on sensitive reductions and serialized numeric arrays.
 - Benchmark deterministic conventions, but do not remove them without changing the contract.
-- Generate the 32 expected registry keys once and compare them with a set of observed keys.
+- Generate the 28 expected registry keys once and compare them with a set of observed keys.
 - Cache verified manifest and checkpoint digests by immutable path and file metadata only
   within one validation process.
 - Validate private inputs before loading participant outcomes, then build a separate
@@ -485,6 +540,8 @@ be substantial.
 
 ## 13. Common failure modes
 
+Each entry below is one boundary from this lesson, described by the way it usually breaks.
+
 1. **Frozen wrapper, mutable array:** attribute assignment fails but in-place mutation succeeds.
 2. **`np.asarray` mistaken for ownership:** the fit aliases caller memory.
 3. **Validation after storage:** an invalid object exists before checks finish.
@@ -495,8 +552,8 @@ be substantial.
 8. **Cleanup only on success:** failed runs accumulate misleading temporary artifacts.
 9. **Several files called one transaction:** readers can observe mismatched generations.
 10. **Canonicalization called interpretation:** deterministic coordinates are mistaken for uniquely identified scientific axes.
-11. **Count-only registry check:** 32 rows pass even though one cell is duplicated and one
-    is missing.
+11. **Count-only registry check:** 28 rows pass even though one allocation row is duplicated
+    and one expected row is missing.
 12. **Filename provenance:** a checkpoint named `final` is accepted without checking its
     completed step or digest.
 13. **Best-effort resume:** a seed or manifest mismatch produces a warning and training
@@ -555,20 +612,21 @@ file survives.
 
 ### Exercise 7
 
-A registry has 32 rows and eight replicate labels. Why must validation still compare the
-complete set of block and cell tuples?
+A registry has 28 rows and eight block labels. Why must validation still compare the
+complete active set of block and allocation tuples?
 
 **Brief solution:** the row count can hide one duplicated cell and one missing cell. Set
-equality with the expected $8\times2\times2$ product detects both problems.
+equality with the expected eight blocks of breadth, balanced, and phase depth, plus four
+prespecified nearby-jitter rows, detects both problems.
 
 ### Exercise 8
 
-The low and high manifest digests are both valid, but one low source group is absent from
-the high manifest. Can the block run?
+The phase-depth and nearby-jitter manifest digests are both valid, but the rows do not
+share the same sequence draw. Can the block run?
 
 **Brief solution:** no. Each digest only establishes identity for one artifact. The
-scientific design separately requires the low group set to be a strict subset of the high
-group set.
+scientific design separately requires the jitter row to be paired to the matching
+phase-depth row, with only the origin construction changed.
 
 ### Exercise 9
 
@@ -589,16 +647,22 @@ content before atomic publication.
 
 ## Recap
 
-A reproducible scientific evaluator validates the exact eight-block four-cell registry,
-proves low-within-high nesting, binds manifests and final-step checkpoints to digests, and
-freezes every seed and stream version before outcomes. Resume and evaluation stop on any
-mismatch. Public summaries pass a privacy allowlist before same-directory atomic
-publication and never include participant identifiers. These checks make the declared
-method harder for software behavior to change silently.
+A reproducible scientific evaluator validates its registry as a complete set rather than a
+row count. In the active study, that set is the 28-row iso-catalog product: eight blocks of
+breadth, balanced, and phase depth, plus four prespecified nearby-jitter rows. It proves the
+nesting and phase-catalog relationships, binds manifests and final-step checkpoints to
+digests, and freezes every seed and stream version before outcomes. Resume and evaluation
+stop on any mismatch. Public summaries pass a privacy allowlist before same-directory
+atomic publication and never include participant identifiers.
+
+Taken together these checks close the gap between the method a paper declares and the
+behavior its software actually has. The next lesson spends that guarantee: it assembles the
+whole curriculum into the iso-catalog phase-allocation study and shows what a claim looks
+like when every boundary has been held.
 
 ## Continue
 
 - Previous: [15. Exposure, replication, and variance decomposition](15_exposure_and_replication.md)
 - Notebook: [16. Reproducible scientific evaluators](../implementations/16_reproducible_scientific_evaluators.ipynb)
-- Next: [17. Hierarchical support interventions and blocked factorial inference](17_hierarchical_support_and_factorial_inference.md)
+- Next: [17. Iso-catalog phase allocation and paired inference](17_hierarchical_support_and_factorial_inference.md)
 - Curriculum: [Tutorial README](../README.md)

@@ -1,0 +1,40 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 400" role="img" aria-labelledby="title desc">
+  <title id="title">Which quantities each data partition is allowed to fit</title>
+  <desc id="desc">Three boxes in a row show the training partition fitting preprocessing, ridge weights, and post-map statistics; the calibration partition fitting only the temperature; and the test partition fitting nothing and scoring the frozen pipeline once. Arrows carry frozen artefacts forward only.</desc>
+  <defs>
+    <marker id="a10d" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto">
+      <path d="M0 0 L10 5 L0 10 z" fill="#52606d"/>
+    </marker>
+  </defs>
+  <rect width="960" height="400" rx="18" fill="#fbfaf7"/>
+  <g font-family="Arial, Helvetica, sans-serif">
+    <text x="480" y="44" text-anchor="middle" font-size="24" font-weight="700" fill="#172b4d">Each partition may fit only its own quantities</text>
+
+    <rect x="40" y="100" width="260" height="170" rx="14" fill="#dbeafe" stroke="#2563eb" stroke-width="3"/>
+    <text x="170" y="140" text-anchor="middle" font-size="18" font-weight="700" fill="#1d4ed8">Training rows</text>
+    <text x="62" y="176" font-size="15" fill="#172b4d">fit scaler and encoder</text>
+    <text x="62" y="202" font-size="15" fill="#172b4d">fit ridge weights</text>
+    <text x="62" y="228" font-size="15" fill="#172b4d">fit post-map means</text>
+
+    <rect x="350" y="100" width="260" height="170" rx="14" fill="#fef3c7" stroke="#d97706" stroke-width="3"/>
+    <text x="480" y="140" text-anchor="middle" font-size="18" font-weight="700" fill="#b45309">Calibration rows</text>
+    <text x="372" y="176" font-size="15" fill="#172b4d">fit one temperature</text>
+    <text x="372" y="202" font-size="15" fill="#172b4d">fit nothing else</text>
+
+    <rect x="660" y="100" width="260" height="170" rx="14" fill="#ede9fe" stroke="#7c3aed" stroke-width="3"/>
+    <text x="790" y="140" text-anchor="middle" font-size="18" font-weight="700" fill="#6d28d9">Test rows</text>
+    <text x="682" y="176" font-size="15" fill="#172b4d">fit nothing at all</text>
+    <text x="682" y="202" font-size="15" fill="#172b4d">score the frozen</text>
+    <text x="682" y="228" font-size="15" fill="#172b4d">pipeline once</text>
+
+    <g stroke="#52606d" stroke-width="3" marker-end="url(#a10d)">
+      <line x1="302" y1="185" x2="344" y2="185"/>
+      <line x1="612" y1="185" x2="654" y2="185"/>
+    </g>
+    <text x="324" y="168" text-anchor="middle" font-size="15" fill="#52606d">frozen</text>
+    <text x="634" y="168" text-anchor="middle" font-size="15" fill="#52606d">frozen</text>
+
+    <text x="480" y="340" text-anchor="middle" font-size="15" fill="#52606d">Nothing flows backward. A quantity fitted on a later partition would leak.</text>
+    <text x="480" y="364" text-anchor="middle" font-size="15" fill="#52606d">Split by participant so one person's rows never span two partitions.</text>
+  </g>
+</svg>

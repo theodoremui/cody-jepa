@@ -1,0 +1,32 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 440" role="img" aria-labelledby="title desc">
+  <title id="title">Catastrophic cancellation on a number line</title>
+  <desc id="desc">Two nearly equal exact values sit between representable points on a seven digit machine. Both round to the same stored value, so their computed difference is zero instead of one.</desc>
+  <defs><marker id="arrow" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto"><path d="M0,0 L0,6 L9,3 z" fill="#52606d"/></marker></defs>
+  <rect width="960" height="440" fill="#fbfaf7"/>
+  <text x="480" y="40" text-anchor="middle" font-family="sans-serif" font-size="24" font-weight="700" fill="#172b4d">Subtraction exposes rounding that already happened</text>
+  <text x="480" y="88" text-anchor="middle" font-family="sans-serif" font-size="17" fill="#52606d">a seven-digit machine, near ten million</text>
+  <g font-family="sans-serif" fill="#172b4d">
+    <text x="150" y="150" font-size="16">exact values</text>
+    <line x1="150" y1="200" x2="900" y2="200" stroke="#52606d" stroke-width="3"/>
+    <g stroke="#52606d" stroke-width="3">
+      <path d="M300 190 V210"/><path d="M580 190 V210"/><path d="M860 190 V210"/>
+    </g>
+    <text x="296" y="178" text-anchor="end" font-size="16">y = 10,000,000</text>
+    <text x="336" y="178" font-size="16">x = 10,000,001</text>
+    <circle cx="300" cy="200" r="8" fill="#dbeafe" stroke="#2563eb" stroke-width="3"/>
+    <circle cx="328" cy="200" r="8" fill="#fee2e2" stroke="#dc2626" stroke-width="3"/>
+    <g font-size="15" text-anchor="middle" fill="#52606d">
+      <text x="300" y="234">10,000,000</text><text x="580" y="234">10,000,010</text><text x="860" y="234">10,000,020</text>
+    </g>
+    <path d="M300 246 V286" stroke="#52606d" stroke-width="3" marker-end="url(#arrow)"/>
+    <path d="M328 246 L306 286" stroke="#52606d" stroke-width="3" marker-end="url(#arrow)"/>
+    <line x1="150" y1="300" x2="900" y2="300" stroke="#52606d" stroke-width="3"/>
+    <g stroke="#52606d" stroke-width="3">
+      <path d="M300 290 V310"/><path d="M580 290 V310"/><path d="M860 290 V310"/>
+    </g>
+    <circle cx="300" cy="300" r="9" fill="#ede9fe" stroke="#7c3aed" stroke-width="3"/>
+    <text x="150" y="336" font-size="16">after rounding, both land on one stored value</text>
+    <rect x="150" y="366" width="660" height="60" rx="14" fill="#fee2e2" stroke="#dc2626" stroke-width="2"/>
+    <text x="480" y="402" text-anchor="middle" font-size="17">exact difference 1, computed difference 0</text>
+  </g>
+</svg>

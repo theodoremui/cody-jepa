@@ -1,0 +1,40 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 420" role="img" aria-labelledby="title desc">
+  <title id="title">Fail-closed resume compares saved provenance with the registry row</title>
+  <desc id="desc">A saved run state is compared field by field with its registry row and protocol version; agreement resumes the run unchanged, and any difference or any missing field stops the job before data is loaded.</desc>
+  <defs>
+    <marker id="a16r" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto"><path d="M0 0 L0 6 L9 3 z" fill="#52606d"/></marker>
+  </defs>
+  <rect width="960" height="420" fill="#fbfaf7"/>
+  <g font-family="sans-serif" fill="#172b4d">
+    <text x="480" y="42" text-anchor="middle" font-size="24" font-weight="700">Resume stops unless every frozen field agrees</text>
+
+    <rect x="40" y="100" width="210" height="110" rx="14" fill="#f1f5f9" stroke="#64748b" stroke-width="2"/>
+    <text x="145" y="138" text-anchor="middle" font-size="17" font-weight="700">Saved state</text>
+    <text x="145" y="168" text-anchor="middle" font-size="15">seeds, digests,</text>
+    <text x="145" y="192" text-anchor="middle" font-size="15">stream versions</text>
+    <path d="M254 155 H296" stroke="#52606d" stroke-width="3" marker-end="url(#a16r)"/>
+
+    <rect x="300" y="100" width="250" height="110" rx="14" fill="#fef3c7" stroke="#d97706" stroke-width="2"/>
+    <text x="425" y="138" text-anchor="middle" font-size="17" font-weight="700">Compare</text>
+    <text x="425" y="168" text-anchor="middle" font-size="15">registry row and</text>
+    <text x="425" y="192" text-anchor="middle" font-size="15">protocol version</text>
+
+    <path d="M554 140 L616 116" stroke="#52606d" stroke-width="3" marker-end="url(#a16r)"/>
+    <path d="M425 214 V288 H612" fill="none" stroke="#52606d" stroke-width="3" marker-end="url(#a16r)"/>
+    <text x="560" y="98" font-size="15" fill="#52606d">match</text>
+    <text x="440" y="252" font-size="15" fill="#52606d">mismatch</text>
+
+    <rect x="620" y="60" width="300" height="110" rx="14" fill="#dcfce7" stroke="#16a34a" stroke-width="2"/>
+    <text x="770" y="98" text-anchor="middle" font-size="17" font-weight="700">All fields agree</text>
+    <text x="770" y="128" text-anchor="middle" font-size="15">resume the same run</text>
+    <text x="770" y="152" text-anchor="middle" font-size="15">with unchanged provenance</text>
+
+    <rect x="620" y="230" width="300" height="140" rx="14" fill="#fee2e2" stroke="#dc2626" stroke-width="2"/>
+    <text x="770" y="268" text-anchor="middle" font-size="17" font-weight="700">Any field differs</text>
+    <text x="770" y="298" text-anchor="middle" font-size="15">stop before loading data</text>
+    <text x="770" y="322" text-anchor="middle" font-size="15">a missing field counts</text>
+    <text x="770" y="346" text-anchor="middle" font-size="15">as a mismatch</text>
+
+    <text x="330" y="400" text-anchor="middle" font-size="16" fill="#52606d">A clear error beats a result with uncertain lineage.</text>
+  </g>
+</svg>

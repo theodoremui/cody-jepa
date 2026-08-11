@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 440" role="img" aria-labelledby="title desc">
+  <title id="title">Concatenating blocks is not equal weighting</title>
+  <desc id="desc">A single cosine over concatenated blocks is dominated by the widest block, while one cosine per block followed by a mean gives every factor the same weight.</desc>
+  <rect width="960" height="440" fill="#fbfaf7"/>
+  <g font-family="Arial, sans-serif" fill="#172b4d">
+    <text x="480" y="42" text-anchor="middle" font-size="24" font-weight="700">Score each block, then average the scores</text>
+
+    <rect x="50" y="80" width="400" height="270" rx="16" fill="#fee2e2" stroke="#dc2626" stroke-width="2"/>
+    <text x="250" y="120" text-anchor="middle" font-size="18" font-weight="700">One cosine over everything</text>
+    <rect x="80" y="148" width="170" height="32" rx="6" fill="#ffffff" stroke="#dc2626" stroke-width="2"/>
+    <text x="266" y="170" font-size="16">speed: 64 numbers</text>
+    <rect x="80" y="196" width="22" height="32" rx="6" fill="#ffffff" stroke="#dc2626" stroke-width="2"/>
+    <text x="266" y="218" font-size="16">clothing: 8</text>
+    <rect x="80" y="244" width="22" height="32" rx="6" fill="#ffffff" stroke="#dc2626" stroke-width="2"/>
+    <text x="266" y="266" font-size="16">direction: 8</text>
+    <text x="250" y="314" text-anchor="middle" font-size="16">speed drives the result</text>
+
+    <rect x="510" y="80" width="400" height="270" rx="16" fill="#dcfce7" stroke="#16a34a" stroke-width="2"/>
+    <text x="710" y="120" text-anchor="middle" font-size="18" font-weight="700">One cosine per block</text>
+    <text x="710" y="172" text-anchor="middle" font-size="16">speed distance = 0.30</text>
+    <text x="710" y="212" text-anchor="middle" font-size="16">clothing distance = 0.10</text>
+    <text x="710" y="252" text-anchor="middle" font-size="16">direction distance = 0.50</text>
+    <line x1="565" y1="276" x2="855" y2="276" stroke="#16a34a" stroke-width="2"/>
+    <text x="710" y="314" text-anchor="middle" font-size="16">equal-factor mean = 0.30</text>
+
+    <text x="480" y="400" text-anchor="middle" font-size="16" fill="#52606d">Block width changes a concatenated score. It cannot change a per-block average.</text>
+  </g>
+</svg>

@@ -1,0 +1,38 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 440" role="img" aria-labelledby="title desc">
+  <title id="title">A random row split leaks a participant across the partition</title>
+  <desc id="desc">Splitting clips at random puts participant one on both the training and the test side, while a group disjoint split keeps every clip from a participant on a single side.</desc>
+  <rect width="960" height="440" fill="#fbfaf7"/>
+  <text x="480" y="40" text-anchor="middle" font-family="sans-serif" font-size="24" font-weight="700" fill="#172b4d">Split whole participants, not individual clips</text>
+  <g font-family="sans-serif" fill="#172b4d">
+    <rect x="50" y="90" width="400" height="250" rx="16" fill="#fee2e2" stroke="#dc2626" stroke-width="2"/>
+    <text x="250" y="128" text-anchor="middle" font-size="18" font-weight="700">Random row split</text>
+    <g font-size="16" text-anchor="middle" fill="#52606d"><text x="145" y="164">train</text><text x="355" y="164">test</text></g>
+    <g fill="#dbeafe" stroke="#2563eb" stroke-width="2">
+      <rect x="100" y="180" width="90" height="38" rx="8"/><rect x="100" y="276" width="90" height="38" rx="8"/><rect x="310" y="180" width="90" height="38" rx="8"/>
+    </g>
+    <g fill="#fef3c7" stroke="#d97706" stroke-width="2">
+      <rect x="100" y="228" width="90" height="38" rx="8"/><rect x="310" y="228" width="90" height="38" rx="8"/><rect x="310" y="276" width="90" height="38" rx="8"/>
+    </g>
+    <g font-size="15" text-anchor="middle">
+      <text x="145" y="205">P1 c1</text><text x="145" y="253">P2 c1</text><text x="145" y="301">P1 c3</text>
+      <text x="355" y="205">P1 c2</text><text x="355" y="253">P2 c2</text><text x="355" y="301">P2 c3</text>
+    </g>
+
+    <rect x="510" y="90" width="400" height="250" rx="16" fill="#dcfce7" stroke="#16a34a" stroke-width="2"/>
+    <text x="710" y="128" text-anchor="middle" font-size="18" font-weight="700">Group-disjoint split</text>
+    <g font-size="16" text-anchor="middle" fill="#52606d"><text x="605" y="164">train</text><text x="815" y="164">test</text></g>
+    <g fill="#dbeafe" stroke="#2563eb" stroke-width="2">
+      <rect x="560" y="180" width="90" height="38" rx="8"/><rect x="560" y="228" width="90" height="38" rx="8"/><rect x="560" y="276" width="90" height="38" rx="8"/>
+    </g>
+    <g fill="#fef3c7" stroke="#d97706" stroke-width="2">
+      <rect x="770" y="180" width="90" height="38" rx="8"/><rect x="770" y="228" width="90" height="38" rx="8"/><rect x="770" y="276" width="90" height="38" rx="8"/>
+    </g>
+    <g font-size="15" text-anchor="middle">
+      <text x="605" y="205">P1 c1</text><text x="605" y="253">P1 c2</text><text x="605" y="301">P1 c3</text>
+      <text x="815" y="205">P2 c1</text><text x="815" y="253">P2 c2</text><text x="815" y="301">P2 c3</text>
+    </g>
+
+    <rect x="150" y="366" width="660" height="60" rx="14" fill="#f1f5f9" stroke="#64748b" stroke-width="2"/>
+    <text x="480" y="402" text-anchor="middle" font-size="17">blue is participant P1, amber is P2; left, P1 sits on both sides</text>
+  </g>
+</svg>

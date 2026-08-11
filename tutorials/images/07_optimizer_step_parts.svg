@@ -1,0 +1,42 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 420" role="img" aria-labelledby="title desc">
+  <title id="title">One Adam step split into four parts</title>
+  <desc id="desc">A raw gradient feeds two moving averages, the averages are bias corrected, and only the final stage changes the parameters.</desc>
+  <defs>
+    <marker id="a07s" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto">
+      <path d="M0 0 L10 5 L0 10 z" fill="#52606d"/>
+    </marker>
+  </defs>
+  <rect width="960" height="420" rx="18" fill="#fbfaf7"/>
+  <g font-family="Arial, sans-serif">
+    <text x="480" y="46" text-anchor="middle" font-size="24" font-weight="700" fill="#172b4d">The four parts of one optimizer step</text>
+
+    <rect x="23" y="110" width="200" height="180" rx="14" fill="#dbeafe" stroke="#2563eb" stroke-width="2"/>
+    <text x="123" y="152" text-anchor="middle" font-size="18" font-weight="700" fill="#172b4d">1. Gradient</text>
+    <text x="123" y="198" text-anchor="middle" font-size="16" fill="#172b4d">g from backward</text>
+    <text x="123" y="228" text-anchor="middle" font-size="16" fill="#172b4d">on the batch mean</text>
+
+    <line x1="227" y1="200" x2="257" y2="200" stroke="#52606d" stroke-width="3" marker-end="url(#a07s)"/>
+
+    <rect x="261" y="110" width="200" height="180" rx="14" fill="#ede9fe" stroke="#7c3aed" stroke-width="2"/>
+    <text x="361" y="152" text-anchor="middle" font-size="18" font-weight="700" fill="#172b4d">2. Moments</text>
+    <text x="361" y="198" text-anchor="middle" font-size="16" fill="#172b4d">m: smoothed g</text>
+    <text x="361" y="228" text-anchor="middle" font-size="16" fill="#172b4d">v: squared scale</text>
+
+    <line x1="465" y1="200" x2="495" y2="200" stroke="#52606d" stroke-width="3" marker-end="url(#a07s)"/>
+
+    <rect x="499" y="110" width="200" height="180" rx="14" fill="#fef3c7" stroke="#d97706" stroke-width="2"/>
+    <text x="599" y="152" text-anchor="middle" font-size="18" font-weight="700" fill="#172b4d">3. Bias fix</text>
+    <text x="599" y="198" text-anchor="middle" font-size="16" fill="#172b4d">undo zero start</text>
+    <text x="599" y="228" text-anchor="middle" font-size="16" fill="#172b4d">early steps only</text>
+
+    <line x1="703" y1="200" x2="733" y2="200" stroke="#52606d" stroke-width="3" marker-end="url(#a07s)"/>
+
+    <rect x="737" y="110" width="200" height="180" rx="14" fill="#dcfce7" stroke="#16a34a" stroke-width="2"/>
+    <text x="837" y="152" text-anchor="middle" font-size="18" font-weight="700" fill="#172b4d">4. Step</text>
+    <text x="837" y="192" text-anchor="middle" font-size="16" fill="#172b4d">u = m-hat over</text>
+    <text x="837" y="220" text-anchor="middle" font-size="16" fill="#172b4d">sqrt v-hat + eps</text>
+    <text x="837" y="252" text-anchor="middle" font-size="16" fill="#172b4d">subtract lr u</text>
+
+    <text x="480" y="352" text-anchor="middle" font-size="17" fill="#52606d">Parts 2 and 3 reshape the direction. Only part 4 moves the parameters.</text>
+  </g>
+</svg>

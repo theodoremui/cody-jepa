@@ -1,0 +1,58 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 460" role="img" aria-labelledby="title desc">
+  <title id="title">The stop-gradient boundary on the computation graph</title>
+  <desc id="desc">Forward values travel along both the online path and the target path into the loss. Gradients travel backward only along the online path. A red cross marks the boundary that gradients cannot cross on the target path.</desc>
+  <defs>
+    <marker id="fwd05" markerWidth="7" markerHeight="7" refX="6" refY="3" orient="auto"><path d="M0,0 L0,6 L7,3 z" fill="#52606d"/></marker>
+    <marker id="bwd05" markerWidth="7" markerHeight="7" refX="6" refY="3" orient="auto"><path d="M0,0 L0,6 L7,3 z" fill="#2563eb"/></marker>
+  </defs>
+  <rect width="960" height="460" fill="#fbfaf7"/>
+  <text x="480" y="40" text-anchor="middle" font-family="sans-serif" font-size="24" font-weight="700" fill="#172b4d">Values cross the boundary, gradients do not</text>
+  <g font-family="sans-serif" fill="#172b4d">
+    <rect x="44" y="104" width="176" height="88" rx="14" fill="#dbeafe" stroke="#2563eb" stroke-width="2"/>
+    <text x="132" y="140" text-anchor="middle" font-size="17" font-weight="700">Context tokens</text>
+    <text x="132" y="168" text-anchor="middle" font-size="15">visible part only</text>
+
+    <rect x="262" y="104" width="176" height="88" rx="14" fill="#dbeafe" stroke="#2563eb" stroke-width="2"/>
+    <text x="350" y="140" text-anchor="middle" font-size="17" font-weight="700">Online encoder</text>
+    <text x="350" y="168" text-anchor="middle" font-size="15">trainable</text>
+
+    <rect x="480" y="104" width="176" height="88" rx="14" fill="#ede9fe" stroke="#7c3aed" stroke-width="2"/>
+    <text x="568" y="140" text-anchor="middle" font-size="17" font-weight="700">Prediction</text>
+    <text x="568" y="168" text-anchor="middle" font-size="15">trainable</text>
+
+    <rect x="744" y="104" width="176" height="88" rx="14" fill="#fee2e2" stroke="#dc2626" stroke-width="2"/>
+    <text x="832" y="140" text-anchor="middle" font-size="17" font-weight="700">Latent loss</text>
+    <text x="832" y="168" text-anchor="middle" font-size="15">one scalar</text>
+
+    <path d="M224 134 H254" stroke="#52606d" stroke-width="3" marker-end="url(#fwd05)"/>
+    <path d="M442 134 H472" stroke="#52606d" stroke-width="3" marker-end="url(#fwd05)"/>
+    <path d="M660 134 H736" stroke="#52606d" stroke-width="3" marker-end="url(#fwd05)"/>
+    <path d="M258 170 H228" stroke="#2563eb" stroke-width="3" stroke-dasharray="7 5" marker-end="url(#bwd05)"/>
+    <path d="M476 170 H446" stroke="#2563eb" stroke-width="3" stroke-dasharray="7 5" marker-end="url(#bwd05)"/>
+    <path d="M740 170 H664" stroke="#2563eb" stroke-width="3" stroke-dasharray="7 5" marker-end="url(#bwd05)"/>
+
+    <rect x="44" y="300" width="176" height="88" rx="14" fill="#dcfce7" stroke="#16a34a" stroke-width="2"/>
+    <text x="132" y="336" text-anchor="middle" font-size="17" font-weight="700">All tokens</text>
+    <text x="132" y="364" text-anchor="middle" font-size="15">visible and hidden</text>
+
+    <rect x="262" y="300" width="176" height="88" rx="14" fill="#dcfce7" stroke="#16a34a" stroke-width="2"/>
+    <text x="350" y="336" text-anchor="middle" font-size="17" font-weight="700">Target encoder</text>
+    <text x="350" y="364" text-anchor="middle" font-size="15">not trainable</text>
+
+    <rect x="480" y="300" width="176" height="88" rx="14" fill="#dcfce7" stroke="#16a34a" stroke-width="2"/>
+    <text x="568" y="336" text-anchor="middle" font-size="17" font-weight="700">Target latents</text>
+    <text x="568" y="364" text-anchor="middle" font-size="15">treated as constants</text>
+
+    <path d="M224 344 H254" stroke="#52606d" stroke-width="3" marker-end="url(#fwd05)"/>
+    <path d="M442 344 H472" stroke="#52606d" stroke-width="3" marker-end="url(#fwd05)"/>
+    <path d="M660 344 L826 200" stroke="#52606d" stroke-width="3" marker-end="url(#fwd05)"/>
+
+    <path d="M786 210 L726 262" stroke="#2563eb" stroke-width="3" stroke-dasharray="7 5" marker-end="url(#bwd05)"/>
+    <path d="M660 214 L764 334" stroke="#dc2626" stroke-width="3" stroke-dasharray="9 6"/>
+    <line x1="700" y1="262" x2="724" y2="286" stroke="#dc2626" stroke-width="5"/>
+    <line x1="724" y1="262" x2="700" y2="286" stroke="#dc2626" stroke-width="5"/>
+    <text x="820" y="392" text-anchor="middle" font-size="16" fill="#dc2626">stop-gradient boundary</text>
+
+    <text x="440" y="440" text-anchor="middle" font-size="15" fill="#52606d">Gray arrows carry forward values. Dashed blue arrows carry backpropagated gradients.</text>
+  </g>
+</svg>
