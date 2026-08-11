@@ -1,168 +1,99 @@
-# Execution Plan: Hierarchical Video Diversity
+# Execution plan: 28-model iso-catalog phase-allocation study
 
-This plan tracks the implementation and deadline work for the proposed
-[hierarchical-diversity method](method.md). The scientific protocol belongs in the
-methods document. This file records what must change in the current repository before
-that protocol can be called executable. The ordered implementation checklist and agent
-acceptance format appear in the
-[training-start handoff](training-start-handoff.md).
+## Objective
 
-## Current implementation gap
+Execute the revised study in [proposal.md](proposal.md) and [method.md](method.md), then stop experiments and analysis by September 4, 2026. The ICLR 2027 abstract deadline is September 18 and the paper deadline is September 25, so September 5 through September 25 are reserved for writing only.
 
-The repository currently implements the unique-sequence scaling study:
+## Starting point
 
-- GaitLU training always resamples from every valid temporal start;
-- pool finalization requires five seeds and four rungs;
-- the private registry and training launcher require exactly 20 rows;
-- GFC preflight expects five named ladders and four rung names;
-- aggregate inference and rendering produce ladder contrasts;
-- the 4.096-million-example fallback configuration is not checked in; and
-- batch feature-export orchestration for even the 20-model study is not yet available.
+The repository contains a working but superseded 32-model hierarchy scaffold based on low and high sequence support with frozen or resampled anchors. It is useful infrastructure, not the protocol. The revised study needs a phase catalog, a 28-row registry, a phase-aware loader, validated outcome instrument, and matching analysis path. Do not run the old registry as evidence for the new question.
 
-The hierarchical protocol must replace these assumptions prospectively. Outcome data
-cannot influence which changes are completed or which design is launched.
+## Gates
 
-## Immediate support audit
+| Gate | Deadline | Required evidence | Failure action |
+| --- | --- | --- | --- |
+| Phase audit | Aug 13 | Frozen estimator, common `k=4` eligibility, blinded manual check, semantic separation from jitter | Stop the phase branch and retain the instrument fallback |
+| Catalog audit | Aug 14 | Source groups, near-duplicate clusters, feasible common `M`, nested-pool rule | Lower `M` once prospectively or use fallback |
+| Metric and power audit | Aug 15 | Synthetic GFC/control cases and legacy or development MDE estimate | Do not launch an underpowered contrast |
+| Software dry run | Aug 17 | 28-row registry, loader, provenance, analysis, figures, synthetic controls | Revert to the separate unique-sequence study |
+| Systems pilot | Aug 18 | Four-cell GPU pilot and eight-job storage probe at checkpoint cadence | Select frozen half exposure or cancel |
+| Training completion | Aug 29 | All 28 rows plus only permitted exact systems reruns | No seed replacement or opportunistic cell dropping |
+| Analysis lock | Sep 4 | Final checkpoints, aggregate export, figures, audit report | Enter paper-only period |
 
-The support audit is the first go or no-go decision, not a task to defer until the
-training code is complete. As of August 8, the aggregate audit command and synthetic
-tests are implemented, but the prepared private `inventory.csv` is not present in the
-local checkout and the corpus result has not been recorded. The hierarchical study
-remains no-go until this report exists and passes.
+## Work packages
 
-After the trusted shards have been converted and exact-deduplicated, run on HAIC:
+### Build the phase catalog
 
-```bash
-uv run --frozen --no-sync cody-jepa-audit-gaitlu-hierarchy \
-  --prepared-root "$GAITLU_PREPARED_ROOT" \
-  > "$GAITLU_PREPARED_ROOT/hierarchical-support-audit.json"
-```
+- Implement deterministic stride-period estimation from the frozen silhouette signal.
+- Store eligibility, stable base-phase rotation, nested `k=1/2/4` origins, and nearby-jitter origins in a hashed catalog.
+- Audit bounds, overlap, phase coverage, trajectory separation, and failure reasons.
+- Build source-group and near-duplicate cluster summaries before pool selection.
 
-The command applies the two-anchor eligibility rule before reconstructing the common
-holdout and eight nested 2,500 and 250,000 pool pairs. It evaluates all 16 pools at
-4,096,000 draws. It exits with status 2 unless every pool has a median of at least four
-eight-frame anchors and an expected resampled-to-frozen support ratio of at least four.
-The aggregate report also includes non-overlapping anchor counts, a conservative
-non-overlapping support ratio, and mean overlap among distinct anchor pairs. It writes
-no sequence IDs or outcome data.
+### Replace the registry and loader contract
 
-If the command fails, stop the hierarchical direction. Do not change spacing, pool
-targets, or the gate after reading the report. If it passes, record the immutable code
-revision and private report digest before implementing the 32-model protocol.
+- Define `breadth`, `balanced`, `phase_depth`, and `nearby_jitter` cells.
+- Require `unique_sequences`, `origins_per_sequence`, `nominal_catalog_size`, `origin_policy`, `phase_catalog_digest`, source-group digest, and cluster summary in every row.
+- Generate eight blocks for the three primary cells and nearby jitter only in four prespecified blocks.
+- Pair optimization, sequence, spatial, and mask streams. Only semantic origin construction differs in the phase-versus-jitter comparison.
+- Make resume and export fail closed on provenance mismatch.
 
-## Required implementation
+### Lock the evaluator
 
-### 1. Temporal anchors and loader contract
+- Implement the matched eight-gallery continuous margin for GFC and independent completion.
+- Run synthetic positive and negative controls before outcomes.
+- Freeze aggregation, competing gallery items, top-1, MRR, missing-data handling, and the eight paired `P_r` contrasts.
+- Implement the supporting cross-context factor-transport geometry diagnostic.
 
-Update `src/cody_jepa/data/gaitlu.py` to construct starts at 8-frame spacing and expose
-two training policies: `frozen_random` and `resampled_anchor`. Frozen selection must use
-a versioned stable digest of sequence ID and replicate seed. Resampling must use a
-separate temporal stream. Policy pairs must receive identical sampler indices, spatial
-parameters, and masks.
+### Train and report
 
-Add the anchor spacing, policy, seed version, and eligibility rule to loader
-configuration, dataset descriptions, checkpoint metadata, and resume validation.
+- Select full or half exposure only through the throughput rule.
+- Train paired block waves with cell-to-hardware randomization.
+- Save complete checkpoint provenance and produce the locked figure with all replicate trajectories, the balanced point, and paired jitter diagnostics.
+- Report nominal catalog cardinality beside measured semantic diagnostics.
 
-### 2. Preparation, eligibility, and manifests
+## Calendar
 
-Update `src/cody_jepa/data/gaitlu_prepare.py` to apply the global rule of at least two
-separated anchors before holdout and pool construction. Build one common holdout near
-10,000 group-disjoint sequences, then create eight seeded nested pairs near 2,500 and
-250,000 sequences.
+| Dates | Deliverable |
+| --- | --- |
+| Aug 11–13 | Phase and near-duplicate audits, common eligibility decision |
+| Aug 13–15 | Catalog freeze, metric synthetic tests, MDE audit |
+| Aug 14–17 | Registry, loader, provenance, analysis, and figure dry run |
+| Aug 18–25 | Primary training waves |
+| Aug 26–29 | Permitted systems reruns, final export, audit completion |
+| Aug 30–Sep 4 | Locked aggregate analysis and figures |
+| Sep 5–17 | Paper only |
+| Sep 18 | Abstract submission |
+| Sep 19–24 | Paper only: anonymization, reproducibility, final checks |
+| Sep 25 | Paper submission |
 
-The training registry must contain exactly four cells per replicate block and include
-`replicate`, `sequence_support`, `window_policy`, actual sequence count, manifest digest,
-optimization seed, exposure, anchor spacing, and seed-scheme version. Each manifest is
-reused across its two policy cells.
+## Non-goals for this cycle
 
-### 3. Training configuration and launch
+- No second dataset, RGB replication, architecture sweep, objective sweep, or `k=8` ladder on the critical path.
+- No claim of a general allocation frontier from three correlated path points.
+- No post-outcome changes to eligibility, phase thresholds, jitter offsets, metric, or allocations.
+- No clinical or balance-assessment conclusion from this representation study.
 
-Generalize `src/cody_jepa/cli/train_gaitlu_study.py` from 20 ladder rows to 32 factorial
-rows. Add a hierarchy-compatible 4.096-million-example configuration before the
-throughput decision. Update `slurm/train-gaitlu-study.sbatch` to launch four waves of
-eight jobs, with two complete replicate blocks per wave. Randomize and record cell-to-GPU
-and cell-to-node assignments.
+## Training-start checklist
 
-### 4. Feature export and evaluation registry
+Do not submit a training job until all artifacts below are frozen and validated.
 
-Add batch feature-export orchestration for all 32 final-step checkpoints. Generalize the
-private GFC registry and preflight from named ladders and rungs to eight complete
-factorial blocks. Preflight must reject missing cells, duplicate cells, policy mismatches,
-manifest mismatches, non-final checkpoints, unequal exposure, and incomplete outcome
-archives.
+1. A versioned phase catalog records sequence eligibility, period estimate, confidence,
+   base phase, nested semantic origins, nearby-jitter origins, and a digest.
+2. A source-group and near-duplicate audit establishes the common pool-size rule.
+3. The registry has exactly 28 rows: eight breadth, balanced, and phase-depth rows per
+   block, plus nearby jitter only in the four prespecified blocks.
+4. Every registry row records allocation, sequence count, origins per sequence, nominal
+   catalog size, origin policy, manifest digest, phase-catalog digest, source-group digest,
+   exposure, seeds, stream versions, and checkpoint rule.
+5. The continuous GFC and independent-completion instrument passes synthetic controls.
+6. The exposure tier is selected once by the throughput rule and applies to every row.
 
-### 5. Factorial inference and rendering
+For the phase-depth versus nearby-jitter pair, sequence draws, base phases, masks, spatial
+transforms, optimization seeds, exposure, and checkpoint rules are paired. Only phase
+separation versus local jitter may change. Resume, feature export, and evaluation reject
+any provenance mismatch rather than inferring missing metadata.
 
-Update `src/cody_jepa/evaluation/gfc/study.py` and
-`src/cody_jepa/cli/make_gfc_study_results.py` to emit cell outcomes, replicate-level
-simple effects, the primary interaction, the direct allocation contrast, the
-completion-gap interaction, ceiling sensitivity, and every frozen decision gate.
-Private participant rows remain confined to the existing aggregate boundary.
-
-The renderer must produce a 32-run condition table, eight replicate factorial plots,
-the raw and clipped-logit interaction intervals side by side in the main figure,
-simple-effect intervals, completion-gap decisions, and training-health summaries. It
-must reject ladder-form or mixed-protocol inputs.
-
-## Verification gates
-
-Before protocol freeze, automated tests must verify:
-
-- anchors are eight frames apart and eligible sequences have at least two anchors;
-- a frozen anchor is stable across epochs, draws, workers, and nested manifests;
-- resampled anchors change and stay within the same anchor set;
-- policy pairs have identical sequence-index, spatial-transform, and mask streams;
-- the lower exposure tier passes the fourfold support gate in both sequence pools;
-- the registry contains eight complete four-cell blocks and no extra cells;
-- resume rejects any policy, anchor, seed, manifest, or exposure mismatch;
-- constructed cell outcomes recover the declared interaction sign and every decision
-  category;
-- hard and soft completion top-1 agree in the complete factorial gallery;
-- the completion-gap interval has materially nonzero, equivalent, and unresolved test
-  cases; and
-- feature export, private preflight, aggregation, and rendering run end to end without
-  Health&Gait outcome aggregates.
-
-The systems pilot must run all four cells. The throughput probe must run eight jobs
-concurrently on the high pool because a single job cannot reveal shared-storage
-contention.
-
-## Compute plan
-
-Eight continuously reserved H100s run two complete replicate blocks per wave. Four
-waves complete 32 models. At 8.192 million examples per model, the experiment processes
-262.144 million examples. The 60-example-per-second boundary gives about 6.3 elapsed
-days. The 4.096-million fallback has the same duration at its 30-example-per-second
-boundary.
-
-The reservation must cover primary training and leave at least two days for exact reruns
-of documented systems failures. New seeds may not replace failed cells after outcomes
-are opened.
-
-## Deadline schedule
-
-| Date | Required exit condition |
-|---|---|
-| August 8 | Start or complete GaitLU conversion and run the support audit before further hierarchy work |
-| August 9 to 12 | Global anchor eligibility and all 16 pool-level support gates pass |
-| August 10 to 14 | Loader, finalizer, 32-row registry, checkpoint contract, inference, and renderer implemented |
-| August 14 to 16 | Four-cell pilot, eight-job throughput probe, margin justification and sensitivity check, and outcome-blind dry run pass |
-| August 16 | Protocol, code, exposure, margins, and GPU reservation frozen |
-| August 17 to 24 | Four primary training waves complete |
-| August 25 to 27 | Exact systems-failure reruns and 32-checkpoint feature export complete |
-| August 28 to September 6 | Private preflight and outcome-blind analysis rehearsal pass |
-| September 7 | Locked outcome aggregates opened once |
-| September 7 to 18 | Results, controls, audit, paper, and abstract completed |
-| September 19 to 25 | Reproducibility, anonymity, references, and submission checks completed |
-
-## Go or no-go rule
-
-The hierarchical study proceeds to implementation only if the private support audit
-passes unchanged. It launches only if every later implementation and verification gate
-passes by August 16, all eight H100s are reserved continuously, and concurrent storage
-meets the throughput tier. Otherwise, the project retains the implemented 20-model
-unique-sequence scaling study.
-
-The two protocols cannot be pooled. The project cannot reduce replication, change
-anchor spacing, select a different high pool, or redefine substitution after inspecting
-Health&Gait outcomes.
+Stop rather than patch around failures when phase separation fails, the common eligible pool
+cannot be built, the metric fails synthetic controls, the MDE is not useful, throughput is
+unstable, or provenance cannot be validated. Permitted reruns are exact systems failures
+defined before training, never seed replacement or selective extra training.

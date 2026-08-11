@@ -1,134 +1,63 @@
-# Proposal: New Windows or New Sequences?
+# Where Does Video Diversity Live?
 
-## Hierarchical data diversity in predictive video learning
+## A focused revision of the hierarchical-diversity study
 
-**Research direction:** proposed hierarchical-diversity study
+Video data are hierarchical. A model can see a new walking sequence, or it can see a new part of a sequence it has already seen. These are both forms of diversity, but they are not the same intervention.
 
-**Target:** ICLR 2027
+This study asks: **when the optimizer processes the same number of clips and has the same nominal catalog of sequence-origin atoms available, does it matter whether those atoms are spread across more sequences or concentrated in phase-separated views of fewer sequences?**
 
-**Abstract deadline:** September 18, 2026
+It is not asking whether more data are useful. It is not estimating a universal exchange rate between sequences and clips. It tests one controlled allocation path in gait-silhouette video self-supervised learning.
 
-**Paper deadline:** September 25, 2026
+## The intervention
 
-> **Status on August 9, 2026.** This would replace the
-> [unique-sequence scaling study](../unique-sequence-scaling/proposal.md). No primary model
-> is trained; Health&Gait outcomes remain unopened. The support audit and implementation
-> remain pending.
+Every primary condition has nominal catalog size `U × k = 250,000`, where `U` is the number of eligible sequences and `k` is the number of deliberately selected phase origins per sequence.
 
-## Research question
+| Allocation | Sequences `U` | Phase origins `k` | Nominal catalog |
+| --- | ---: | ---: | ---: |
+| Breadth | 250,000 | 1 | 250,000 |
+| Balanced | 125,000 | 2 | 250,000 |
+| Phase depth | 62,500 | 4 | 250,000 |
+| Nearby-jitter diagnostic | 62,500 | 4 | 250,000 |
 
-> **General question.** Suppose two video models train on the same number of clips. One
-> sees clips from many sequences. The other revisits fewer sequences at more moments in
-> time. Does this choice change what their representations support? In particular, can
-> seeing more moments within fewer sequences match seeing one moment from many more
-> sequences when a downstream task must combine information from different recordings,
-> rather than simply recognize each factor separately?
->
-> **Technical question.** A fixed clip budget can expose a video learner to more
-> sequences or to more temporal windows from familiar sequences. We ask whether these
-> sources of training support differ in the donor-based factor composition they enable
-> after supervised alignment, beyond their effects on predicting each factor separately.
->
-> Holding the encoder, latent-prediction objective, optimization, augmentations,
-> nuisance draws, and total sampled clips fixed, does the effect of temporal-window
-> resampling on factor-composition retrieval depend on whether training uses 2,500 or
-> 250,000 exact-content-deduplicated sequences? Is this interaction distinguishable
-> from the corresponding interaction in independent-factor prediction? At these
-> allocations, is the small resampled pool equivalent to the 100×-larger frozen-window
-> pool under a separately justified margin?
+The first three rows form an iso-catalog allocation path. The fourth is a mechanism diagnostic, not a fourth path point. It replaces four phase-separated origins with four nearby origins around the same base phase. A phase-depth versus jitter difference is evidence that separated gait-cycle content matters beyond drawing different start indices.
 
-The design estimates effects at these allocations. It does not optimize a general data
-allocation policy.
+`U × k` is a counting control, not a claim that atoms contain equal information. The paper will report phase coverage, window overlap, trajectory separation, and outcome-blind near-duplicate clusters.
 
-## Why this is novel and non-trivial
+## Comparable phase origins
 
-Different starts can reveal temporal phases, while new sequences may add motion, body
-shape, clothing, framing, or acquisition variation. The two sources may interact.
+For every eligible sequence, a frozen silhouette signal estimates stride period and confidence. All cells use the same `k = 4`-eligible corpus. A stable hash chooses a uniform base phase for each sequence and replicate block. The origin sets are nested: `k = 1` is the base phase, `k = 2` adds the antipodal phase, and `k = 4` adds the quarter-cycle phases. Nearby jitter uses symmetric small offsets around the same base phase.
 
-Prior work compares video breadth with temporal information in continual-learning replay
-([Just a Glimpse](https://arxiv.org/abs/2305.18418)) and video-language finetuning
-([VideoWeave](https://arxiv.org/abs/2601.06309)). This study instead fully crosses
-sequence-pool size with within-sequence window access during fixed-objective predictive
-pretraining, then compares its effect on factor-composition retrieval with its effect on
-separate factor prediction.
+The estimator, confidence threshold, clip construction, jitter offsets, and manual audit plan are frozen before outcomes are opened. If the audit does not establish reliable phase separation, the phase-allocation study does not launch.
 
-## Experiment
+## What stays fixed
 
-The primary design crosses two sequence pools with two temporal-window policies:
+Architecture, JEPA objective, sampled-clip exposure, optimizer, schedule, masks, spatial transforms, and checkpoint selection are fixed. An outcome-blind systems gate selects one exposure tier for every model: 8.192 million or 4.096 million clips. These imply about 32.77 or 16.38 planned draws per nominal atom.
 
-| | One frozen-random window per sequence | Resampled window on every draw |
-|---|---:|---:|
-| Approximately 2,500 sequences | Low breadth, low temporal support | Low breadth, high temporal support |
-| Approximately 250,000 sequences | High breadth, low temporal support | High breadth, high temporal support |
+Eight paired blocks contain breadth, balanced, and phase depth, for 24 primary models. Four prespecified blocks add nearby jitter, for four more. The study therefore trains 28 models, and the paired block is the model-level inference unit.
 
-Temporal anchors are eight frames apart, so adjacent 16-frame windows overlap by 50
-percent and are not treated as independent examples. The inventory reports both this
-anchor support and a conservative count based on non-overlapping windows.
+## The outcome and headline test
 
-A frozen anchor is sampled uniformly for each sequence and replicate, then reused. This
-is an information-support control, not a recommended recipe. The resampled condition
-draws from the same anchor set on every exposure. Spatial transformations and JEPA masks
-are paired, so only the temporal anchor differs within each sequence-support pair.
+Health&Gait GFC v2 evaluates source-disjoint recombination of speed, clothing, and direction. It is a controlled representation instrument, not a clinical prediction task and not a test of unsupervised disentanglement.
 
-Eight replicate blocks produce 32 models. Cells within a block share initialization and
-optimization seeds. Policies share manifests, pools are nested, exposure is fixed, and
-the final-step checkpoint is always used.
+The primary score is a continuous eight-gallery target margin:
 
-## Evidence for substitution
+$$
+m(q)=d(q,\text{best non-target})-d(q,\text{true target}).
+$$
 
-The primary endpoint remains full-gallery GFC-v2 top-1. The primary estimand is the
-interaction between sequence support and window policy. A negative interaction means
-that temporal resampling helps more when the sequence pool is small, which is consistent
-with substitution.
+Positive margin means the target wins. The same gallery construction is used for GFC recombination and independent factor completion. Top-1 and MRR are directional checks.
 
-Because top-1 is bounded, saturation can create an apparently negative raw interaction.
-The main result therefore reports raw and prespecified clipped-logit interactions
-together. A sign reversal blocks a substitution claim.
+For each block and allocation, subtract independent-completion margin from GFC margin. The confirmatory contrast asks whether this residual differs between phase depth and breadth. This tests whether the allocation changes donor-based recombination more than separately predicted factors.
 
-An interaction alone cannot establish substitution. The claim requires material benefits
-from resampling at low sequence support and from sequence breadth under frozen anchors,
-no material harm in the other two cells, a material negative interaction, and the same
-sign in the ceiling sensitivity. Full performance replacement also requires equivalence
-between the 2,500-sequence resampled condition and the 250,000-sequence frozen condition.
-The separately justified 6.25-point margin is the largest average retrieval loss treated
-as practically interchangeable at these allocations. It corresponds to one of the 16
-GFC-v2 queries per participant and is frozen before outcomes are opened. If the small
-resampled pool remains materially worse, the result supports partial replacement.
+## Interpreting results
 
-Before implementation, the private inventory audit reconstructs all nested pools and
-reports anchor counts, non-overlapping counts, expected support, and overlap. Every pool
-must have a median of at least four anchors and at least fourfold expected support under
-resampling. Otherwise, the study will not launch. Anchors are support units, not
-independent semantic examples.
+- Similar path points establish a useful null at the tested precision.
+- Breadth winning shows equal nominal catalog size is not equal diversity.
+- Phase depth winning and differing from nearby jitter shows value from temporally separated content, not only temporal randomness.
+- A residual GFC effect that agrees with the locked factor-geometry diagnostic is evidence for a representation-level dissociation.
 
-## Representation claim
+The strongest claim requires agreement among continuous margin, top-1, MRR, phase versus jitter, and geometry. The study remains a controlled case study in GaitLU silhouettes with one objective. It cannot establish a general video law, identify sequences as people, or make a clinical claim.
 
-Independent-factor completion tests whether GFC-v2 is explained by separate speed,
-clothing, and direction predictions. The raw GFC-v2 interaction is primary; the
-GFC-v2-minus-completion interaction is the interpretation gate.
+## ICLR 2027 schedule
 
-Gap equivalence supports an independent-completion explanation. A materially nonzero gap
-is necessary but insufficient evidence beyond independent prediction. Other results are
-unresolved. None establishes intrinsic compositionality or unsupervised factor discovery.
-
-## Feasibility and decision gate
-
-Thirty-two single-GPU models run in four waves if eight H100s are continuously reserved
-and shared storage sustains the measured rate. Training takes about 3.7 to 6.3 elapsed
-days and processes 262.144 million examples at full exposure.
-
-The inventory gate must pass first. The switch then requires all four cells, an eight-job
-storage probe, factorial analysis, and checkpoint provenance to pass by August 16.
-Otherwise, the project retains the existing 20-model study. The studies will not be
-combined after outcomes are observed.
-
-The detailed implementation sequence and fallback rules appear in
-[execution-plan.md](execution-plan.md).
-
-## Scope
-
-The hierarchy is windows nested within exact-content-deduplicated sequences, not verified
-people, walks, cameras, or environments. One JEPA recipe, silhouette corpus, and
-supervised evaluation cannot establish an objective-general law or RGB transfer.
-
-The full protocol appears in [method.md](method.md).
+The abstract deadline is September 18, 2026 and the paper deadline is September 25. Phase, catalog, metric, power, and systems gates must pass by August 17. Training and permitted systems reruns end by August 29. Results freeze by September 4, leaving September 5 through September 25 for paper writing only.

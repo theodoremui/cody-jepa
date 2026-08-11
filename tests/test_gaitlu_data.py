@@ -40,7 +40,7 @@ from cody_jepa.data.gaitlu_prepare import (
     pack_gaitlu_shard,
     validate_and_pack_sequence,
 )
-from cody_jepa.masks import DEFAULT_MASK_GROUPS
+from cody_jepa.masks import DEFAULT_MASK_GROUPS, multiblock_mask
 from cody_jepa.training.checkpoint import (
     CHECKPOINT_SCHEMA,
     MODEL_ARCHITECTURE,
@@ -521,6 +521,212 @@ class GaitLUDeterminismTest(unittest.TestCase):
             )
             assert_batches_equal(self, expected_train, collect_batches(worker_train))
             assert_batches_equal(self, expected_val, collect_batches(worker_val))
+
+
+class GaitLUHierarchyWindowTest(unittest.TestCase):
+    def _dataset(self, manifest, prepared, policy, *, seed=31, replicate_seed=47):
+        return GaitLUIndexedDataset(
+            manifest,
+            data_root=prepared,
+            split="train",
+            clip_length=16,
+            image_size=(12, 12),
+            random_windows=True,
+            base_seed=seed,
+            crop_scale=(0.65, 1.0),
+            horizontal_flip_prob=0.5,
+            window_policy=policy,
+            anchor_spacing=8,
+            replicate_seed=replicate_seed,
+        )
+
+    def test_anchor_grid_and_hierarchy_option_validation(self):
+        expected = {
+            16: (0,),
+            24: (0, 8),
+            32: (0, 8, 16),
+            40: (0, 8, 16, 24),
+        }
+        self.assertEqual(
+            {
+                frames: gaitlu._allowed_temporal_anchors(frames, 16, 8)
+                for frames in expected
+            },
+            expected,
+        )
+
+        with tempfile.TemporaryDirectory() as directory:
+            prepared, manifest, _ = prepare_one_shard(
+                Path(directory),
+                [synthetic_sequence(index, frames=frames) for index, frames in enumerate(expected)],
+            )
+            with self.assertRaisesRegex(
+                ManifestValidationError, "at least two allowed temporal anchors"
+            ):
+                self._dataset(manifest, prepared, "frozen_random")
+
+            with self.assertRaisesRegex(ValueError, "anchor_spacing must be positive"):
+                GaitLULoaderConfig(
+                    train_manifest_csv=manifest,
+                    val_manifest_csv=manifest,
+                    data_root=prepared,
+                    anchor_spacing=0,
+                )
+            with self.assertRaisesRegex(ValueError, "unknown hierarchy window policy"):
+                GaitLULoaderConfig(
+                    train_manifest_csv=manifest,
+                    val_manifest_csv=manifest,
+                    data_root=prepared,
+                    train_window_policy="random_anchor",
+                )
+
+            val_manifest = prepared / "val.csv"
+            val_rows = read_csv(manifest)
+            for row in val_rows:
+                row["split"] = "val"
+            write_csv(val_manifest, GAITLU_MANIFEST_COLUMNS, val_rows)
+            with self.assertRaisesRegex(ValueError, "accepted only for training"):
+                GaitLUIndexedDataset(
+                    val_manifest,
+                    data_root=prepared,
+                    split="val",
+                    window_policy="frozen_random",
+                )
+
+    def test_frozen_anchor_is_stable_across_draws_epochs_workers_and_manifests(self):
+        with tempfile.TemporaryDirectory() as directory:
+            prepared, manifest, _ = prepare_one_shard(
+                Path(directory),
+                [synthetic_sequence(index, frames=40) for index in range(3)],
+            )
+            rows = read_csv(manifest)
+            target_id = rows[0]["sequence_id"]
+            low_manifest = prepared / "low.csv"
+            high_manifest = prepared / "high.csv"
+            write_csv(low_manifest, GAITLU_MANIFEST_COLUMNS, rows[:2])
+            write_csv(high_manifest, GAITLU_MANIFEST_COLUMNS, list(reversed(rows)))
+            low = self._dataset(low_manifest, prepared, "frozen_random")
+            high = self._dataset(high_manifest, prepared, "frozen_random")
+            low_index = next(
+                index
+                for index, sample in enumerate(low.samples)
+                if sample["sequence_id"] == target_id
+            )
+            high_index = next(
+                index
+                for index, sample in enumerate(high.samples)
+                if sample["sequence_id"] == target_id
+            )
+
+            starts = set()
+            for epoch in (0, 3, 11):
+                low.set_epoch(epoch)
+                starts.update(low[(low_index, draw)]["window_start"] for draw in range(12))
+            high.set_epoch(19)
+            starts.update(high[(high_index, draw)]["window_start"] for draw in range(12))
+            self.assertEqual(len(starts), 1)
+
+            low.set_epoch(23)
+            worker_copy = pickle.loads(pickle.dumps(low))
+            worker_starts = {
+                worker_copy[(low_index, draw)]["window_start"] for draw in range(8)
+            }
+            self.assertEqual(worker_starts, starts)
+
+            worker_loader = torch.utils.data.DataLoader(
+                low,
+                batch_size=4,
+                sampler=[(low_index, draw) for draw in range(8)],
+                num_workers=2,
+            )
+            loader_starts = {
+                int(value)
+                for batch in worker_loader
+                for value in batch["window_start"]
+            }
+            self.assertEqual(loader_starts, starts)
+
+            starts_by_seed = {
+                self._dataset(
+                    low_manifest,
+                    prepared,
+                    "frozen_random",
+                    replicate_seed=replicate_seed,
+                )[(low_index, 0)]["window_start"]
+                for replicate_seed in range(32)
+            }
+            self.assertGreater(len(starts_by_seed), 1)
+
+    def test_resampled_anchors_are_allowed_variable_and_reproducible(self):
+        with tempfile.TemporaryDirectory() as directory:
+            prepared, manifest, _ = prepare_one_shard(
+                Path(directory), [synthetic_sequence(0, frames=40)]
+            )
+            first = self._dataset(manifest, prepared, "resampled_anchor")
+            first.set_epoch(5)
+            starts = [first[(0, draw)]["window_start"] for draw in range(64)]
+            self.assertTrue(set(starts) <= {0, 8, 16, 24})
+            self.assertGreater(len(set(starts)), 1)
+
+            random.seed(901)
+            np.random.seed(902)
+            torch.manual_seed(903)
+            repeated = self._dataset(manifest, prepared, "resampled_anchor")
+            repeated.set_epoch(5)
+            self.assertEqual(
+                starts,
+                [repeated[(0, draw)]["window_start"] for draw in range(64)],
+            )
+            repeated.set_epoch(6)
+            next_epoch = [repeated[(0, draw)]["window_start"] for draw in range(64)]
+            self.assertTrue(set(next_epoch) <= {0, 8, 16, 24})
+            self.assertNotEqual(starts, next_epoch)
+
+    def test_paired_policies_preserve_sequence_spatial_and_mask_streams(self):
+        with tempfile.TemporaryDirectory() as directory:
+            prepared, manifest, _ = prepare_one_shard(
+                Path(directory),
+                [synthetic_sequence(index, frames=40) for index in range(3)],
+            )
+            frozen = self._dataset(manifest, prepared, "frozen_random")
+            resampled = self._dataset(manifest, prepared, "resampled_anchor")
+            frozen.set_epoch(4)
+            resampled.set_epoch(4)
+            frozen_draws = list(FixedExposureSampler(frozen, 24, seed=31))
+            resampled_draws = list(FixedExposureSampler(resampled, 24, seed=31))
+            self.assertEqual(frozen_draws, resampled_draws)
+            self.assertEqual(
+                [frozen[index]["sequence_id"] for index in frozen_draws],
+                [resampled[index]["sequence_id"] for index in resampled_draws],
+            )
+
+            probe = torch.arange(16 * 8 * 6, dtype=torch.float32).reshape(16, 1, 8, 6)
+            for sample_index, draw_index in frozen_draws:
+                self.assertTrue(
+                    torch.equal(
+                        frozen._transform(probe.clone(), sample_index, draw_index),
+                        resampled._transform(probe.clone(), sample_index, draw_index),
+                    )
+                )
+
+            mask_config = {
+                "tubelet_size": 2,
+                "patch_size": 8,
+                "num_frames": 16,
+                "img_size": 16,
+                "num_tokens": 32,
+                "min_context_tokens": 8,
+            }
+            frozen_mask_rng = random.Random(31)
+            resampled_mask_rng = random.Random(31)
+            for frozen_index, resampled_index in zip(frozen_draws, resampled_draws):
+                _ = frozen[frozen_index]
+                frozen_masks = multiblock_mask(mask_config, 2, frozen_mask_rng)
+                _ = resampled[resampled_index]
+                resampled_masks = multiblock_mask(mask_config, 2, resampled_mask_rng)
+                for left, right in zip(frozen_masks, resampled_masks):
+                    self.assertTrue(torch.equal(left["ctx"], right["ctx"]))
+                    self.assertTrue(torch.equal(left["pred"], right["pred"]))
 
 
 class GaitLUManifestContractTest(unittest.TestCase):

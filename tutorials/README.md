@@ -64,11 +64,12 @@ Read the lecture first, then run the matching notebook. The lessons are progress
 
 | Lesson | Lecture | Implementation |
 | --- | --- | --- |
-| 17. Hierarchical support interventions and blocked factorial inference | [Lecture](lectures/17_hierarchical_support_and_factorial_inference.md) | [Notebook](implementations/17_hierarchical_support_and_factorial_inference.ipynb) |
+| 17. Iso-catalog phase allocation and paired inference | [Lecture](lectures/17_hierarchical_support_and_factorial_inference.md) | [Notebook](implementations/17_hierarchical_support_and_factorial_inference.ipynb) |
 
 Lesson 11 uses factorial language for the downstream outcome state space. Lessons 14, 15,
-and 17 use factorial language for the training experiment. The first enumerates possible
-factor combinations. The second crosses interventions and estimates their interaction.
+and 17 use paired comparisons for the training experiment. The first enumerates possible
+factor combinations. The later lessons show why an allocation path with a matched jitter
+diagnostic needs block-level inference rather than treating every trained model as unrelated.
 
 ## Directory layout
 
@@ -150,5 +151,5 @@ Applied next steps:
 - [Proposed hierarchical-diversity method](../docs/hierarchical-diversity/method.md)
 - [Hierarchical-diversity execution plan](../docs/hierarchical-diversity/execution-plan.md)
 - [Data roles and preprocessing](../docs/unique-sequence-scaling/data.md)
-- [GaitLU-1M preparation and fixed-exposure training](../docs/gaitlu_training.md)
+- [GaitLU-1M shared preparation runbook](../docs/gaitlu_training.md)
 - [Unique-sequence scaling fallback method](../docs/unique-sequence-scaling/method.md)

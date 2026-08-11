@@ -1,43 +1,43 @@
 # Research documentation
 
-The repository contains two alternative ICLR research directions. They share GaitLU
-pretraining infrastructure, Health&Gait evaluation roles, and GFC-v2, but they ask
-different questions and require different model registries. They must not be combined
-after outcomes are observed.
+## Start here
 
-## Unique-sequence scaling study
+The active research direction is the **iso-catalog phase-allocation study**. It asks whether, under fixed training exposure and fixed nominal sequence-origin catalog size, representation learning differs when video diversity is placed across more sequences or across phase-separated views of fewer sequences.
 
-This is the study currently implemented by the 20-row training and evaluation pipeline.
-It varies the number of unique GaitLU sequences across four nested pools while holding
-sampled-sequence exposure fixed. A completion-gap interval and equality assertion remain
-required pre-freeze analysis additions.
+Read in this order:
 
-- [Proposal](unique-sequence-scaling/proposal.md)
-- [Methods](unique-sequence-scaling/method.md)
+1. [Revised study overview](hierarchical-diversity/README.md)
+2. [Research proposal](hierarchical-diversity/proposal.md)
+3. [Frozen method](hierarchical-diversity/method.md)
+4. [Execution plan](hierarchical-diversity/execution-plan.md)
+
+The active study has 28 models: eight paired blocks of breadth, balanced, and phase-depth allocation, plus a nearby-jitter diagnostic in four prespecified blocks. It supersedes the earlier low/high support by frozen/resampled-anchor design.
+
+## Shared GaitLU operations
+
+[GaitLU preparation](gaitlu_training.md) explains the shared path from the private raw release to validated, indexed, deduplicated prepared data. It deliberately stops before constructing an experiment-specific training registry.
+
+## Legacy fallback: unique-sequence scaling
+
+The repository retains an earlier unique-sequence-scaling study as a fallback and reusable baseline. It is not the active ICLR framing.
+
 - [Data roles and preprocessing](unique-sequence-scaling/data.md)
-- [GaitLU preparation and 20-model training runbook](gaitlu_training.md)
-- [Evidence available before the primary study](unique-sequence-scaling/results.md)
+- [Method](unique-sequence-scaling/method.md)
+- [Original proposal and evidence record](archive/unique-sequence-scaling/)
 
-## Hierarchical-diversity study
+## Archive
 
-This is a proposed replacement that is not yet implemented. It crosses sequence-pool
-size with temporal-window resampling policy. It asks whether these sources of training
-support have different effects on donor-based factor-composition retrieval than on
-independent-factor prediction, and whether multiple windows from a small pool can match
-one frozen window from a 100×-larger pool.
+The archive preserves reasoning and results that informed the revised direction. These files are not active protocol sources.
 
-- [Proposal](hierarchical-diversity/proposal.md)
-- [Methods](hierarchical-diversity/method.md)
-- [Execution plan](hierarchical-diversity/execution-plan.md)
-- [Training-start agent handoff](hierarchical-diversity/training-start-handoff.md)
+- [Hierarchical-diversity design reviews and handoff](archive/hierarchical-diversity/)
+- [Legacy unique-sequence study materials](archive/unique-sequence-scaling/)
+- [Stage B preliminary results](archive/stage-b-results.md)
+- [GFC-v2 adversarial review record](archive/gfc-v2-adversarial-review.md)
 
-The hierarchical study requires a new frozen-random window policy, a 32-model registry,
-factorial inference, and new execution tests. Until those changes pass the documented
-gate, the existing runbook applies only to the unique-sequence scaling study.
+## Future translation
+
+[Future clinical applications](future-clinical-applications.md) describes possible ambient-intelligence, biomechanics, and balance-assessment follow-on work. It does not make clinical claims for the active representation study.
 
 ## Shared boundaries
 
-GaitLU trains encoders. Health&Gait fits evaluation heads and scores frozen encoders.
-No Health&Gait recording updates a primary encoder. The public documentation contains
-only aggregate, non-identifying evidence. Raw data, participant tables, embeddings,
-participant-level results, and identity-capable checkpoints remain private.
+GaitLU trains encoders. Health&Gait fits evaluation heads and scores frozen encoders. No Health&Gait recording updates a primary encoder. Public documentation contains only aggregate, non-identifying evidence. Raw data, participant tables, embeddings, participant-level results, and identity-capable checkpoints remain private.

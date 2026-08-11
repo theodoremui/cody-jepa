@@ -4,8 +4,9 @@ This document specifies the original unique-sequence scaling study. It is writte
 the methods section for the ICLR paper draft. The alternative hierarchical-diversity
 study has a separate [proposal](../hierarchical-diversity/proposal.md) and
 [methods section](../hierarchical-diversity/method.md). Dataset access, preparation, and
-privacy rules are described in [data.md](data.md). Operator commands for this 20-model
-design are in the [GaitLU runbook](../gaitlu_training.md).
+privacy rules are described in [data.md](data.md). Shared preparation commands are in the
+[GaitLU runbook](../gaitlu_training.md); the 20-model launcher instructions are preserved
+in the [legacy runbook](../archive/unique-sequence-scaling/gaitlu-training-runbook.md).
 
 ## 1. Study design
 

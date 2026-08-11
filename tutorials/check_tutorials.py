@@ -136,19 +136,18 @@ def validate_notebook(path: Path, errors: list[str]) -> None:
         "07_gradient_updates_and_schedules": {
             "REQUIRED_RESUME_FIELDS": "declare the exact resume field set",
             "sequence_stream_version": "record the sequence stream version",
-            "temporal_stream_version": "record the temporal stream version",
+            "phase_stream_version": "record the phase stream version",
             "spatial_stream_version": "record the spatial stream version",
             "mask_stream_version": "record the mask stream version",
             "storage_stable": "include the shared-storage stability gate",
             "rates.shape != (8,)": "require eight concurrent throughput rates",
         },
         "08_group_aware_sampling": {
-            "frozen_random": "use the canonical frozen policy label",
-            "resampled_anchor": "use the canonical resampled policy label",
-            "repeated_draw_fraction": "report expected repeated-draw fractions",
-            "mean_distinct_anchor_overlap": "report mean distinct-anchor overlap",
-            "expected_frozen_support": "calculate frozen occupancy",
-            "expected_resampled_support": "calculate resampled occupancy",
+            "phase_separated": "use the semantic phase-origin policy label",
+            "nearby_jitter": "use the matched jitter policy label",
+            "nominal_catalog_size": "calculate the nominal catalog cardinality",
+            "trajectory_separation": "report phase-separation evidence",
+            "phase_catalog_digest": "record the phase catalog digest",
             "required_audit_fields": "assert the complete treatment-audit schema",
         },
     }
@@ -160,9 +159,9 @@ def validate_notebook(path: Path, errors: list[str]) -> None:
 
     if path.stem == "08_group_aware_sampling":
         noncanonical_policy_fragments = {
-            "policy == 'frozen'",
-            "policy == 'resampled'",
-            "'temporal_policy': 'resampled'",
+            "frozen_random",
+            "resampled_anchor",
+            "sequence_support",
         }
         for fragment in sorted(noncanonical_policy_fragments):
             if fragment in code:

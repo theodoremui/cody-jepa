@@ -1,417 +1,91 @@
-# Methods: Hierarchical Video Diversity
+# Method: iso-catalog phase allocation in video self-supervised learning
 
-This section specifies the proposed hierarchical-diversity study. It is an alternative
-to the [unique-sequence scaling method](../unique-sequence-scaling/method.md), not an experiment that follows
-it. Shared data access, Health&Gait roles, and privacy rules are described in the
-[data guide](../unique-sequence-scaling/data.md). Implementation work and deadline gates are maintained in a
-separate [execution plan](execution-plan.md).
+## Claim boundary
 
-## 1. Study design
+The study tests whether the hierarchical location of video diversity changes learned representations under fixed compute and fixed nominal catalog cardinality. It compares new sequences with phase-separated views of fewer sequences. It does not estimate a universal sequence-to-clip exchange rate.
 
-At a fixed sampled-clip budget, a video learner can draw from more sequences or from
-more temporal windows within familiar sequences. This study asks whether these sources
-of training support have different effects on donor-based factor-composition retrieval
-after supervised alignment, beyond their effects on independent-factor prediction.
+All inference is conditional on GaitLU silhouettes, the JEPA objective, the chosen architecture, and the fixed corpus. It describes reproducibility over paired optimization, stable phase rotations, and pool ordering. Sequence IDs must not be called people, walks, cameras, or environments without verification.
 
-With the encoder, latent-prediction objective, optimization, augmentations, nuisance
-draws, and sampled-clip exposure fixed, the primary question is whether the effect of
-temporal-window resampling depends on sequence-pool size. The interpretation gate asks
-whether this interaction differs from the corresponding independent-factor-completion
-interaction. A direct allocation comparison asks whether the low-sequence resampled
-cell is equivalent to the high-sequence frozen-window cell under a separately justified
-margin.
+## Treatment construction
 
-The experiment crosses two factors:
+### Common eligibility
 
-- sequence support $u\in\{L,H\}$, with $L\approx2{,}500$ and
-  $H\approx250{,}000$ exact-content-deduplicated GaitLU sequences;
-- temporal-window policy $w\in\{F,R\}$, where $F$ exposes one frozen-random temporal
-  anchor per sequence and $R$ resamples from separated temporal anchors on every draw.
+Estimate stride period and confidence for each validated sequence using a documented frozen silhouette signal, such as width or area autocorrelation. Apply one outcome-blind confidence, coverage, and clip-validity rule to make a common corpus that supports four candidate origins. This prevents one cell from receiving cleaner or longer sequences.
 
-Eight replicate blocks contain all four cells, giving
+Before selecting pools, group known source groups and outcome-blind near-duplicate feature clusters. Freeze a common available count `M` and selection rule. If source-group constraints make the target counts infeasible, lower `M` once for every cell and record that decision.
+
+### Nested phase origins
+
+For sequence `i` in replicate block `r`, stable hashing selects a uniform base phase `b_ir`. The semantic origins are quarter-cycle separated and nested:
 
 $$
-2\times2\times8=32
-$$
-
-primary models. The primary endpoint is participant-averaged Health&Gait GFC-v2 top-1.
-The primary estimand is the sequence-support by window-policy interaction across the
-eight trained-model blocks.
-
-## 2. Data and fixed roles
-
-GaitLU-1M supplies unlabelled encoder pretraining data and a common 10,000-sequence
-holdout. Health&Gait supplies labelled frozen-feature development and outcome cohorts.
-No Health&Gait recording updates an encoder. Constructed cases test the evaluator and
-factorial analysis without supporting empirical claims.
-
-GaitLU preparation validates decoding, frame count, silhouette range, and empty-frame
-rate. Packed content and shape are hashed to remove exact duplicates. A complete
-distributor-provided source-group map is preserved when available. Without verified
-metadata, exact-content-deduplicated sequences are treated as singleton groups. Paths,
-anonymous identifiers, and archive shards are never interpreted as people, physical
-walks, source videos, cameras, or environments.
-
-Each replicate seed defines a random group order. Nested prefixes create the low and
-high sequence pools. The high pool contains the low pool. A group is never split to
-reach a nominal target, and actual sequence and source-group counts are reported.
-Approximately 10,000 group-disjoint sequences are reserved as a common holdout by
-selecting whole groups to the nearest attainable sequence count.
-
-Health&Gait contains one $2\times2\times2$ grid per complete participant: usual or fast
-speed, without or with a jacket, and right-to-left or left-to-right direction. The
-80-person development group contains 76 complete participants. The prospectively locked
-318-person outcome group contains 308 complete participants. The outcome group is not
-historically untouched because earlier project work used these participants.
-
-## 3. Hierarchical support intervention
-
-### 3.1 Valid temporal support
-
-For a sequence with $n_i$ contiguous frames and clip length $T=16$, the number of valid
-window starts is
-
-$$
-W_i=n_i-T+1.
-$$
-
-The intervention uses the fixed anchor set
-
-$$
-\mathcal A_i=\{0,8,16,\ldots,8\lfloor(W_i-1)/8\rfloor\},
-\qquad K_i=|\mathcal A_i|.
-$$
-
-Adjacent anchors are separated by eight frames, so their 16-frame windows overlap by at
-most 50 percent. This overlap is part of the intervention, not evidence that the anchors
-are independent examples. The experiment asks whether access to partly overlapping
-temporal phases has value after sampled-example exposure is fixed. The treatment audit
-therefore reports both $K_i$ and the conservative non-overlapping count obtained with
-16-frame spacing.
-
-One global temporal-capability rule, $K_i\ge2$, is applied after basic sequence
-validation and before holdout selection or replicate pool construction. The rule does
-not change across pools or replicates. If the resulting corpus cannot supply the common
-holdout and approximately 250,000 training sequences without splitting source groups,
-the hierarchical study is not launched.
-
-### 3.2 Frozen-random policy
-
-The frozen policy chooses one start uniformly from $\mathcal A_i$ for every
-`(sequence_id, replicate_seed)` pair. The seed is produced by a versioned stable hash of
-the sequence ID and replicate seed. It never uses Python's process-dependent hash or a
-manifest row index. The chosen start remains fixed across epochs and repeated draws and
-is unchanged when the same sequence appears in a nested manifest.
-
-A center window is not used because center position could systematically differ in gait
-phase or recording quality. Frozen and resampled starts have the same uniform marginal
-distribution over $\mathcal A_i$.
-
-Frozen-random is a deliberately low-temporal-support information control. It is not
-presented as a practical augmentation policy or a candidate recipe. Its purpose is to
-hold the available temporal location fixed while preserving the same marginal start
-distribution, sequence sampler, spatial transformations, masks, and optimization as the
-resampled condition.
-
-### 3.3 Resampled policy
-
-The resampled policy selects a start uniformly from $\mathcal A_i$ on every draw. Its
-deterministic random seed includes the base seed, virtual epoch, stable sequence or
-sample identity, draw index, and a versioned temporal-window stream. Spatial crops and
-JEPA masks are generated by separate streams and continue changing under both window
-policies.
-
-Window policy is the only intended difference within each sequence-support pair.
-Architecture, manifest, sampler, sampled-example exposure, initialization, optimizer,
-masks, spatial transformations, and checkpoint rule remain fixed.
-
-### 3.4 Treatment audit
-
-The intervention changes support over `(sequence_id, window_start)` pairs. Under uniform
-sequence sampling with replacement for $C$ draws, expected realized support is
-
-$$
-E_F(U)=U\left[1-\left(1-\frac{1}{U}\right)^C\right]
-$$
-
-for frozen windows and
-
-$$
-E_R(U)=\sum_{i=1}^{U}K_i
-\left[1-\left(1-\frac{1}{UK_i}\right)^C\right]
-$$
-
-for resampled windows.
-
-Before further hierarchy implementation, the audit reconstructs the common holdout and
-all eight nested low and high pool pairs from the exact-deduplicated inventory. For every
-pool it reports $W_i$, $K_i$, the 16-frame-spaced non-overlapping anchor count, $E_F$,
-$E_R$, the expected non-overlapping support ratio, the expected fraction of repeated
-anchors, and mean overlap among distinct anchor pairs. Treatment separation is evaluated
-at the lower possible exposure, $C=4{,}096{,}000$, so the gate also applies if the full
-tier is selected.
-
-The study launches only if median $K_i\ge4$ and $E_R/E_F\ge4$ in every low and high
-pool. The non-overlapping count and overlap summaries are required diagnostics, not
-additional post hoc gates. This criterion establishes a substantial support
-intervention, not semantic independence. Anchored windows are never described as
-independent video examples.
-
-## 4. Encoder training and replication
-
-All models use the same six-layer, 384-dimensional, single-stream JEPA-style Vision
-Transformer. Each input contains 16 one-channel silhouette frames at $112\times112$
-pixels. The optimizer, learning-rate schedule, exponential moving average schedule,
-masking, spatial augmentation, effective batch size, and pooling remain fixed.
-Horizontal flipping is disabled because direction is evaluated.
-
-The primary exposure is $C=8{,}192{,}000$ sampled examples, or 128,000 updates at
-effective batch size 64. An outcome-blind eight-job concurrent throughput probe selects
-one exposure for every model:
-
-- at least 60 examples per second per GPU selects 8,192,000 examples;
-- 30 to 59 examples per second per GPU selects 4,096,000 examples;
-- below 30 examples per second per GPU, unstable shared-storage performance, or
-  insufficient storage cancels the hierarchical study.
-
-Within a replicate block, the four cells share initialization and optimization seed.
-The same low or high manifest is reused across the two window policies. The final-step
-checkpoint is primary. Within a sequence-support pair, both policies receive the same
-ordered sequence draws, spatial-transform parameters, and mask draws. Only the temporal
-anchor differs. Training health may trigger an exact rerun after a documented systems
-failure, but downstream metrics may not select epochs, seeds, or reruns.
-
-The private registry records replicate block, sequence-support level, window policy,
-actual unique-sequence count, exposure, manifest digest, optimization seed, and
-window-seed version. Resume and evaluation stop if any value differs. The eight blocks
-reuse an overlapping finite corpus. Model-level inference therefore measures joint
-reproducibility over pool ordering, frozen anchors, and optimization seeds. It does not
-treat the blocks as eight independent source corpora.
-
-## 5. Frozen Health&Gait representations
-
-Every Health&Gait direction recording supplies three distinct deterministic 16-frame
-windows. The frozen encoder maps each window to one pooled vector, and the vectors are
-averaged in float64 before fitting or scoring. A complete participant contributes eight
-recording representations.
-
-Three separate ridge heads map each representation to two scores for speed, clothing,
-and direction. Only development participants fit standardization, coefficients,
-intercepts, and normalization. The primary ridge penalty is $\alpha=1$, with
-$\alpha=0.1$ and $10$ as fixed sensitivities. Head fitting uses float64,
-population-statistic input standardization, and an unpenalized intercept. Exact
-post-map block normalization matches the unique-sequence protocol and gives the three
-factor blocks comparable influence in retrieval.
-
-This is supervised factor alignment. It does not test unsupervised factor discovery.
-
-## 6. GFC-v2 and controls
-
-For target $x=(s,c,d)$ and focal factor $a\in\{s,c\}$, complementary donors are
-
-$$
-u_a=x_a,\qquad u_j=1-x_j\quad(j\ne a),
+O_{i,r}^{(1)}=\{b_{i,r}\},\qquad
+O_{i,r}^{(2)}=\{b_{i,r},b_{i,r}+1/2\},
 $$
 
 $$
-v_a=1-x_a,\qquad v_j=x_j\quad(j\ne a).
+O_{i,r}^{(4)}=\{b_{i,r},b_{i,r}+1/4,b_{i,r}+1/2,b_{i,r}+3/4\}\pmod 1.
 $$
 
-The query takes factor block $a$ from $u$ and the other two blocks from $v$. The target
-contributes no features. Both donors must have `source_video_id` different from the
-target. All eight participant recordings remain in the gallery, including both donors.
-Eight targets and two focal factors yield 16 queries per complete participant.
+Nearby jitter uses four distinct symmetric small offsets around `b_ir`. It shares the base phase distribution, sequence draws, spatial transforms, masks, exposure, and all nuisance streams with semantic `k=4`. Jitter offsets, rounding, boundary handling, and weights are selected by outcome-blind audit and then frozen.
 
-Retrieval uses the equal mean of speed, clothing, and direction cosine distances.
-Float64 distances within the frozen tolerance are tied. First-place ties receive
-fractional top-1 credit, and MRR uses the average occupied rank. The exact top-1 oracle
-for zero, one, two, or three recovered binary factors is $1/8$, $1/4$, $1/2$, and $1$.
+Audit a stratified sample manually before outcomes. Report phase confidence, origin coverage, realized starts, window overlap, pose-trajectory separation, nominal sequence count, and effective near-duplicate cluster count. Failure ends the phase-allocation branch.
 
-The [nine acquisition cues](../unique-sequence-scaling/data.md#35-extract-a-matched-acquisition-cue-baseline)
-receive the same development-fitted three-head pipeline. Hard
-independent completion retrieves the tuple formed by marginal factor argmaxes. Soft
-completion uses one positive development-fitted temperature and the product of marginal
-factor probabilities. In a complete Cartesian gallery, hard and soft top-1 coincide,
-so they constitute one top-1 control. Soft negative log-likelihood and calibration are
-reported separately.
+### Allocation registry
 
-Factor balanced accuracy, acquisition cues, focal factor, donor attraction, and ridge
-sensitivities are secondary. Context reliance and cross-condition identity follow the
-fixed definitions in the [shared secondary-measurement protocol](../unique-sequence-scaling/method.md#7-secondary-measurements).
+| Cell | `U` | `k` | Purpose |
+| --- | ---: | ---: | --- |
+| `breadth` | 250,000 | 1 | New-sequence extreme |
+| `balanced` | 125,000 | 2 | Intermediate path point |
+| `phase_depth` | 62,500 | 4 | Phase-separated extreme |
+| `nearby_jitter` | 62,500 | 4 | Mechanism diagnostic |
 
-## 7. Estimands and statistical analysis
+Every row has `U × k = 250,000`. Within each block, source pools are nested whenever the frozen source-group rule permits: `62,500 ⊂ 125,000 ⊂ 250,000`. A row records allocation, sequence count, origins per sequence, nominal catalog size, origin policy, phase-catalog digest, source-group digest, cluster summary, every stream version, and checkpoint provenance.
 
-Let $Y_{r,u,w}$ be participant-averaged GFC-v2 top-1 for replicate block $r$, sequence
-support $u\in\{L,H\}$, and window policy $w\in\{F,R\}$. The primary replicate-level
-interaction is
+Eight blocks include breadth, balanced, and phase depth. Four prespecified blocks include nearby jitter. The registry therefore has `8 × 3 + 4 = 28` models. The jitter comparison is deliberately lower precision and is not used as a fourth allocation-path point.
 
-$$
-I_r=
-\left(Y_{r,H,R}-Y_{r,L,R}\right)
--\left(Y_{r,H,F}-Y_{r,L,F}\right).
-$$
+### Constant conditions
 
-This is also the temporal-policy effect at high support minus the temporal-policy effect
-at low support. Under this sign convention, $I_r<0$ means resampling provides more
-benefit when sequence support is low.
+Architecture, objective, optimizer, schedule, masks, spatial transformations, batch size, checkpoint selection, and sampled-clip exposure are fixed. One outcome-blind systems gate selects 8,192,000 or 4,096,000 clips for every model. With cardinality 250,000, planned recurrence is 32.77 or 16.38 draws per nominal atom. Report recurrence because equal cardinality does not mean equal information.
 
-The primary estimate is $\hat I=\frac{1}{8}\sum_{r=1}^{8}I_r$, with a Student's t
-interval over the eight trained-model interactions. All eight interaction values and
-all 32 cell outcomes are shown. Participant and crossed bootstraps are sensitivities.
-Participants, recordings, windows, and queries do not increase model-level replication.
+## Outcome instrument
 
-Because top-1 is bounded, saturation in a high-support cell can mechanically reduce an
-additive interaction on the percentage scale. The prespecified primary-adjacent
-robustness analysis defines
+Health&Gait GFC v2 uses source-disjoint donors and a complete eight-item factorial gallery. It is supervised alignment followed by donor-based factor recombination retrieval. It is not an unsupervised disentanglement score.
+
+For query `q`, use continuous target margin:
 
 $$
-Z_{r,u,w}=\operatorname{logit}(\operatorname{clip}(Y_{r,u,w},\epsilon,1-\epsilon)),
-\qquad
-\epsilon=\frac{1}{2\cdot308\cdot16},
+m(q)=d(q,g^-_q)-d(q,g^+_q),
 $$
 
-and repeats the interaction on $Z$. The raw and clipped-logit interactions, their eight
-replicate values, and their intervals appear together in the main results table and
-figure. A negative raw interaction that reverses sign on the transformed scale is
-labelled scale-dependent and cannot support substitution. The raw percentage-scale
-interaction remains the sole confirmatory test.
+where `g⁺` is the true target and `g⁻` is the nearest frozen non-target competitor. Positive margin means the target wins. Freeze block normalization, competitor rule, aggregation, tie policy, and distance scale. Aggregate within participant before model-level inference.
 
-Prespecified replicate-level simple effects are
+Independent completion uses the same eight-gallery continuous margin. If that construction fails synthetic controls, use development-fitted shared-temperature gallery NLL instead. Validate the selected score on perfect factorized recovery, independent noisy recovery, missing factors, donor attraction, acquisition shortcut, collapse, and confidence rescaling. Top-1 and MRR must agree in direction with the margin for a directional headline.
 
-$$
-T_{L,r}=Y_{r,L,R}-Y_{r,L,F},\qquad
-T_{H,r}=Y_{r,H,R}-Y_{r,H,F},
-$$
+## Confirmatory contrast
+
+Let `G_{r,a}` be participant-averaged GFC margin and `C_{r,a}` independent-completion margin for block `r` and allocation `a`. Define
 
 $$
-S_{F,r}=Y_{r,H,F}-Y_{r,L,F},\qquad
-S_{R,r}=Y_{r,H,R}-Y_{r,L,R}.
+D_{r,a}=G_{r,a}-C_{r,a},
 $$
 
-For each effect, the mean and Student's t interval are computed over its eight
-replicate-level values. The direct allocation contrast is
+and the primary paired model-level contrast
 
 $$
-A_r=Y_{r,L,R}-Y_{r,H,F}.
+P_r=D_{r,\mathrm{phase\_depth}}-D_{r,\mathrm{breadth}}.
 $$
 
-It tests performance replacement at these two allocations. It is not an
-equal-information or equal-support comparison.
+Analyze the eight `P_r` values using the frozen small-sample procedure, show all values, and require a useful minimum-detectable-effect result before launch. Participant and query observations improve cell precision but do not create additional trained-model replicates.
 
-The materiality margins for the simple effects and interaction are
-$\delta_T=\delta_I=6.25$ percentage points. For a simple effect, this is one correct
-GFC-v2 query per participant. For the interaction, it is a one-query difference between
-the temporal-policy effects at high and low sequence support.
+Report the raw breadth-to-phase-depth GFC contrast, the balanced path point, the four-block phase-depth versus jitter contrast, and the direction of margin, top-1, and MRR. A development-estimated factor-transport geometry check, evaluated on locked participants for parallelism and donor-vector closure, is supporting mechanism evidence only.
 
-The direct allocation equivalence margin is separately set to $\delta_A=6.25$
-percentage points. It is the largest average retrieval loss considered practically
-interchangeable when asking whether the low-sequence resampled allocation recovers the
-high-sequence frozen allocation. It also corresponds to one of the 16 GFC-v2 queries
-per participant, but it is justified for this direct replacement claim rather than
-inherited from the interaction margin.
+## Interpretation rules
 
-A prospective simulation evaluates sensitivity at all frozen margins but cannot change
-them. If eight blocks cannot provide useful sensitivity, the hierarchical study is not
-launched. Health&Gait outcome aggregates cannot enter this check. Failure to reject
-zero is never called equivalence.
+Allowed: hierarchical organization of nominal video support mattered, or no difference was resolved at the declared precision; phase-separated origins differed from matched jitter; and an allocation effect did or did not exceed independent factor recovery.
 
-An effect is materially positive when its 95% interval lies above zero and its estimate
-is at least the relevant margin. Materially negative is defined symmetrically.
-Equivalence requires a 90% interval fully inside the relevant margin. A simple effect
-has no material harm when its 95% lower bound is greater than $-\delta_T$.
+Not allowed: `U × k` equalizes information; phase origins are independent examples; GFC proves intrinsic composition; three points establish a law, frontier, or transferable exchange rate; or a silhouette result automatically transfers to RGB or clinical assessment.
 
-The interaction is the only confirmatory test. A materially negative or positive
-interaction establishes a hierarchy-dependent policy effect in that direction.
-Interaction equivalence supports additivity at the frozen resolution only when the
-simple-effect gate below also passes. Every other interaction result is inconclusive.
+## Lock requirements
 
-The following categories are prespecified descriptive intersection gates:
-
-- **substitution-compatible:** $\bar T_L$ and $\bar S_F$ are materially positive,
-  $\bar T_H$ and $\bar S_R$ show no material harm, $\hat I$ is materially negative,
-  and the ceiling sensitivity has the same interaction sign;
-- **full performance replacement:** the substitution-compatible gate passes and the
-  90% interval for $\bar A$ lies in $[-\delta_A,+\delta_A]$;
-- **partial performance replacement:** the substitution-compatible gate passes and
-  $\bar A$ is materially negative;
-- **temporal allocation exceeds sequence allocation:** the substitution-compatible
-  gate passes and $\bar A$ is materially positive;
-- **additive benefits:** all four mean simple effects are materially positive and the
-  interaction is equivalent within $[-\delta_I,+\delta_I]$;
-- **complementarity:** all four mean simple effects are materially positive and the
-  interaction is materially positive;
-- **window-policy dominance:** $\bar T_L$ and $\bar T_H$ are materially positive while
-  $\bar S_F$ and $\bar S_R$ are equivalent within $[-\delta_T,+\delta_T]$;
-- **sequence-support dominance:** $\bar S_F$ and $\bar S_R$ are materially positive
-  while $\bar T_L$ and $\bar T_H$ are equivalent within the same margin;
-- **harm or crossover:** any mean simple effect is materially negative, with crossover
-  reported when the corresponding low and high effects have opposite resolved signs;
-- **inconclusive:** no category passes, including an unresolved $\bar A$ after the
-  substitution-compatible gate.
-
-Full performance replacement is an intersection-union claim because every listed
-component must pass. The other labels organize the reported estimates and do not create
-additional confirmatory tests. All component intervals are reported, and Holm
-correction applies within any further secondary families.
-
-Let $C_{r,u,w}$ be independent-factor completion top-1 and
-$G_{r,u,w}=Y_{r,u,w}-C_{r,u,w}$. The replicate-level completion-gap interaction is
-
-$$
-J_r=(G_{r,H,R}-G_{r,L,R})-(G_{r,H,F}-G_{r,L,F}).
-$$
-
-Its frozen margin is $\delta_G=6.25$ percentage points. A 95% interval excluding zero
-with $|\bar J|\ge\delta_G$ is a resolved gap interaction. A 90% interval inside
-$[-\delta_G,+\delta_G]$ supports gap equivalence. Every other result leaves the
-representation interpretation unresolved. Gap equivalence supports an independent-
-completion explanation at this resolution. A resolved gap is necessary but not
-sufficient evidence for donor-based composition beyond independent factor prediction
-because ceiling, calibration, and score construction can also affect the subtraction.
-
-## 8. Compute and prospective failure rules
-
-Thirty-two single-GPU runs process 262.144 million examples at full exposure. With eight
-H100s continuously reserved, two complete replicate blocks run per wave for four waves.
-At a sustained concurrent rate of 60 examples per second per GPU, four waves take about
-6.3 elapsed days. Historical rates of 66 to 104 examples per second imply about 3.7 to
-5.8 days. The half-exposure tier preserves the same worst-case duration at its 30-example
-boundary. These estimates require stable shared-storage throughput under eight jobs.
-Cell-to-GPU and cell-to-node assignments are randomized within each wave and recorded.
-
-The hierarchical headline requires all eight complete replicate blocks. Missing cells
-are not repaired with new seeds after outcomes are opened. If treatment separation,
-continuous GPU reservation, throughput, provenance, or analysis gates fail, the
-hierarchical study is not launched. The dated implementation sequence is kept outside
-the manuscript in [execution-plan.md](execution-plan.md).
-
-## 9. Protocol safeguards and scope
-
-Before outcome access, a timestamped commit freezes data roles, manifests, window
-policies, exposure, all checkpoints, failure rules, GFC-v2, completion controls,
-materiality margins, statistical code, and figure templates. Constructed tests verify
-window-policy determinism, uniform anchor selection, changing resampled anchors,
-nested-manifest stability, identical sampler-index streams, identical spatial and mask
-streams within policy pairs, complete four-cell blocks, exact factorial signs, GFC-v2
-oracle values, and development-only fitting.
-
-The strongest conclusion is conditional on this JEPA recipe, silhouette encoder,
-GaitLU hierarchy intervention, supervised factor alignment, and Health&Gait GFC-v2
-protocol. It does not establish a universal data hierarchy, objective-independent
-behavior, intrinsic compositionality, semantic independence of windows, or transfer to
-RGB video.
-
-Raw Health&Gait recordings, participant tables, embeddings, participant-level outputs,
-nearest-neighbor examples, and identity-capable checkpoints remain private. No
-re-identification, participant contact, deployment, or clinical claim is permitted.
-
-## References
-
-- Alssum, L., et al. (2023). [Just a Glimpse: Rethinking Temporal Information for Video Continual Learning](https://arxiv.org/abs/2305.18418). CVPR Workshops.
-- Bardes, A., et al. (2024). [Revisiting Feature Prediction for Learning Visual Representations from Video](https://arxiv.org/abs/2404.08471).
-- Durante, Z., et al. (2026). [VideoWeave: A Data-Centric Approach for Efficient Video Understanding](https://arxiv.org/abs/2601.06309).
-- Fan, C., Hou, S., Huang, Y., and Yu, S. (2022). [Learning Gait Representation from Massive Unlabelled Walking Videos: A Benchmark](https://arxiv.org/abs/2206.13964).
-- Hammoud, H. A. K., et al. (2024). [On Pretraining Data Diversity for Self-Supervised Learning](https://openreview.net/forum?id=SLokff4aKI). ECCV.
-- Qing, Z., et al. (2022). [Learning from Untrimmed Videos: Self-Supervised Video Representation Learning with Hierarchical Consistency](https://arxiv.org/abs/2204.03017).
-- Tschannen, M., et al. (2019). [Self-Supervised Learning of Video-Induced Visual Invariances](https://arxiv.org/abs/1912.02783).
-- Zafra-Palma, J., et al. (2025). [Health & Gait: A Dataset for Gait-Based Analysis](https://www.nature.com/articles/s41597-024-04327-4). Scientific Data.
+Before outcome access, freeze phase estimation, eligibility, common `M`, source and cluster construction, registry, exposure, metric, synthetic tests, primary contrast, analysis code, figures, and failure rules. Resume, evaluation, and export fail closed on any mismatch in manifest, phase catalog, streams, exposure, checkpoint, or registry digests. Release aggregate allowlisted results and instrument code, never participant identifiers, raw recordings, embeddings, or private paths.

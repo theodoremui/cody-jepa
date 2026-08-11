@@ -1,5 +1,7 @@
 # 16. Reproducible scientific evaluators and numerical contracts
 
+> **Current-study note.** The software contracts in this lecture apply directly to the revised study. The older 32-row low/high registry described in its worked example is superseded. The active contract validates a 28-row iso-catalog registry with `breadth`, `balanced`, `phase_depth`, and four prespecified `nearby_jitter` rows, including a phase-catalog digest and origin policy. The executable current example is in [the Lesson 16 notebook](../implementations/16_reproducible_scientific_evaluators.ipynb), and the full study design is in [Lesson 17](17_hierarchical_support_and_factorial_inference.md).
+
 ![A reproducible evaluator validates inputs, freezes fitted state, computes deterministically, and publishes atomically](../images/16_reproducible_scientific_evaluators.svg)
 
 ## Why this lesson matters

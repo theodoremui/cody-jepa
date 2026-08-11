@@ -46,6 +46,9 @@ _SAMPLER_STREAM = 1
 _TRAIN_WINDOW_STREAM = 2
 _TRAIN_SPATIAL_STREAM = 3
 _VAL_SPATIAL_STREAM = 4
+_FROZEN_ANCHOR_DOMAIN = "gaitlu-temporal-frozen-v1"
+_RESAMPLED_ANCHOR_DOMAIN = "gaitlu-temporal-resampled-v1"
+_HIERARCHY_WINDOW_POLICIES = frozenset(("frozen_random", "resampled_anchor"))
 _MANIFEST_PAIR_DOMAIN = b"cody-jepa-gaitlu-manifest-pair-v1"
 _HASH_CHUNK_SIZE = 1024 * 1024
 
@@ -61,6 +64,24 @@ def _gaitlu_seed(base_seed, epoch, sample_index, draw_index, stream):
     mixed = ((mixed ^ (mixed >> 30)) * 0xBF58476D1CE4E5B9) & _UINT64_MASK
     mixed = ((mixed ^ (mixed >> 27)) * 0x94D049BB133111EB) & _UINT64_MASK
     return (mixed ^ (mixed >> 31)) & _UINT64_MASK
+
+
+def _stable_temporal_seed(namespace, *coordinates):
+    """Hash stable temporal coordinates without relying on process hash state."""
+
+    digest = hashlib.blake2b(digest_size=8)
+    for coordinate in (namespace, *coordinates):
+        encoded = f"{type(coordinate).__name__}:{coordinate}".encode("utf-8")
+        digest.update(len(encoded).to_bytes(8, "little"))
+        digest.update(encoded)
+    return int.from_bytes(digest.digest(), "little")
+
+
+def _allowed_temporal_anchors(num_frames, clip_length, anchor_spacing):
+    """Return starts on the fixed anchor grid through the last valid window."""
+
+    count = int(num_frames) - int(clip_length) + 1
+    return tuple(range(0, max(0, count), int(anchor_spacing)))
 
 
 def gaitlu_manifest_pair_sha256(train_manifest_csv, val_manifest_csv):
@@ -130,6 +151,9 @@ class GaitLUIndexedDataset(Dataset):
         crop_scale=(1.0, 1.0),
         horizontal_flip_prob=0.0,
         deterministic_windows=1,
+        window_policy=None,
+        anchor_spacing=8,
+        replicate_seed=0,
     ):
         self.manifest_csv = Path(manifest_csv).expanduser().resolve()
         self.data_root = Path(data_root).expanduser().resolve()
@@ -141,6 +165,9 @@ class GaitLUIndexedDataset(Dataset):
         self.crop_scale = tuple(float(value) for value in crop_scale)
         self.horizontal_flip_prob = float(horizontal_flip_prob)
         self.deterministic_windows = int(deterministic_windows)
+        self.window_policy = None if window_policy is None else str(window_policy)
+        self.anchor_spacing = int(anchor_spacing)
+        self.replicate_seed = int(replicate_seed)
         self.epoch = 0
         self._handles: dict[Path, object] = {}
         self._validate_options()
@@ -168,6 +195,18 @@ class GaitLUIndexedDataset(Dataset):
             raise ValueError("horizontal_flip_prob must be in [0, 1]")
         if self.deterministic_windows <= 0:
             raise ValueError("deterministic_windows must be positive")
+        if self.anchor_spacing <= 0:
+            raise ValueError("anchor_spacing must be positive")
+        if (
+            self.window_policy is not None
+            and self.window_policy not in _HIERARCHY_WINDOW_POLICIES
+        ):
+            allowed = ", ".join(sorted(_HIERARCHY_WINDOW_POLICIES))
+            raise ValueError(
+                f"unknown hierarchy window policy {self.window_policy!r}; expected {allowed}"
+            )
+        if self.window_policy is not None and self.split != "train":
+            raise ValueError("hierarchy window policies are accepted only for training")
         if self.random_windows and self.deterministic_windows != 1:
             raise ValueError("random datasets must use deterministic_windows=1")
 
@@ -267,6 +306,14 @@ class GaitLUIndexedDataset(Dataset):
                     raise ManifestValidationError(
                         f"row {line_no}: {num_frames} frames is shorter than clip_length"
                     )
+                temporal_anchors = _allowed_temporal_anchors(
+                    num_frames, self.clip_length, self.anchor_spacing
+                )
+                if self.window_policy is not None and len(temporal_anchors) < 2:
+                    raise ManifestValidationError(
+                        f"row {line_no}: hierarchy training requires at least two "
+                        "allowed temporal anchors"
+                    )
                 available_windows = num_frames - self.clip_length + 1
                 if not self.random_windows and self.deterministic_windows > available_windows:
                     raise ManifestValidationError(
@@ -282,6 +329,7 @@ class GaitLUIndexedDataset(Dataset):
                         "num_frames": num_frames,
                         "height": height,
                         "width": width,
+                        "temporal_anchors": temporal_anchors,
                     }
                 )
         if not samples:
@@ -330,6 +378,23 @@ class GaitLUIndexedDataset(Dataset):
         return bits.reshape(sample["num_frames"], sample["height"], sample["width"])
 
     def _window_start(self, sample_index, sample, draw_index, window_index):
+        if self.window_policy == "frozen_random":
+            seed = _stable_temporal_seed(
+                _FROZEN_ANCHOR_DOMAIN,
+                sample["sequence_id"],
+                self.replicate_seed,
+            )
+            return random.Random(seed).choice(sample["temporal_anchors"])
+        if self.window_policy == "resampled_anchor":
+            seed = _stable_temporal_seed(
+                _RESAMPLED_ANCHOR_DOMAIN,
+                self.base_seed,
+                self.replicate_seed,
+                self.epoch,
+                sample["sequence_id"],
+                draw_index,
+            )
+            return random.Random(seed).choice(sample["temporal_anchors"])
         count = sample["num_frames"] - self.clip_length + 1
         if self.random_windows:
             seed = _gaitlu_seed(
@@ -393,7 +458,7 @@ class GaitLUIndexedDataset(Dataset):
         }
 
     def description(self):
-        return {
+        description = {
             "version": GAITLU_MANIFEST_VERSION,
             "manifest_name": self.manifest_csv.name,
             "clip_length": self.clip_length,
@@ -407,6 +472,15 @@ class GaitLUIndexedDataset(Dataset):
             "sequence_count": len(self.samples),
             "sample_count": len(self),
         }
+        if self.window_policy is not None:
+            description.update(
+                {
+                    "window_policy": self.window_policy,
+                    "anchor_spacing": self.anchor_spacing,
+                    "replicate_seed": self.replicate_seed,
+                }
+            )
+        return description
 
 
 @dataclass(frozen=True)
@@ -425,6 +499,9 @@ class GaitLULoaderConfig:
     train_horizontal_flip_prob: float = 0.0
     eval_windows: int = 1
     epoch_examples: int = 65_536
+    train_window_policy: str | None = None
+    anchor_spacing: int = 8
+    replicate_seed: int = 0
 
     def __post_init__(self):
         root = Path(self.data_root).expanduser().resolve()
@@ -441,15 +518,33 @@ class GaitLULoaderConfig:
         object.__setattr__(self, "prefetch_factor", int(self.prefetch_factor))
         object.__setattr__(self, "eval_windows", int(self.eval_windows))
         object.__setattr__(self, "epoch_examples", int(self.epoch_examples))
+        object.__setattr__(
+            self,
+            "train_window_policy",
+            None if self.train_window_policy is None else str(self.train_window_policy),
+        )
+        object.__setattr__(self, "anchor_spacing", int(self.anchor_spacing))
+        object.__setattr__(self, "replicate_seed", int(self.replicate_seed))
         if self.batch_size <= 0 or self.num_workers < 0 or self.prefetch_factor <= 0:
             raise ValueError("invalid GaitLU DataLoader size/worker settings")
         if self.epoch_examples <= 0 or self.epoch_examples % self.batch_size:
             raise ValueError("epoch_examples must be positive and divisible by batch_size")
         if self.eval_windows <= 0:
             raise ValueError("eval_windows must be positive")
+        if self.anchor_spacing <= 0:
+            raise ValueError("anchor_spacing must be positive")
+        if (
+            self.train_window_policy is not None
+            and self.train_window_policy not in _HIERARCHY_WINDOW_POLICIES
+        ):
+            allowed = ", ".join(sorted(_HIERARCHY_WINDOW_POLICIES))
+            raise ValueError(
+                f"unknown hierarchy window policy {self.train_window_policy!r}; "
+                f"expected {allowed}"
+            )
 
     def as_dict(self):
-        return {
+        config = {
             "clip_length": self.clip_length,
             "image_size": list(self.image_size),
             "seed": self.seed,
@@ -462,6 +557,15 @@ class GaitLULoaderConfig:
             "eval_windows": self.eval_windows,
             "epoch_examples": self.epoch_examples,
         }
+        if self.train_window_policy is not None:
+            config.update(
+                {
+                    "train_window_policy": self.train_window_policy,
+                    "anchor_spacing": self.anchor_spacing,
+                    "replicate_seed": self.replicate_seed,
+                }
+            )
+        return config
 
 
 def build_gaitlu_datasets_from_config(config: GaitLULoaderConfig):
@@ -475,6 +579,9 @@ def build_gaitlu_datasets_from_config(config: GaitLULoaderConfig):
         base_seed=config.seed,
         crop_scale=config.train_crop_scale,
         horizontal_flip_prob=config.train_horizontal_flip_prob,
+        window_policy=config.train_window_policy,
+        anchor_spacing=config.anchor_spacing,
+        replicate_seed=config.replicate_seed,
     )
     val = GaitLUIndexedDataset(
         config.val_manifest_csv,

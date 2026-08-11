@@ -1,5 +1,7 @@
 # 15. Exposure, replication, and variance decomposition
 
+> **Current-study note.** The exposure and replication principles in this lesson remain active. References below to the earlier four-cell hierarchy experiment are a legacy worked example, not the current protocol. The active study has a 28-model iso-catalog allocation registry: eight blocks of breadth, balanced, and phase depth, plus nearby jitter in four prespecified blocks. See [Lesson 17](17_hierarchical_support_and_factorial_inference.md) for the current design.
+
 ![Overview of exposure and replication](../images/15_exposure_and_replication.svg)
 
 ## Prerequisites

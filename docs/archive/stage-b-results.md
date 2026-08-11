@@ -18,7 +18,8 @@ checkpoints. The planned `b00-clip-var` result is absent from the compact result
 so Stage B does not independently confirm the a07 configuration at 100 epochs.
 
 The source analysis is
-[04-writeup-stage-b-results.ipynb](../notebooks/04-writeup-stage-b-results.ipynb).
+The original notebook is not retained in this repository. The aggregate artifacts below
+remain available as an historical record.
 It validates the experiment contract against `results/checkpoint_histories.json`,
 cross-checks selected values against the stored trajectories, and reconstructs every
 figure below from aggregate checked-in results.
@@ -35,7 +36,7 @@ more context-sensitive features were not generally better downstream features.
 
 ## Training health
 
-![Stage B loss, cosine similarity, effective rank, and wrong-context trajectories](images/stage-b-health-trajectories.png)
+![Stage B loss, cosine similarity, effective rank, and wrong-context trajectories](../images/stage-b-health-trajectories.png)
 
 The 50 stored validation points per run show stable, distinct regimes:
 
@@ -56,7 +57,7 @@ on the common GaitLU holdout.
 
 ## Selected-checkpoint comparison
 
-![Stage A antecedents and Stage B selected checkpoints](images/stage-b-selected-checkpoints.png)
+![Stage A antecedents and Stage B selected checkpoints](../images/stage-b-selected-checkpoints.png)
 
 | Run | Selected epoch | Validation loss | Effective rank | Rank ratio | Wrong-context gap | Relative gap | Closed-set identity | Held-out identity | Speed balanced accuracy |
 |---|---:|---:|---:|---:|---:|---:|---:|---:|---:|
@@ -113,7 +114,7 @@ but they use `legacy_donor_excluded_v1`, not GFC-v2:
 - both donors are removed, leaving a six-cell gallery; and
 - the shortcut does not use the revised, fully matched three-head control.
 
-![Legacy donor-excluded development GFC comparison](images/stage-b-legacy-gfc.png)
+![Legacy donor-excluded development GFC comparison](../images/stage-b-legacy-gfc.png)
 
 Under the declared historical `raw_retain_all` normalization:
 
@@ -157,7 +158,7 @@ or figures.
 
 ## Revised next steps
 
-![Stage B evidence to revised study execution](images/stage-b-revised-next-steps.svg)
+![Stage B evidence to revised study execution](../images/stage-b-revised-next-steps.svg)
 
 ### 1. Finish and freeze the instrument
 

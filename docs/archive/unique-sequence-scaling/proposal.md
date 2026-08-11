@@ -15,7 +15,7 @@
 
 This document covers the original unique-sequence scaling study. The alternative
 hierarchical study is documented separately in
-[hierarchical-diversity/proposal.md](../hierarchical-diversity/proposal.md).
+[hierarchical-diversity/proposal.md](../../hierarchical-diversity/proposal.md).
 
 ## Research question
 
@@ -109,6 +109,6 @@ GaitLU support manipulation, supervised alignment, and Health&Gait protocol. The
 cannot establish intrinsic compositionality, unsupervised factor discovery, clinical
 utility, objective-general behavior, or transfer to RGB video.
 
-The complete protocol appears in [method.md](method.md). Dataset preparation and role
-boundaries appear in [data.md](data.md), and the evidence available before the primary
-study appears in [results.md](results.md).
+The retained fallback method appears in [method.md](../../unique-sequence-scaling/method.md).
+Dataset preparation and role boundaries appear in [data.md](../../unique-sequence-scaling/data.md),
+and the historical evidence record appears in [results.md](results.md).

@@ -1,8 +1,10 @@
 # Data guide
 
 This document defines the shared data roles and the preprocessing used by the
-unique-sequence scaling study. Its scientific motivation is in
-[proposal.md](proposal.md), and its evaluation procedure is in [method.md](method.md).
+legacy unique-sequence scaling study. Its original scientific motivation and evidence
+record are archived in [the original proposal](../archive/unique-sequence-scaling/proposal.md)
+and [result trajectory](../archive/unique-sequence-scaling/results.md). Its evaluation
+procedure is in [method.md](method.md).
 The proposed hierarchical-diversity replacement uses the same role boundaries but has
 its own [proposal](../hierarchical-diversity/proposal.md) and
 [methods](../hierarchical-diversity/method.md).
@@ -27,13 +29,15 @@ which it will be judged.
 | Constructed procedural cases | Test whether the code behaves as designed | Claims about people or generalization |
 
 The repository also contains older Health&Gait-only experiments. They used different
-roles and a different evaluator. Their aggregates remain preliminary evidence in
-[results.md](results.md), not results of the unique-sequence scaling study.
+roles and a different evaluator. Their aggregates remain preliminary evidence in the
+[archived result trajectory](../archive/unique-sequence-scaling/results.md), not results
+of the unique-sequence scaling study.
 
 ## 2. Prepare GaitLU-1M for encoder pretraining
 
-The exact HAIC conversion, loader-smoke, and twenty-run commands are in
-[gaitlu_training.md](../gaitlu_training.md).
+The shared HAIC conversion and loader-smoke steps are in
+[gaitlu_training.md](../gaitlu_training.md). The archived twenty-run launcher instructions
+are in the [legacy runbook](../archive/unique-sequence-scaling/gaitlu-training-runbook.md).
 
 The v2 preparation, indexed-loader, and primary-exposure code now exists and passes
 synthetic tests. The private 100-shard corpus has not yet been processed with it, so the

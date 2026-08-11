@@ -30,7 +30,9 @@ cody-jepa-gfc-study = "cody_jepa.cli.gfc_study:main"
 cody-jepa-make-gfc-study-results = "cody_jepa.cli.make_gfc_study_results:main"
 cody-jepa-prepare-gaitlu = "cody_jepa.cli.prepare_gaitlu:main"
 cody-jepa-audit-gaitlu-hierarchy = "cody_jepa.cli.audit_gaitlu_hierarchy:main"
+cody-jepa-prepare-gaitlu-hierarchy = "cody_jepa.cli.prepare_gaitlu_hierarchy:main"
 cody-jepa-train-gaitlu-study = "cody_jepa.cli.train_gaitlu_study:main"
+cody-jepa-train-gaitlu-hierarchy = "cody_jepa.cli.train_gaitlu_hierarchy:main"
 
 [dependency-groups]
 dev = [

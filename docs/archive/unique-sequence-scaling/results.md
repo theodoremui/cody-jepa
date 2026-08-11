@@ -44,7 +44,7 @@ showed that the trainer and feature export worked and that speed was linearly
 recoverable. They did not demonstrate factorization or meaningful use of context.
 
 The compact source is `results/phase0_summary.json`; the active table is
-[phase0_table.csv](../../results/generated/phase0_table.csv).
+[phase0_table.csv](../../../results/generated/phase0_table.csv).
 
 ## Stage 2: Phase 1 checkpoint disagreement
 
@@ -68,9 +68,9 @@ This rank disagreement motivated a real-target completion test. It did not ident
 which checkpoint had scientifically better factor structure.
 
 Source: `results/phase1_summary.csv`. Generated outputs:
-[phase1_table.csv](../../results/generated/phase1_table.csv) and the figure below.
+[phase1_table.csv](../../../results/generated/phase1_table.csv) and the figure below.
 
-![Phase 1 validation loss and effective-rank ratio](../../results/generated/phase1_diagnostics.png)
+![Phase 1 validation loss and effective-rank ratio](../../../results/generated/phase1_diagnostics.png)
 
 ## Stage 3: context and pooling diagnosis
 
@@ -106,7 +106,7 @@ acquisition shortcut causes prediction.
 
 Source: `results/context_diagnosis.json`.
 
-![Context substitution gaps and token-versus-pooled breadth](../../results/generated/context_diagnosis.png)
+![Context substitution gaps and token-versus-pooled breadth](../../../results/generated/context_diagnosis.png)
 
 ## Stage 4: legacy GFC development results
 
@@ -144,10 +144,10 @@ checkpoints. This is a descriptive rank inversion over three models, not a popul
 estimate of how often standard diagnostics fail.
 
 Source: `results/gfc-*/summary.json`. Generated output:
-[legacy_gfc_table.csv](../../results/generated/legacy_gfc_table.csv) and the explicitly legacy figure
+[legacy_gfc_table.csv](../../../results/generated/legacy_gfc_table.csv) and the explicitly legacy figure
 below.
 
-![Legacy development GFC comparison](../../results/generated/legacy_gfc_comparison.png)
+![Legacy development GFC comparison](../../../results/generated/legacy_gfc_comparison.png)
 
 ## Why the legacy positive result is not confirmatory
 

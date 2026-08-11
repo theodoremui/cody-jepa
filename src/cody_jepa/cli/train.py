@@ -137,6 +137,9 @@ def run_training(args, *, config_updates=None):
             train_horizontal_flip_prob=float(config["train_horizontal_flip_prob"]),
             eval_windows=1 if args.eval_windows is None else args.eval_windows,
             epoch_examples=int(config.get("loader_epoch_examples", 65_536)),
+            train_window_policy=config.get("train_window_policy"),
+            anchor_spacing=int(config.get("anchor_spacing", 8)),
+            replicate_seed=int(config.get("replicate_seed", 0)),
         )
         gaitlu_manifest_digest = gaitlu_manifest_pair_sha256(
             loader_config.train_manifest_csv, loader_config.val_manifest_csv

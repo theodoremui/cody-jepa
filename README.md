@@ -44,15 +44,16 @@ Configs are grouped by purpose under `configs/train/` and `configs/eval/`. The t
 
 ## Research workflow
 
-### Prepare and train the GaitLU scaling ladders
+### Legacy fallback: prepare and train the GaitLU scaling ladders
 
-The unique-sequence scaling study trains twenty GaitLU-only encoders: four nested
+The unique-sequence scaling study is a retained fallback, not the active ICLR direction. It trains twenty GaitLU-only encoders: four nested
 unique-sequence rungs for each of five paired pool/optimization seeds. The ingestion and training code
 is implemented, but the private HAIC shards have not yet been processed and no eligible
 ladder checkpoint is checked in. Follow the complete operator runbook rather than
 training directly from `.tar.gz` files:
 
-- [GaitLU-1M preparation and training runbook](docs/gaitlu_training.md)
+- [Shared GaitLU preparation runbook](docs/gaitlu_training.md)
+- [Legacy twenty-run training runbook](docs/archive/unique-sequence-scaling/gaitlu-training-runbook.md)
 - [GaitLU scaling configuration](configs/train/gaitlu_scaling.json)
 - [Preparation Slurm array](slurm/prepare-gaitlu-shards.sbatch)
 - [Twenty-run training Slurm array](slurm/train-gaitlu-study.sbatch)
@@ -207,17 +208,20 @@ and path-bearing inputs. The historical generator above remains unchanged.
 
 ## Documentation
 
-- [Documentation map](docs/README.md): the two alternative research directions and their status.
-- [Unique-sequence proposal](docs/unique-sequence-scaling/proposal.md): concise motivation, design, and claim boundary.
-- [Unique-sequence methods](docs/unique-sequence-scaling/method.md): the paper-style methodology for the implemented 20-model design.
-- [Hierarchical-diversity proposal](docs/hierarchical-diversity/proposal.md): the proposed sequence-by-window study.
-- [Hierarchical-diversity methods](docs/hierarchical-diversity/method.md): the proposed 32-model factorial protocol.
-- [Hierarchical-diversity execution plan](docs/hierarchical-diversity/execution-plan.md): implementation and deadline gates.
-- [Data](docs/unique-sequence-scaling/data.md): Health&Gait access, layout, splits, privacy, and preprocessing boundaries.
-- [GaitLU training runbook](docs/gaitlu_training.md): HAIC conversion, pool construction,
-  throughput gates, fixed-exposure training, resume, and evaluation handoff.
-- [Results](docs/unique-sequence-scaling/results.md): current aggregate evidence and the claims it does and does not support.
-- [Result files](results/README.md): compact inputs to the paper-result generator.
+- [Documentation map](docs/README.md): start here for the active study, shared operations,
+  legacy fallback, archive, and future translation.
+- [Hierarchical-diversity guide](docs/hierarchical-diversity/README.md): the active 28-model
+  iso-catalog phase-allocation study.
+- [Research proposal](docs/hierarchical-diversity/proposal.md): motivation, contribution,
+  expected evidence, and ICLR scope.
+- [Method](docs/hierarchical-diversity/method.md): frozen treatment, instrument, estimand,
+  and claim boundary.
+- [Execution plan](docs/hierarchical-diversity/execution-plan.md): implementation gates,
+  training-start checklist, and ICLR calendar.
+- [GaitLU preparation](docs/gaitlu_training.md): shared HAIC conversion, auditing, and
+  loader smoke testing before a study-specific finalizer.
+- [Unique-sequence scaling fallback](docs/unique-sequence-scaling/): retained baseline
+  method and data guide. Its proposal, runbook, and result history are archived.
 - [Technical tutorials](tutorials/README.md): repository-independent foundations and
   executable synthetic notebooks.
 

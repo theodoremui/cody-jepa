@@ -1,5 +1,7 @@
 # 14. Paired contrasts, uncertainty, and decision thresholds
 
+> **Current-study note.** The general paired-inference principles in this lesson remain active. Its later four-cell worked example is retained only as a mathematical illustration of a difference in differences. The hierarchical-diversity study now uses an eight-block breadth, balanced, and phase-depth allocation path plus a four-block nearby-jitter diagnostic. Use [Lesson 17](17_hierarchical_support_and_factorial_inference.md) for the active estimand, registry, and interpretation rules.
+
 ![Overview of paired inference](../images/14_paired_inference.svg)
 
 ## Prerequisites
