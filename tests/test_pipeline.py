@@ -12,11 +12,13 @@ from pathlib import Path
 import numpy as np
 import torch
 from PIL import Image
+from torch.torch_version import TorchVersion
 from torch.utils.data import DataLoader
 
 import build_manifest
 from cody_jepa.data import HealthGaitDataset, build_loaders
 from cody_jepa.engine import (
+    accumulation_size,
     collapse_metrics,
     ema_tau_for_step,
     ema_update,
@@ -25,7 +27,12 @@ from cody_jepa.engine import (
     load_checkpoint,
     train_jepa,
 )
-from cody_jepa.evaluation import build_target_encoder, export_features, run_probes
+from cody_jepa.evaluation import (
+    build_random_target_encoder,
+    build_target_encoder,
+    export_features,
+    run_probes,
+)
 from cody_jepa.masks import multiblock_mask
 from cody_jepa.models import build_models
 
@@ -96,6 +103,41 @@ def write_manifest(root, raw_root):
     return manifest
 
 
+def write_wide_manifest(root):
+    frame_dir = root / "wide" / "silhouette" / "PA000" / "UGS" / "WoJ_1"
+    frame_dir.mkdir(parents=True)
+    frame = np.zeros((32, 64), dtype=np.uint8)
+    frame[6:27, 44:53] = 255
+    for index in range(8):
+        Image.fromarray(frame, mode="L").save(frame_dir / f"{index + 1:03d}.png")
+    manifest = root / "wide_manifest.csv"
+    import csv
+
+    from cody_jepa.data import MANIFEST_COLUMNS
+
+    row = {
+        "subject_id": "PA000",
+        "split": "train",
+        "frame_dir": "wide/silhouette/PA000/UGS/WoJ_1",
+        "num_frames": 8,
+        "gait_system": "UGS",
+        "speed": "UGS",
+        "clothing": "WoJ",
+        "direction": "1",
+        "recording_id": "PA000_UGS_WoJ_1",
+        "source_video_id": "PA000_UGS_WoJ",
+    }
+    with manifest.open("w", newline="") as handle:
+        writer = csv.DictWriter(handle, fieldnames=MANIFEST_COLUMNS)
+        writer.writeheader()
+        writer.writerow(row)
+    return manifest
+
+
+def foreground_pixel_fraction(video):
+    return video.gt(0.05).float().mean().item()
+
+
 class ScheduleTest(unittest.TestCase):
     def test_learning_rate_warms_up_then_decays(self):
         config = {"lr": 1.0, "start_lr": 0.0, "min_lr": 0.0, "warmup_steps": 5, "steps": 20}
@@ -121,6 +163,10 @@ class ScheduleTest(unittest.TestCase):
         after = next(target.parameters())
         self.assertFalse(torch.allclose(before, after))
         self.assertTrue(torch.allclose(after, before + 0.5))
+
+    def test_final_accumulation_group_uses_its_actual_size(self):
+        sizes = [accumulation_size(10, index, 4) for index in range(10)]
+        self.assertEqual(sizes, [4, 4, 4, 4, 4, 4, 4, 4, 2, 2])
 
 
 class MaskTest(unittest.TestCase):
@@ -165,17 +211,21 @@ class DataTest(unittest.TestCase):
 
             with manifest.open() as handle:
                 rows = list(csv.DictReader(handle))
-            train = {row["subject_id"] for row in rows if row["split"] == "train"}
-            val = {row["subject_id"] for row in rows if row["split"] == "val"}
-            self.assertTrue(train and val)
-            self.assertFalse(train & val)
+            subjects = {
+                split: {row["subject_id"] for row in rows if row["split"] == split}
+                for split in ("train", "tune", "test")
+            }
+            self.assertTrue(all(subjects.values()))
+            self.assertFalse(subjects["train"] & subjects["tune"])
+            self.assertFalse(subjects["train"] & subjects["test"])
+            self.assertFalse(subjects["tune"] & subjects["test"])
 
     def test_eval_windows_are_deterministic_and_spread(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             manifest = write_manifest(root, make_corpus(root))
             dataset = HealthGaitDataset(
-                manifest, "val", root, clip_length=4, image_size=16, windows=3
+                manifest, "tune", root, clip_length=4, image_size=16, windows=3
             )
             self.assertEqual(len(dataset), len(dataset.samples) * 3)
             starts = [dataset[index]["window_start"] for index in range(3)]
@@ -190,6 +240,27 @@ class DataTest(unittest.TestCase):
             self.assertEqual(tuple(sample["video"].shape), (4, 1, 16, 16))
             self.assertGreaterEqual(float(sample["video"].min()), 0.0)
             self.assertLessEqual(float(sample["video"].max()), 1.0)
+
+    def test_foreground_crop_raises_patch_coverage_on_wide_frames(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            manifest = write_wide_manifest(root)
+            legacy = HealthGaitDataset(
+                manifest,
+                "train",
+                root,
+                clip_length=4,
+                image_size=16,
+                foreground_crop=False,
+            )[0]
+            cropped = HealthGaitDataset(
+                manifest, "train", root, clip_length=4, image_size=16
+            )[0]
+            self.assertGreater(foreground_pixel_fraction(cropped["video"]), 0.30)
+            self.assertGreater(
+                foreground_pixel_fraction(cropped["video"]),
+                foreground_pixel_fraction(legacy["video"]),
+            )
 
     def test_train_windows_vary_across_epochs(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -206,24 +277,30 @@ class DataTest(unittest.TestCase):
 
 
 class TrainingTest(unittest.TestCase):
+    def test_safe_checkpoint_loader_allows_legacy_torch_version_metadata(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "legacy.pt"
+            torch.save({"torch_version": TorchVersion(torch.__version__)}, path)
+            self.assertEqual(load_checkpoint(path)["torch_version"], torch.__version__)
+
     def test_training_runs_checkpoints_and_exports_probeable_features(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             manifest = write_manifest(root, make_corpus(root))
             output_dir = root / "run"
-            train_loader, val_loader = build_loaders(
+            train_loader, tune_loader = build_loaders(
                 CONFIG, manifest, root, num_workers=0, windows=2
             )
 
             history = train_jepa(
                 CONFIG,
                 train_loader,
-                val_loader,
+                tune_loader,
                 output_dir=output_dir,
                 device=torch.device("cpu"),
             )
             self.assertEqual(len(history), 2)
-            self.assertIn("val", history[-1])
+            self.assertIn("tune", history[-1])
             self.assertTrue(np.isfinite(history[-1]["train_loss"]))
             self.assertTrue((output_dir / "last.pt").is_file())
             self.assertTrue((output_dir / "best.pt").is_file())
@@ -238,7 +315,7 @@ class TrainingTest(unittest.TestCase):
                     ),
                     batch_size=4,
                 )
-                for split in ("train", "val")
+                for split in ("train", "test")
             ]
             table = export_features(encoder, loaders, CONFIG, torch.device("cpu"))
             self.assertEqual(len(table), sum(len(loader.dataset) for loader in loaders))
@@ -247,42 +324,85 @@ class TrainingTest(unittest.TestCase):
 
             results = run_probes(table)
             self.assertEqual(set(results["task"]), {"gait_system", "identity"})
+            self.assertEqual(set(results["model"]), {"trained"})
             for _, row in results.iterrows():
                 self.assertGreaterEqual(row["accuracy"], 0.0)
                 self.assertLessEqual(row["accuracy"], 1.0)
+
+            random_encoder = build_random_target_encoder(
+                checkpoint["config"], torch.device("cpu"), seed=1
+            )
+            random_table = export_features(
+                random_encoder, loaders, CONFIG, torch.device("cpu")
+            )
+            random_results = run_probes(random_table, model="random_init")
+            self.assertEqual(set(random_results["model"]), {"random_init"})
 
     def test_resume_continues_from_saved_epoch(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             manifest = write_manifest(root, make_corpus(root))
-            output_dir = root / "run"
-            train_loader, val_loader = build_loaders(CONFIG, manifest, root, num_workers=0)
+            full_dir, resumed_dir = root / "full", root / "resumed"
+            full_train, full_tune = build_loaders(CONFIG, manifest, root, num_workers=0)
+            full = train_jepa(
+                {**CONFIG, "num_epochs": 3}, full_train, full_tune,
+                output_dir=full_dir, device=torch.device("cpu"),
+            )
+            first_train, first_tune = build_loaders(CONFIG, manifest, root, num_workers=0)
             train_jepa(
-                CONFIG, train_loader, val_loader, output_dir=output_dir,
+                CONFIG, first_train, first_tune, output_dir=resumed_dir,
                 device=torch.device("cpu"),
             )
+            resumed_train, resumed_tune = build_loaders(CONFIG, manifest, root, num_workers=0)
             resumed = train_jepa(
-                {**CONFIG, "num_epochs": 3},
-                train_loader,
-                val_loader,
-                device=torch.device("cpu"),
-                resume=load_checkpoint(output_dir / "last.pt"),
+                {**CONFIG, "num_epochs": 3}, resumed_train, resumed_tune,
+                output_dir=resumed_dir, device=torch.device("cpu"),
+                resume=load_checkpoint(resumed_dir / "last.pt"),
             )
             self.assertEqual([entry["epoch"] for entry in resumed], [3])
+            self.assertEqual(resumed[-1]["step"], full[-1]["step"])
+            full_checkpoint = load_checkpoint(full_dir / "last.pt")
+            resumed_checkpoint = load_checkpoint(resumed_dir / "last.pt")
+            self.assertEqual(resumed_checkpoint["global_step"], full_checkpoint["global_step"])
+            for name, parameter in full_checkpoint["context_encoder"].items():
+                self.assertTrue(torch.equal(parameter, resumed_checkpoint["context_encoder"][name]))
+            self.assertEqual(load_checkpoint(resumed_dir / "best.pt")["epoch"], 2)
+
+    def test_training_stops_at_the_configured_step_budget(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            manifest = write_manifest(root, make_corpus(root))
+            train_loader, tune_loader = build_loaders(CONFIG, manifest, root, num_workers=0)
+            history = train_jepa(
+                {**CONFIG, "num_epochs": 2, "steps": 1},
+                train_loader,
+                tune_loader,
+                device=torch.device("cpu"),
+            )
+            self.assertEqual(history[-1]["step"], 1)
+            self.assertEqual(len(history), 1)
 
     def test_evaluate_reports_loss_and_collapse_metrics(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             manifest = write_manifest(root, make_corpus(root))
-            _, val_loader = build_loaders(CONFIG, manifest, root, num_workers=0)
+            _, tune_loader = build_loaders(CONFIG, manifest, root, num_workers=0)
             context, target, predictor = build_models(CONFIG, torch.device("cpu"), 2)
             from cody_jepa.masks import DEFAULT_MASK_GROUPS
 
             metrics = evaluate(
-                context, target, predictor, val_loader, CONFIG,
+                context, target, predictor, tune_loader, CONFIG,
                 torch.device("cpu"), DEFAULT_MASK_GROUPS,
             )
-            for key in ("loss", "cosine", "effective_rank", "feature_std"):
+            for key in (
+                "loss",
+                "cosine",
+                "effective_rank",
+                "feature_std",
+                "clip_effective_rank",
+                "token_effective_rank",
+                "blank_context_loss_delta",
+            ):
                 self.assertIn(key, metrics)
                 self.assertTrue(np.isfinite(metrics[key]))
 

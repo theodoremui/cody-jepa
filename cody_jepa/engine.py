@@ -9,8 +9,9 @@ from pathlib import Path
 import torch
 import torch.nn as nn
 from torch import optim
+from torch.torch_version import TorchVersion
 
-from .losses import encode_targets, group_forward, vicreg
+from .losses import encode_targets, group_forward, prediction_loss, vicreg
 from .masks import DEFAULT_MASK_GROUPS, multiblock_mask
 from .models import build_models
 
@@ -80,6 +81,14 @@ def optimizer_param_groups(modules, weight_decay):
     ]
 
 
+def accumulation_size(num_batches, batch_index, accumulation_steps):
+    """Number of microbatches contributing to this optimizer update."""
+    if accumulation_steps < 1:
+        raise ValueError("accumulation_steps must be at least one")
+    group_start = (batch_index // accumulation_steps) * accumulation_steps
+    return min(accumulation_steps, num_batches - group_start)
+
+
 def video_from_batch(batch, device, config):
     video = batch["video"].to(device, non_blocking=True)
     mean = float(config.get("input_mean", 0.5))
@@ -108,27 +117,50 @@ def collapse_metrics(features):
     }
 
 
+def prefix_metrics(prefix, metrics):
+    return {f"{prefix}_{key}": value for key, value in metrics.items()}
+
+
+def _mask_loss_with_context(predictor, context_tokens, targets, mask_group, mask_index, loss_exp):
+    target_indices = mask_group["pred"]
+    gather = target_indices.unsqueeze(-1).expand(-1, -1, targets.size(-1))
+    target_tokens = torch.gather(targets, 1, gather)
+    predicted = predictor(
+        context_tokens, mask_group["ctx"], target_indices, mask_index
+    )
+    return prediction_loss(predicted, target_tokens, loss_exp)[0]
+
+
 @torch.inference_mode()
 def evaluate(context_encoder, target_encoder, predictor, loader, config, device, mask_groups):
+    context_was_training = context_encoder.training
+    target_was_training = target_encoder.training
+    predictor_was_training = predictor.training
     context_encoder.eval()
+    target_encoder.eval()
     predictor.eval()
     rng = random.Random(int(config.get("seed", 0)) + 1)
     total_loss = total_cosine = 0.0
+    total_blank_delta = 0.0
+    blank_examples = 0
     examples = 0
-    pooled = []
+    pooled_clips, pooled_tokens = [], []
 
     for batch in loader:
         video = video_from_batch(batch, device, config)
         masks = multiblock_mask(config, video.size(0), rng, device, mask_groups)
         with autocast(config, device):
-            pooled.append(context_encoder(video).float().mean(dim=1).cpu())
+            _, target_pre_norm = target_encoder(video, return_pre_norm=True)
+            pooled_clips.append(target_pre_norm.float().mean(dim=1).cpu())
+            pooled_tokens.append(target_pre_norm.float().reshape(-1, target_pre_norm.size(-1)).cpu())
             targets = encode_targets(
                 target_encoder,
                 video,
                 bool(config.get("target_batch_standardize", False)),
             )
+            blank_video = torch.zeros_like(video)
             for mask_index, mask_group in enumerate(masks):
-                loss, cosine, _ = group_forward(
+                loss, cosine, context_tokens = group_forward(
                     context_encoder,
                     predictor,
                     video,
@@ -139,18 +171,48 @@ def evaluate(context_encoder, target_encoder, predictor, loader, config, device,
                 )
                 total_loss += float(loss.sum()) / len(masks)
                 total_cosine += float(cosine.sum()) / len(masks)
+                blank_context_tokens = context_encoder(blank_video, mask_group["ctx"])
+                blank_loss = _mask_loss_with_context(
+                    predictor,
+                    blank_context_tokens,
+                    targets,
+                    mask_group,
+                    mask_index,
+                    float(config.get("loss_exp", 1.0)),
+                )
+                total_blank_delta += float((blank_loss - loss).sum()) / len(masks)
+        blank_examples += video.size(0)
         examples += video.size(0)
 
-    context_encoder.train()
-    predictor.train()
+    context_encoder.train(context_was_training)
+    target_encoder.train(target_was_training)
+    predictor.train(predictor_was_training)
+    clip_metrics = collapse_metrics(torch.cat(pooled_clips))
+    token_metrics = collapse_metrics(torch.cat(pooled_tokens))
     return {
         "loss": total_loss / examples,
         "cosine": total_cosine / examples,
-        **collapse_metrics(torch.cat(pooled)),
+        "blank_context_loss_delta": total_blank_delta / blank_examples,
+        "effective_rank": clip_metrics["effective_rank"],
+        "feature_std": clip_metrics["feature_std"],
+        **prefix_metrics("clip", clip_metrics),
+        **prefix_metrics("token", token_metrics),
     }
 
 
-def save_checkpoint(path, config, context_encoder, target_encoder, predictor, optimizer, epoch):
+def save_checkpoint(
+    path,
+    config,
+    context_encoder,
+    target_encoder,
+    predictor,
+    optimizer,
+    epoch,
+    global_step,
+    best_loss,
+    mask_rng,
+    scaler,
+):
     Path(path).parent.mkdir(parents=True, exist_ok=True)
     torch.save(
         {
@@ -160,19 +222,29 @@ def save_checkpoint(path, config, context_encoder, target_encoder, predictor, op
             "predictor": predictor.state_dict(),
             "optimizer": optimizer.state_dict(),
             "epoch": epoch,
+            "global_step": global_step,
+            "best_loss": best_loss,
+            "mask_rng_state": mask_rng.getstate(),
+            "torch_rng_state": torch.get_rng_state(),
+            "cuda_rng_state": torch.cuda.get_rng_state_all() if torch.cuda.is_available() else None,
+            "scaler": scaler.state_dict(),
         },
         path,
     )
 
 
 def load_checkpoint(path, device="cpu"):
-    return torch.load(Path(path), map_location=device, weights_only=False)
+    # Older CoDy-JEPA checkpoints store torch.__version__ as TorchVersion. It is
+    # a known PyTorch value type, so allowlisting only it preserves safe loading
+    # without enabling arbitrary pickle execution.
+    with torch.serialization.safe_globals([TorchVersion]):
+        return torch.load(Path(path), map_location=device, weights_only=True)
 
 
 def train_jepa(
     config,
     train_loader,
-    val_loader,
+    tune_loader,
     output_dir=None,
     device=None,
     mask_groups=DEFAULT_MASK_GROUPS,
@@ -197,7 +269,7 @@ def train_jepa(
         target_encoder.load_state_dict(resume["target_encoder"])
         predictor.load_state_dict(resume["predictor"])
         optimizer.load_state_dict(resume["optimizer"])
-        start_epoch = int(resume["epoch"])
+        start_epoch = int(resume.get("epoch", resume.get("completed_epochs", 0)))
 
     trainable = [
         parameter
@@ -210,15 +282,31 @@ def train_jepa(
     )
     mask_rng = random.Random(int(config.get("seed", 0)))
     accumulation = int(config.get("accumulation_steps", 1))
+    if accumulation < 1:
+        raise ValueError("accumulation_steps must be at least one")
     max_steps = int(config["steps"])
-    var_coef = float(config.get("var_coef", 0.0))
-    cov_coef = float(config.get("cov_coef", 0.0))
+    clip_var_coef = float(config.get("clip_var_coef", config.get("var_coef", 0.0)))
+    clip_cov_coef = float(config.get("clip_cov_coef", config.get("cov_coef", 0.0)))
+    token_var_coef = float(config.get("token_var_coef", 0.0))
+    token_cov_coef = float(config.get("token_cov_coef", 0.0))
     var_gamma = float(config.get("var_gamma", 1.0))
-    regularize = var_coef > 0.0 or cov_coef > 0.0
+    regularize_tokens = token_var_coef > 0.0 or token_cov_coef > 0.0
+    regularize_clips = clip_var_coef > 0.0 or clip_cov_coef > 0.0
 
     history = []
     best_loss = math.inf
     global_step = 0
+    if resume is not None:
+        global_step = int(resume.get("global_step", 0))
+        best_loss = float(resume.get("best_loss", resume.get("best_val_loss", math.inf)))
+        if "mask_rng_state" in resume:
+            mask_rng.setstate(resume["mask_rng_state"])
+        if "torch_rng_state" in resume:
+            torch.set_rng_state(resume["torch_rng_state"])
+        if device.type == "cuda" and resume.get("cuda_rng_state") is not None:
+            torch.cuda.set_rng_state_all(resume["cuda_rng_state"])
+        if "scaler" in resume:
+            scaler.load_state_dict(resume["scaler"])
 
     for epoch in range(start_epoch, int(config["num_epochs"])):
         if global_step >= max_steps:
@@ -233,13 +321,26 @@ def train_jepa(
         epoch_started = time.perf_counter()
 
         for batch_index, batch in enumerate(train_loader):
+            if global_step >= max_steps:
+                break
             if pending == 0:
                 learning_rate = learning_rate_for_step(config, global_step + 1)
                 for group in optimizer.param_groups:
                     group["lr"] = learning_rate
+            current_accumulation = accumulation_size(
+                len(train_loader), batch_index, accumulation
+            )
             video = video_from_batch(batch, device, config)
             masks = multiblock_mask(config, video.size(0), mask_rng, device, mask_groups)
+            clip_regularizer = video.new_zeros(())
             with autocast(config, device):
+                if regularize_clips:
+                    _, pre_norm_tokens = context_encoder(video, return_pre_norm=True)
+                    clip_features = pre_norm_tokens.float().mean(dim=1)
+                    variance, covariance = vicreg(clip_features, var_gamma)
+                    clip_regularizer = (
+                        clip_var_coef * variance + clip_cov_coef * covariance
+                    )
                 targets = encode_targets(
                     target_encoder,
                     video,
@@ -257,12 +358,14 @@ def train_jepa(
                         float(config.get("loss_exp", 1.0)),
                     )
                     total = loss.mean()
-                if regularize:
+                if regularize_tokens:
                     # Computed in float32 outside autocast; gradients still reach
                     # the encoder.
                     variance, covariance = vicreg(context_tokens.float(), var_gamma)
-                    total = total + var_coef * variance + cov_coef * covariance
-                scaler.scale(total / len(masks) / accumulation).backward()
+                    total = total + token_var_coef * variance + token_cov_coef * covariance
+                if mask_index == 0:
+                    total = total + clip_regularizer * len(masks)
+                scaler.scale(total / len(masks) / current_accumulation).backward()
                 epoch_loss += float(loss.detach().sum()) / len(masks)
                 epoch_cosine += float(cosine.detach().sum()) / len(masks)
             epoch_examples += video.size(0)
@@ -290,15 +393,17 @@ def train_jepa(
             "epoch_seconds": time.perf_counter() - epoch_started,
         }
         if (epoch + 1) % int(config.get("eval_every_epochs", 1)) == 0 or global_step >= max_steps:
-            metrics["val"] = evaluate(
-                context_encoder, target_encoder, predictor, val_loader, config, device, mask_groups
+            metrics["tune"] = evaluate(
+                context_encoder, target_encoder, predictor, tune_loader, config, device, mask_groups
             )
         history.append(metrics)
 
-        val = metrics.get("val")
+        tune = metrics.get("tune")
         summary = (
-            f" | val_loss={val['loss']:.4f} eff_rank={val['effective_rank']:.1f}"
-            if val
+            f" | tune_loss={tune['loss']:.4f}"
+            f" clip_rank={tune['clip_effective_rank']:.1f}"
+            f" blank_delta={tune['blank_context_loss_delta']:.2e}"
+            if tune
             else ""
         )
         print(
@@ -307,10 +412,23 @@ def train_jepa(
         )
 
         if output_dir is not None:
-            arguments = (config, context_encoder, target_encoder, predictor, optimizer, epoch + 1)
+            is_best = tune is not None and tune["loss"] < best_loss
+            if is_best:
+                best_loss = tune["loss"]
+            arguments = (
+                config,
+                context_encoder,
+                target_encoder,
+                predictor,
+                optimizer,
+                epoch + 1,
+                global_step,
+                best_loss,
+                mask_rng,
+                scaler,
+            )
             save_checkpoint(Path(output_dir) / "last.pt", *arguments)
-            if val is not None and val["loss"] < best_loss:
-                best_loss = val["loss"]
+            if is_best:
                 save_checkpoint(Path(output_dir) / "best.pt", *arguments)
 
     return history

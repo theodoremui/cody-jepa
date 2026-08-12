@@ -4,7 +4,7 @@
 Expects <raw-root>/<modality>/<participant>/<speed>/<clothing>_<direction>/*.png,
 e.g. silhouette/PA001/UGS/WoJ_1. Writes one CSV row per recording.
 
-    python build_manifest.py --raw-root data/healthgait/raw/Health_Gait --fps 30
+    python build_manifest.py --raw-root data/healthgait/raw/Health_Gait
 """
 
 import argparse
@@ -58,16 +58,34 @@ def build_rows(raw_root, modality, root, clip_length):
     return rows
 
 
-def assign_splits(rows, val_fraction, seed):
-    """Hold out whole participants so train and val never share a subject."""
+def assign_splits(rows, val_fraction, seed, tune_fraction=None):
+    """Make subject-disjoint train, tuning, and test participant splits."""
     subjects = sorted({row["subject_id"] for row in rows})
+    if len(subjects) < 3:
+        raise ValueError("three subject-disjoint splits require at least three participants")
+    if not 0.0 < val_fraction < 1.0:
+        raise ValueError("val_fraction must be between zero and one")
+    if tune_fraction is None:
+        tune_fraction = val_fraction / 2.0
+    if not 0.0 < tune_fraction < val_fraction:
+        raise ValueError("tune_fraction must be positive and smaller than val_fraction")
     rng = random.Random(seed)
     rng.shuffle(subjects)
-    val_count = max(1, round(val_fraction * len(subjects)))
-    val_subjects = set(subjects[:val_count])
+    heldout_count = max(2, round(val_fraction * len(subjects)))
+    if heldout_count >= len(subjects):
+        raise ValueError("val_fraction leaves no participants for training")
+    tune_count = round(heldout_count * tune_fraction / val_fraction)
+    tune_count = min(heldout_count - 1, max(1, tune_count))
+    tune_subjects = set(subjects[:tune_count])
+    test_subjects = set(subjects[tune_count:heldout_count])
     for row in rows:
-        row["split"] = "val" if row["subject_id"] in val_subjects else "train"
-    return len(subjects) - val_count, val_count
+        if row["subject_id"] in tune_subjects:
+            row["split"] = "tune"
+        elif row["subject_id"] in test_subjects:
+            row["split"] = "test"
+        else:
+            row["split"] = "train"
+    return len(subjects) - heldout_count, tune_count, heldout_count - tune_count
 
 
 def main():
@@ -77,12 +95,26 @@ def main():
     parser.add_argument("--root", type=Path, default=Path("."))
     parser.add_argument("--modality", default="silhouette")
     parser.add_argument("--clip-length", type=int, default=16)
-    parser.add_argument("--val-fraction", type=float, default=0.2)
+    parser.add_argument(
+        "--heldout-fraction",
+        "--val-fraction",
+        dest="heldout_fraction",
+        type=float,
+        default=0.2,
+        help="total participant fraction reserved for tuning and test",
+    )
+    parser.add_argument(
+        "--tune-fraction",
+        type=float,
+        help="participant fraction reserved for tuning; defaults to half of heldout-fraction",
+    )
     parser.add_argument("--seed", type=int, default=0)
     args = parser.parse_args()
 
     rows = build_rows(args.raw_root, args.modality, args.root, args.clip_length)
-    train_subjects, val_subjects = assign_splits(rows, args.val_fraction, args.seed)
+    train_subjects, tune_subjects, test_subjects = assign_splits(
+        rows, args.heldout_fraction, args.seed, args.tune_fraction
+    )
     args.output.parent.mkdir(parents=True, exist_ok=True)
     with args.output.open("w", newline="") as handle:
         writer = csv.DictWriter(handle, fieldnames=MANIFEST_COLUMNS)
@@ -90,7 +122,7 @@ def main():
         writer.writerows(rows)
     print(
         f"wrote {len(rows)} recordings to {args.output} "
-        f"({train_subjects} train / {val_subjects} val participants)"
+        f"({train_subjects} train / {tune_subjects} tune / {test_subjects} test participants)"
     )
 
 

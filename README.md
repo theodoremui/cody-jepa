@@ -5,7 +5,8 @@ A single-stream masked video JEPA for self-supervised gait representation learni
 A Vision Transformer encodes visible "context" tubes of a silhouette video; a predictor
 maps them to the embeddings of masked "target" tubes produced by an EMA copy of the same
 encoder. Nothing is reconstructed in pixel space — the loss lives entirely in embedding
-space, with VICReg variance/covariance terms preventing the degenerate constant solution.
+space, with clip-level VICReg variance/covariance terms preventing the degenerate
+constant solution.
 
 The whole thing is ~1,100 lines. Everything in it either trains a model or measures one.
 
@@ -38,10 +39,10 @@ The test suite runs on a synthetic corpus and needs no private data.
 ## Usage
 
 **1. Build a manifest.** Walks `<raw-root>/<modality>/<participant>/<speed>/<clothing>_<direction>/`
-and holds out whole participants for validation:
+and creates subject-disjoint train, tuning, and test splits. By default, they are 80/10/10:
 
 ```bash
-python build_manifest.py --raw-root data/healthgait/raw/Health_Gait --fps 30
+python build_manifest.py --raw-root data/healthgait/raw/Health_Gait
 ```
 
 **2. Train:**
@@ -51,11 +52,12 @@ python train.py --config configs/healthgait.json \
     --manifest data/healthgait/manifest.csv --output-dir outputs/run-01
 ```
 
-Each epoch prints train loss and, on eval epochs, validation loss and **effective rank** —
-the exponentiated entropy of the covariance spectrum. It equals the embedding dimension for
-isotropic features and collapses toward 1 when every clip maps to the same direction. Watch
-it: a falling effective rank means the run is collapsing, and no amount of falling loss
-redeems that.
+Each epoch prints train loss and, on eval epochs, tuning loss, **clip effective rank**,
+and the loss delta from replacing context with an all-zero video. Effective rank is the
+exponentiated entropy of the covariance spectrum on the same EMA target features exported
+to probes. It equals the embedding dimension for isotropic features and collapses toward 1
+when every clip maps to the same direction. Watch it: a falling clip rank, or a near-zero
+blank-context delta, means the run is solving the wrong problem.
 
 Writes `last.pt`, `best.pt`, and `history.json`. Resume with `--resume outputs/run-01/last.pt`.
 
@@ -63,21 +65,24 @@ Writes `last.pt`, `best.pt`, and `history.json`. Resume with `--resume outputs/r
 
 ```bash
 python export_features.py --checkpoint outputs/run-01/best.pt \
-    --manifest data/healthgait/manifest.csv --output outputs/run-01/features.csv
+    --manifest data/healthgait/manifest.csv --output outputs/run-01/features.csv \
+    --random-init-output outputs/run-01/random-init-features.csv
 
-python probe.py --features outputs/run-01/features.csv
+python probe.py --features outputs/run-01/features.csv \
+    --random-init-features outputs/run-01/random-init-features.csv
 ```
 
 Two probes, both reported against a majority-class baseline:
 
 | Probe | What it asks | Protocol |
 |---|---|---|
-| `gait_system` | Is walking speed linearly decodable? | Held-out participants |
+| `gait_system` | Is walking speed linearly decodable? | Held-out test participants |
 | `identity` | Is the participant linearly decodable? | Held-out source videos |
 
-Both are disjoint by design — `gait_system` never sees a validation participant during
-training, and `identity` holds out whole source videos so a score cannot come from matching
-the same recording to itself.
+Both are disjoint by design — training uses only training participants, checkpoint selection
+uses the tuning participants, and `gait_system` is reported only on test participants.
+`identity` holds out whole source videos so a score cannot come from matching the same
+recording to itself.
 
 ## Configuration
 
@@ -85,10 +90,16 @@ One JSON file per run (`configs/healthgait.json`). Model geometry must satisfy
 `img_size % patch_size == 0`, `num_frames % tubelet_size == 0`, and `embed_dim % 6 == 0`
 (the position embedding splits channels three ways). A test enforces this.
 
+Silhouette clips are foreground-cropped over the whole temporal window, padded to preserve
+aspect ratio, then resized to the model input. The default `var_coef` and `cov_coef`
+regularize pooled clip features; set `token_var_coef` and `token_cov_coef` only when you
+also want token-axis VICReg.
+
 ## Data boundaries
 
 Raw recordings, manifests, feature exports, and checkpoints stay out of Git. Anything
-committed should be aggregate and reproducible from a script here.
+committed should be aggregate and reproducible from a script here. Checkpoints are loaded
+in PyTorch's tensor-only mode; use checkpoints from known sources.
 
 Earlier research directions (Grounded Factorial Completion, hierarchical-diversity scaling)
 and the GaitLU-1M loader were removed; they are recoverable from the `archive/pre-refactor`

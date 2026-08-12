@@ -35,6 +35,17 @@ def build_target_encoder(checkpoint, device):
     return encoder.requires_grad_(False).eval()
 
 
+def build_random_target_encoder(config, device, seed=0):
+    """Build an untrained frozen encoder with the same geometry as a run."""
+    state = torch.get_rng_state()
+    try:
+        torch.manual_seed(int(seed))
+        encoder = build_encoder(config, device)
+    finally:
+        torch.set_rng_state(state)
+    return encoder.requires_grad_(False).eval()
+
+
 @torch.inference_mode()
 def export_features(encoder, loaders, config, device):
     """Return a DataFrame of pooled features plus clip metadata, one row per clip."""
@@ -70,13 +81,14 @@ def feature_columns(table):
     return [column for column in table.columns if column.startswith("feature_")]
 
 
-def _metrics(task, train_labels, true_labels, predicted_labels):
+def _metrics(task, train_labels, true_labels, predicted_labels, model="trained"):
     from sklearn.metrics import accuracy_score, balanced_accuracy_score, f1_score
 
     true_labels = np.asarray(true_labels, dtype=str)
     predicted_labels = np.asarray(predicted_labels, dtype=str)
     _, counts = np.unique(true_labels, return_counts=True)
     return {
+        "model": model,
         "task": task,
         "train_examples": int(len(train_labels)),
         "val_examples": int(len(true_labels)),
@@ -113,26 +125,27 @@ def _logistic_predictions(train_features, train_labels, val_features, seed=0):
         return model.predict(val_features)
 
 
-def probe_gait_system(table, seed=0):
-    """Classify walking speed (UGS/FGS) across held-out participants."""
+def probe_gait_system(table, seed=0, model="trained"):
+    """Classify walking speed (UGS/FGS) on held-out test participants."""
     columns = feature_columns(table)
     train = table[table["split"] == "train"]
-    val = table[table["split"] == "val"]
+    test = table[table["split"] == "test"]
     predictions = _logistic_predictions(
         train[columns].to_numpy(np.float64),
         train["gait_system"].astype(str).to_numpy(),
-        val[columns].to_numpy(np.float64),
+        test[columns].to_numpy(np.float64),
         seed,
     )
     return _metrics(
         "gait_system",
         train["gait_system"].astype(str).to_numpy(),
-        val["gait_system"].astype(str).to_numpy(),
+        test["gait_system"].astype(str).to_numpy(),
         predictions,
+        model,
     )
 
 
-def probe_identity(table, seed=0, split="train"):
+def probe_identity(table, seed=0, split="train", model="trained"):
     """Identify participants, holding out whole source videos from training."""
     columns = feature_columns(table)
     subset = table[table["split"] == split]
@@ -151,9 +164,11 @@ def probe_identity(table, seed=0, split="train"):
     predictions = _logistic_predictions(
         features[~is_val], labels[~is_val], features[is_val], seed
     )
-    return _metrics("identity", labels[~is_val], labels[is_val], predictions)
+    return _metrics("identity", labels[~is_val], labels[is_val], predictions, model)
 
 
-def run_probes(table, seed=0):
+def run_probes(table, seed=0, model="trained"):
     """Run every probe and return a one-row-per-task DataFrame."""
-    return pd.DataFrame([probe_gait_system(table, seed), probe_identity(table, seed)])
+    return pd.DataFrame(
+        [probe_gait_system(table, seed, model), probe_identity(table, seed, model=model)]
+    )

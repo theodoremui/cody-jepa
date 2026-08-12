@@ -17,6 +17,8 @@
   "loss_exp": 1.0,
   "var_coef": 1.0,
   "cov_coef": 0.04,
+  "token_var_coef": 0.0,
+  "token_cov_coef": 0.0,
   "var_gamma": 1.0,
   "target_batch_standardize": true,
 
@@ -26,6 +28,9 @@
   "tubelet_size": 2,
   "in_channels": 1,
   "min_context_tokens": 64,
+  "foreground_crop": true,
+  "foreground_threshold": 8,
+  "foreground_margin": 0.15,
   "train_horizontal_flip_prob": 0.0,
 
   "embed_dim": 384,

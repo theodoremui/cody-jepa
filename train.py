@@ -27,18 +27,18 @@ def main():
 
     config = json.loads(args.config.read_text())
     mask_groups = config.get("masks", DEFAULT_MASK_GROUPS)
-    train_loader, val_loader = build_loaders(
+    train_loader, tune_loader = build_loaders(
         config, args.manifest, args.root, args.num_workers
     )
     print(
         f"train: {len(train_loader.dataset)} clips | "
-        f"val: {len(val_loader.dataset)} clips"
+        f"tune: {len(tune_loader.dataset)} clips"
     )
 
     history = train_jepa(
         config,
         train_loader,
-        val_loader,
+        tune_loader,
         output_dir=args.output_dir,
         device=resolve_device(args.device),
         mask_groups=mask_groups,

@@ -20,6 +20,8 @@ def vicreg(features, gamma=1.0):
     centered = features - features.mean(dim=0, keepdim=True)
     standard_deviation = torch.sqrt(centered.pow(2).mean(dim=0) + 1e-4)
     variance_loss = F.relu(gamma - standard_deviation).mean()
+    if features.size(0) < 2:
+        return variance_loss, features.new_zeros(())
     covariance = centered.T @ centered / (features.size(0) - 1)
     off_diagonal = covariance - torch.diag_embed(covariance.diagonal())
     covariance_loss = off_diagonal.pow(2).sum() / features.size(1)
