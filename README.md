@@ -1,31 +1,30 @@
 # CoDy-JEPA
 
-CoDy-JEPA is a research codebase for studying where useful video diversity comes from in
-self-supervised representation learning.
+CoDy-JEPA is a research codebase for self-supervised video representation learning and
+factorial evaluation. The previous active research direction has been removed from the
+documentation so the repository can be used as a clean starting point for the next
+direction.
 
-The current baseline is the hierarchical-diversity approach. It keeps model architecture,
-training exposure, optimizer settings, evaluation rules, and analysis rules fixed, then
-moves a fixed catalog of sampling opportunities between two places in the video hierarchy:
-more source sequences, or more phase-separated origins inside fewer sequences. The method
-is the contribution. The current repository instance applies it to private gait video data,
-but the design is meant to carry forward to future JEPA studies that need the same clean
-separation between training support, evaluation support, and claim boundaries.
+The repository currently preserves code, configurations, tests, and checked-in aggregate
+results. It does not define a current study proposal, active tutorial track, or training
+claim.
 
-The main evaluator family is Grounded Factorial Completion, or GFC. It measures whether a
-frozen representation supports recombining factor information under a locked factorial
-retrieval protocol. The detailed evaluator contract lives in the method documentation.
+## Latest Checked-In Results
 
-## Current Status
+The current public evidence lives in [results](results/README.md). These files are
+aggregate, non-identifying outputs from prior development runs:
 
-The repository contains the code and documentation needed to convert and audit private
-training shards, define the active study gates, and run the reusable evaluator pieces. The
-active 28-row registry finalizer, phase-aware loader, and production launcher are still
-implementation gates before the documented study can train end to end. The repository does
-not contain private datasets, trained study checkpoints, participant-level results, or a
-locked outcome result.
+- Phase 0 diagnostic summary for a single-stream masked JEPA run.
+- Phase 1 diagnostic table for 11 development runs across architecture and training
+  variants.
+- Context-substitution and foreground-pooling diagnostics for the Phase 0 best-loss
+  checkpoint.
+- Legacy GFC development-split comparisons for selected checkpoints.
+- Historical planning records that should be treated as archived context, not as an active
+  research direction.
 
-Checked-in development diagnostic tables are not active study outcomes. Treat them as
-development evidence only.
+These results are useful for understanding what the current code has produced so far. They
+are not final claims and should not be presented as a locked outcome study.
 
 ## Setup
 
@@ -50,43 +49,15 @@ uv run python -m unittest discover -s tests -v
 - `configs/` contains training and evaluation configuration files.
 - `scripts/` contains compatibility wrappers for installed command-line tools.
 - `slurm/` contains HAIC launchers for data preparation and training jobs.
-- `docs/` explains the active research method, execution path, and data preparation
-  workflow.
-- `tutorials/` teaches the mathematical, machine-learning, statistical, and engineering
-  background needed to understand the study.
+- `results/` contains aggregate result artifacts that are safe to track in Git.
+- `docs/` is intentionally minimal while the next research direction is being chosen.
 - `tests/` contains unit and smoke tests that run without private data.
-
-## Research Workflow
-
-The active workflow has five parts.
-
-1. Prepare a private video corpus into validated, seekable training records.
-2. Freeze a phase catalog and allocation registry for the hierarchical-diversity study.
-3. Train paired model blocks at one fixed exposure tier.
-4. Export frozen features and score them with the GFC evaluator and matched controls.
-5. Report aggregate contrasts, uncertainty, diagnostics, and claim boundaries.
-
-In this repository, GaitLU is the current pretraining corpus and Health&Gait is the current
-held-out factorial evaluator. Future JEPA studies can reuse the same separation of
-concerns: one source trains the encoder, another held-out factorial setting evaluates what
-the frozen representation supports.
-
-## Documentation
-
-Start with the documentation map in [docs/README.md](docs/README.md). The active method is
-under [docs/hierarchical-diversity](docs/hierarchical-diversity/README.md), and the shared
-GaitLU preparation runbook is [docs/gaitlu_training.md](docs/gaitlu_training.md).
-
-Use [tutorials/README.md](tutorials/README.md) if the tensor, JEPA, GFC, inference, or
-reproducibility vocabulary is unfamiliar.
 
 ## Data and Claim Boundaries
 
 Raw recordings, private manifests, participant tables, feature exports, checkpoints, and
-participant-level results stay outside Git. Public artifacts must be aggregate and
-non-identifying.
+participant-level results stay outside Git. Public artifacts should stay aggregate,
+non-identifying, and traceable to reproducible scripts or documented analysis steps.
 
-The active study can support narrow claims about how the hierarchical organization of
-training support affects frozen representations under the declared protocol. It does not
-establish a universal video-scaling law, identify people, validate downstream use, or prove
-unsupervised disentanglement.
+At this point, use the repository as an implementation and result archive. Define the next
+scientific question before adding new method documentation or tutorials.
