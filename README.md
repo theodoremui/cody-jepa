@@ -1,106 +1,95 @@
 # CoDy-JEPA
 
-A single-stream video JEPA (Joint-Embedding Predictive Architecture) for self-supervised
-representation learning on gait video, reduced to its core parts: the model, the training
-engine, dataset loading, and frozen-representation evaluation.
+A single-stream masked video JEPA for self-supervised gait representation learning.
 
-This repository is deliberately a foundation, not a study. Earlier research directions
-(Grounded Factorial Completion, the hierarchical-diversity scaling campaign) and their
-result artifacts have been removed. Everything before that removal is recoverable from the
-`archive/pre-refactor` git tag.
+A Vision Transformer encodes visible "context" tubes of a silhouette video; a predictor
+maps them to the embeddings of masked "target" tubes produced by an EMA copy of the same
+encoder. Nothing is reconstructed in pixel space — the loss lives entirely in embedding
+space, with VICReg variance/covariance terms preventing the degenerate constant solution.
 
-## What's here
+The whole thing is ~1,100 lines. Everything in it either trains a model or measures one.
+
+## Structure
 
 ```
-src/cody_jepa/
-  models/       ViT encoder, predictor, attention blocks, 3D sin-cos position embedding
-  masks/        Multiblock context/target mask sampling
-  training/     Training engine, VICReg + prediction losses, EMA/LR schedules,
-                checkpointing, AMP runtime, representation diagnostics
-  data/         Manifest schema, frame discovery, Health&Gait and GaitLU-1M loaders
-  evaluation/   Frozen feature export, linear probes (gait system, identity)
-  cli/          Five entry points wiring the above together
+train.py              Train a JEPA
+export_features.py    Export frozen features from a checkpoint
+probe.py              Run linear probes on a feature table
+build_manifest.py     Build a subject-disjoint manifest from raw frames
+
+cody_jepa/
+  models.py           ViT encoder, predictor, 3D sin-cos position embedding
+  masks.py            Multi-block tube masking
+  data.py             Manifest reading and clip loading
+  losses.py           Prediction loss and VICReg
+  engine.py           Training loop, schedules, validation, checkpoints
+  evaluation.py       Feature export and linear probes
 ```
-
-The dependency direction is one-way: `evaluation` and `cli` depend on `models`,
-`masks`, `training`, and `data`; those four never depend on evaluation or CLI code.
-
-### Model and objective
-
-A Vision Transformer encodes masked video clips; a narrower predictor maps context
-embeddings to target-block embeddings produced by an EMA target encoder. The loss combines
-prediction error with VICReg variance/covariance terms to prevent representation collapse.
-Training is instrumented with representation-health diagnostics (effective rank, cosine
-similarity, context-substitution checks) so collapse is visible while it happens rather
-than after.
-
-### Datasets
-
-Two loaders, both deterministic and seed-controlled:
-
-- **Health&Gait** — silhouette / optical-flow / segmentation recordings with a
-  subject-disjoint manifest. Factors are `speed`, `clothing`, `direction`; the manifest
-  also carries non-learned shortcut features so probes can be checked against trivial
-  baselines.
-- **GaitLU-1M** — seekable, bit-packed tar shards with a fixed-exposure sampler, for
-  large-scale pretraining. Shards must be prepared first (`cody-jepa-prepare-gaitlu`).
-
-### Evaluation
-
-Frozen features are exported from a trained checkpoint's target encoder, then evaluated
-with linear probes: gait-system classification, closed-set identity, and held-out identity
-retrieval. Probes report against majority-class and shortcut-feature baselines.
 
 ## Setup
 
-Requires Python 3.10+ and `uv`.
-
 ```bash
-git clone https://github.com/theodoremui/cody-jepa.git
-cd cody-jepa
-uv sync --frozen
-```
-
-Run the tests (no private data required):
-
-```bash
+uv sync
 uv run python -m unittest discover -s tests
 ```
 
+The test suite runs on a synthetic corpus and needs no private data.
+
 ## Usage
 
-Build a Health&Gait manifest from raw recordings:
+**1. Build a manifest.** Walks `<raw-root>/<modality>/<participant>/<speed>/<clothing>_<direction>/`
+and holds out whole participants for validation:
 
 ```bash
-uv run cody-jepa-build-manifest --fps 30
+python build_manifest.py --raw-root data/healthgait/raw/Health_Gait --fps 30
 ```
 
-Train:
+**2. Train:**
 
 ```bash
-uv run cody-jepa-train \
-  --config configs/train/healthgait_baseline.json \
-  --manifest data/healthgait/manifests/silhouette_subject_split_seed0.csv \
-  --output-dir outputs/run-01
+python train.py --config configs/healthgait.json \
+    --manifest data/healthgait/manifest.csv --output-dir outputs/run-01
 ```
 
-Export frozen features and run probes:
+Each epoch prints train loss and, on eval epochs, validation loss and **effective rank** —
+the exponentiated entropy of the covariance spectrum. It equals the embedding dimension for
+isotropic features and collapses toward 1 when every clip maps to the same direction. Watch
+it: a falling effective rank means the run is collapsing, and no amount of falling loss
+redeems that.
+
+Writes `last.pt`, `best.pt`, and `history.json`. Resume with `--resume outputs/run-01/last.pt`.
+
+**3. Evaluate.** Export frozen EMA-target features, then probe them:
 
 ```bash
-uv run cody-jepa-export-features \
-  --checkpoint outputs/run-01/best.pt \
-  --manifest data/healthgait/manifests/silhouette_subject_split_seed0.csv \
-  --output outputs/run-01/features.npz
+python export_features.py --checkpoint outputs/run-01/best.pt \
+    --manifest data/healthgait/manifest.csv --output outputs/run-01/features.csv
 
-uv run cody-jepa-eval-probes \
-  --features outputs/run-01/features.npz \
-  --output-dir outputs/run-01/probes
+python probe.py --features outputs/run-01/features.csv
 ```
 
-On SLURM, see `slurm/train-jepa.sbatch` and `slurm/prepare-gaitlu-shards.sbatch`.
+Two probes, both reported against a majority-class baseline:
 
-## Data and claim boundaries
+| Probe | What it asks | Protocol |
+|---|---|---|
+| `gait_system` | Is walking speed linearly decodable? | Held-out participants |
+| `identity` | Is the participant linearly decodable? | Held-out source videos |
 
-Raw recordings, manifests, participant tables, feature exports, and checkpoints stay
-outside Git. Anything committed should be aggregate, non-identifying, and reproducible
-from a script in this repo.
+Both are disjoint by design — `gait_system` never sees a validation participant during
+training, and `identity` holds out whole source videos so a score cannot come from matching
+the same recording to itself.
+
+## Configuration
+
+One JSON file per run (`configs/healthgait.json`). Model geometry must satisfy
+`img_size % patch_size == 0`, `num_frames % tubelet_size == 0`, and `embed_dim % 6 == 0`
+(the position embedding splits channels three ways). A test enforces this.
+
+## Data boundaries
+
+Raw recordings, manifests, feature exports, and checkpoints stay out of Git. Anything
+committed should be aggregate and reproducible from a script here.
+
+Earlier research directions (Grounded Factorial Completion, hierarchical-diversity scaling)
+and the GaitLU-1M loader were removed; they are recoverable from the `archive/pre-refactor`
+tag.

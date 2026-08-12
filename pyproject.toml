@@ -5,24 +5,13 @@ description = "Single-stream video JEPA: model, training engine, dataset loaders
 readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [
-    "matplotlib>=3.10.9",
     "numpy>=2.2.6",
     "pandas>=2.3.3",
     "pillow>=12.3.0",
     "scikit-learn>=1.5",
-    "scipy>=1.15",
     "torch==2.6.0 ; sys_platform != 'linux' or platform_machine != 'x86_64'",
     "torch==2.6.0+cu124 ; sys_platform == 'linux' and platform_machine == 'x86_64'",
-    "tqdm>=4.68.4",
-    "triton==3.2.0 ; platform_machine == 'x86_64' and sys_platform == 'linux'",
 ]
-
-[project.scripts]
-cody-jepa-train = "cody_jepa.cli.train:main"
-cody-jepa-build-manifest = "cody_jepa.cli.build_manifest:main"
-cody-jepa-prepare-gaitlu = "cody_jepa.cli.prepare_gaitlu:main"
-cody-jepa-export-features = "cody_jepa.cli.export_features:main"
-cody-jepa-eval-probes = "cody_jepa.cli.eval_probes:main"
 
 [dependency-groups]
 dev = [
@@ -46,8 +35,8 @@ explicit = true
 requires = ["setuptools>=68"]
 build-backend = "setuptools.build_meta"
 
-[tool.setuptools.packages.find]
-where = ["src"]
+[tool.setuptools]
+packages = ["cody_jepa"]
 
 [tool.ruff]
 line-length = 100
@@ -55,7 +44,3 @@ target-version = "py310"
 
 [tool.ruff.lint]
 select = ["E4", "E7", "E9", "F"]
-
-[tool.ruff.lint.per-file-ignores]
-"src/cody_jepa/data/dataset.py" = ["F401"]
-"tests/*.py" = ["E402"]

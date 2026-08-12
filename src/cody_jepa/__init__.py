@@ -1,2 +1,0 @@
-"""CoDy-JEPA research utilities."""
-
