@@ -1,7 +1,7 @@
 [project]
 name = "cody-jepa"
 version = "0.1.0"
-description = "Research code for CoDy-JEPA and Grounded Factorial Completion"
+description = "Single-stream video JEPA: model, training engine, dataset loaders, and frozen-representation evaluation"
 readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [
@@ -19,20 +19,10 @@ dependencies = [
 
 [project.scripts]
 cody-jepa-train = "cody_jepa.cli.train:main"
+cody-jepa-build-manifest = "cody_jepa.cli.build_manifest:main"
+cody-jepa-prepare-gaitlu = "cody_jepa.cli.prepare_gaitlu:main"
 cody-jepa-export-features = "cody_jepa.cli.export_features:main"
 cody-jepa-eval-probes = "cody_jepa.cli.eval_probes:main"
-cody-jepa-run-gfc = "cody_jepa.cli.run_gfc:main"
-cody-jepa-build-manifest = "cody_jepa.cli.build_manifest:main"
-cody-jepa-prepare-gfc-features = "cody_jepa.cli.prepare_gfc_features:main"
-cody-jepa-make-results = "cody_jepa.cli.make_results:main"
-cody-jepa-export-histories = "cody_jepa.cli.export_histories:main"
-cody-jepa-gfc-study = "cody_jepa.cli.gfc_study:main"
-cody-jepa-make-gfc-study-results = "cody_jepa.cli.make_gfc_study_results:main"
-cody-jepa-prepare-gaitlu = "cody_jepa.cli.prepare_gaitlu:main"
-cody-jepa-audit-gaitlu-hierarchy = "cody_jepa.cli.audit_gaitlu_hierarchy:main"
-cody-jepa-prepare-gaitlu-hierarchy = "cody_jepa.cli.prepare_gaitlu_hierarchy:main"
-cody-jepa-train-gaitlu-study = "cody_jepa.cli.train_gaitlu_study:main"
-cody-jepa-train-gaitlu-hierarchy = "cody_jepa.cli.train_gaitlu_hierarchy:main"
 
 [dependency-groups]
 dev = [
@@ -67,9 +57,5 @@ target-version = "py310"
 select = ["E4", "E7", "E9", "F"]
 
 [tool.ruff.lint.per-file-ignores]
-"scripts/*.py" = ["F401", "F403"]
 "src/cody_jepa/data/dataset.py" = ["F401"]
-"src/cody_jepa/gfc*.py" = ["F401", "F403"]
-"src/cody_jepa/probes.py" = ["F401"]
-"src/cody_jepa/single_stream_jepa.py" = ["F401"]
 "tests/*.py" = ["E402"]

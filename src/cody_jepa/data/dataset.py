@@ -10,7 +10,7 @@ from torch.utils.data import Dataset
 
 from .frames import contiguous_window_starts, is_within, list_frame_paths, resolve_frame_dir
 from .schema import (
-    GFC_FACTOR_COLUMNS,
+    FACTOR_COLUMNS,
     RECORDING_HIERARCHY_COLUMNS,
     REQUIRED_MANIFEST_COLUMNS,
     REQUIRED_NONEMPTY_FIELDS,
@@ -689,7 +689,7 @@ class HealthGaitManifestDataset(Dataset):
 
 __all__ = [
     "HealthGaitManifestDataset",
-    "GFC_FACTOR_COLUMNS",
+    "FACTOR_COLUMNS",
     "ManifestValidationError",
     "REQUIRED_MANIFEST_COLUMNS",
     "REQUIRED_NONEMPTY_FIELDS",

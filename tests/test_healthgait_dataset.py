@@ -17,7 +17,7 @@ if str(SRC_ROOT) not in sys.path:
     sys.path.insert(0, str(SRC_ROOT))
 
 from cody_jepa.data.dataset import (
-    GFC_FACTOR_COLUMNS,
+    FACTOR_COLUMNS,
     RECORDING_HIERARCHY_COLUMNS,
     SHORTCUT_FEATURE_COLUMNS,
     HealthGaitManifestDataset,
@@ -29,7 +29,7 @@ from cody_jepa.data.healthgait import (
     build_healthgait_datasets_from_config,
     build_healthgait_loaders_from_config,
 )
-from scripts.build_healthgait_manifest import build_rows, compute_shortcut_features
+from cody_jepa.cli.build_manifest import build_rows, compute_shortcut_features
 
 
 MANIFEST_FIELDNAMES = [
@@ -41,7 +41,7 @@ MANIFEST_FIELDNAMES = [
     "num_frames",
     "split",
     "fps",
-    *GFC_FACTOR_COLUMNS,
+    *FACTOR_COLUMNS,
     *RECORDING_HIERARCHY_COLUMNS,
     *SHORTCUT_FEATURE_COLUMNS,
 ]

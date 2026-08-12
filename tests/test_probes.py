@@ -8,19 +8,21 @@ import pandas as pd
 import torch
 from torch import nn
 
-from cody_jepa.probes import (
+from cody_jepa.evaluation.features import (
     FEATURE_SOURCE,
     METADATA_COLUMNS,
-    PROBE_SUMMARY_COLUMNS,
-    evaluate_all_probes,
-    evaluate_gait_system,
     export_frozen_features,
     read_feature_table,
     validate_feature_table,
     write_feature_table,
+)
+from cody_jepa.evaluation.probes import (
+    PROBE_SUMMARY_COLUMNS,
+    evaluate_all_probes,
+    evaluate_gait_system,
     write_probe_results,
 )
-from cody_jepa.probes import _closed_set_masks
+from cody_jepa.evaluation.probes.identity import closed_set_masks as _closed_set_masks
 
 
 def clip_metadata(sequence, split, subject, gait, trial, window):

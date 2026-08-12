@@ -1,9 +1,0 @@
-Run,One change,Question it answers
-a00,none (control),Does the control reproduce the failure?
-a01,learning rate 1e-4 to 3e-5,Is optimization too aggressive?
-a02,learning rate 1e-4 to 3e-4,Can stronger optimization force context use?
-a03,EMA constant 0.99 to 0.995,Does a slower target help?
-a04,light masks (more context),Does more visible context help?
-a05,heavy masks (less context),Does a harder task help?
-a06,predictor depth 6 to 3,Is the predictor absorbing the encoder's work?
-a07,variance penalty on pooled clips,Does fixing the pooling mismatch work?

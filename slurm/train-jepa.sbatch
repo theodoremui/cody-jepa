@@ -1,5 +1,5 @@
 #!/bin/bash
-#SBATCH --job-name=single-stream-jepa
+#SBATCH --job-name=cody-jepa-train
 #SBATCH --account=mind
 #SBATCH --partition=hai
 #SBATCH --gres=gpu:h100:1
@@ -19,7 +19,7 @@ NUM_WORKERS="${CODY_JEPA_NUM_WORKERS:-4}"
 
 nvidia-smi
 
-uv run --frozen --no-sync python scripts/train.py \
+uv run --frozen --no-sync cody-jepa-train \
   --config "$CONFIG" \
   --manifest "$MANIFEST" \
   --output-dir "$OUTPUT_DIR" \

@@ -1,5 +1,5 @@
 from .dataset import (
-    GFC_FACTOR_COLUMNS,
+    FACTOR_COLUMNS,
     RECORDING_HIERARCHY_COLUMNS,
     SHORTCUT_FEATURE_COLUMNS,
     HealthGaitManifestDataset,
@@ -51,7 +51,7 @@ __all__ = [
     "DEFAULT_MANIFEST_SEED",
     "DEFAULT_MODALITY",
     "DEFAULT_WINDOW_POLICY",
-    "GFC_FACTOR_COLUMNS",
+    "FACTOR_COLUMNS",
     "FixedExposureSampler",
     "GAITLU_MANIFEST_COLUMNS",
     "GAITLU_MANIFEST_VERSION",

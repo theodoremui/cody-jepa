@@ -2,7 +2,7 @@
 """Train the single-stream JEPA baseline from a readable JSON config.
 
 Example:
-    uv run python scripts/train.py --config configs/train/healthgait_baseline.json \
+    uv run cody-jepa-train --config configs/train/healthgait_baseline.json \
         --manifest data/healthgait/manifests/silhouette_subject_split_seed0.csv \
         --output-dir outputs/training-baseline
 """
@@ -25,7 +25,8 @@ from cody_jepa.data import (
     build_healthgait_loaders_from_config,
     gaitlu_manifest_pair_sha256,
 )
-from cody_jepa.single_stream_jepa import MaskGroupConfig, load_checkpoint, train_jepa
+from cody_jepa.masks import MaskGroupConfig
+from cody_jepa.training import load_checkpoint, train_jepa
 
 
 def parse_args(argv=None):

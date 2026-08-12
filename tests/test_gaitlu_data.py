@@ -18,7 +18,6 @@ import numpy as np
 import torch
 
 from cody_jepa.cli.train import parse_args as parse_train_args, run_training
-from cody_jepa.cli.train_gaitlu_study import parse_args as parse_study_args
 from cody_jepa.data import (
     GaitLUIndexedDataset,
     GaitLULoaderConfig,
@@ -381,14 +380,6 @@ class GaitLURuntimeValidationTest(unittest.TestCase):
         with redirect_stderr(io.StringIO()), self.assertRaises(SystemExit):
             parse_train_args([*train_required, "--record-verify-mode", "all"])
 
-        study_required = [
-            "--registry", "registry.csv", "--config", "config.json",
-            "--data-root", "data", "--output-root", "output",
-        ]
-        study_args = parse_study_args(study_required)
-        self.assertFalse(hasattr(study_args, "record_verify_mode"))
-        with redirect_stderr(io.StringIO()), self.assertRaises(SystemExit):
-            parse_study_args([*study_required, "--record-verify-mode", "all"])
 
     def test_loader_preserves_structural_manifest_checks(self):
         with tempfile.TemporaryDirectory() as directory:

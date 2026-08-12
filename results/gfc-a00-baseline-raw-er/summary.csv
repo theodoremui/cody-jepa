@@ -1,2 +1,0 @@
-protocol,split,normalization,model_label,seed,participants,excluded_participants,learned_top1,shortcut_top1,learned_minus_shortcut,interval_lower,interval_upper,confidence_level,bootstrap_resamples
-legacy_donor_excluded_v1,development,raw_effective_rank,a00-baseline,20260728,76,4,0.6106542397660818,0.6125274122807017,-0.001873172514619883,-0.022021198830409358,0.017636376096491213,0.95,10000

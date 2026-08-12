@@ -1,6 +1,6 @@
 """Canonical Health&Gait manifest schema and factor vocabulary."""
 
-GFC_FACTOR_COLUMNS = ("recording_id", "speed", "clothing", "direction")
+FACTOR_COLUMNS = ("recording_id", "speed", "clothing", "direction")
 RECORDING_HIERARCHY_COLUMNS = ("source_video_id", "direction_clip_id")
 SHORTCUT_FEATURE_COLUMNS = (
     "shortcut_log_frame_count",
@@ -23,7 +23,7 @@ REQUIRED_MANIFEST_COLUMNS = frozenset(
         "num_frames",
         "split",
         "fps",
-        *GFC_FACTOR_COLUMNS,
+        *FACTOR_COLUMNS,
         *RECORDING_HIERARCHY_COLUMNS,
         *SHORTCUT_FEATURE_COLUMNS,
     }
@@ -34,7 +34,7 @@ REQUIRED_NONEMPTY_FIELDS = frozenset(
         "modality",
         "gait_system",
         "trial",
-        *GFC_FACTOR_COLUMNS,
+        *FACTOR_COLUMNS,
         *RECORDING_HIERARCHY_COLUMNS,
     }
 )
@@ -47,7 +47,7 @@ VALID_DIRECTIONS = frozenset({"R2L", "L2R"})
 
 
 __all__ = [
-    "GFC_FACTOR_COLUMNS",
+    "FACTOR_COLUMNS",
     "IMAGE_SUFFIXES",
     "RECORDING_HIERARCHY_COLUMNS",
     "REQUIRED_MANIFEST_COLUMNS",

@@ -9,33 +9,31 @@ from unittest.mock import patch
 import torch
 from torch.utils.data import DataLoader, Dataset
 
-from cody_jepa.single_stream_jepa import (
-    DEFAULT_MASK_GROUPS,
-    VisionTransformer,
+from cody_jepa.masks import DEFAULT_MASK_GROUPS, multiblock_mask
+from cody_jepa.models import VisionTransformer, build_models
+from cody_jepa.training import (
     balanced_wrong_subject_permutation,
-    build_models,
     ema_tau_for_step,
     encode_targets,
     evaluate_jepa,
     healthy_checkpoint_path,
     learning_rate_for_step,
     load_checkpoint,
-    multiblock_mask,
     optimizer_param_groups,
     representation_diagnostics,
     resolve_device,
     train_jepa,
     validate_resume_state,
     vicreg,
-    video_from_batch,
 )
-from cody_jepa.single_stream_jepa import (
-    _context_shuffle_plan,
-    _context_source_loader,
-    _maybe_compile,
-    _prediction_metrics,
-    _subject_balanced_mean,
+from cody_jepa.training.batches import video_from_batch
+from cody_jepa.training.diagnostics import (
+    context_shuffle_plan as _context_shuffle_plan,
+    context_source_loader as _context_source_loader,
+    subject_balanced_mean as _subject_balanced_mean,
 )
+from cody_jepa.training.losses import prediction_metrics as _prediction_metrics
+from cody_jepa.training.runtime import maybe_compile as _maybe_compile
 
 
 def tiny_config(num_epochs=2):

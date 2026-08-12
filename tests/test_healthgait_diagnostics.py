@@ -15,7 +15,7 @@ if str(SRC_ROOT) not in sys.path:
     sys.path.insert(0, str(SRC_ROOT))
 
 from cody_jepa.data import (
-    GFC_FACTOR_COLUMNS,
+    FACTOR_COLUMNS,
     RECORDING_HIERARCHY_COLUMNS,
     SHORTCUT_FEATURE_COLUMNS,
     run_healthgait_motion_diagnostics,
@@ -33,7 +33,7 @@ MANIFEST_FIELDNAMES = [
     "num_frames",
     "split",
     "fps",
-    *GFC_FACTOR_COLUMNS,
+    *FACTOR_COLUMNS,
     *RECORDING_HIERARCHY_COLUMNS,
     *SHORTCUT_FEATURE_COLUMNS,
 ]

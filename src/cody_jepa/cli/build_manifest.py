@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Build a subject-disjoint Health&Gait manifest with GFC metadata.
+"""Build a subject-disjoint Health&Gait manifest with factor and shortcut metadata.
 
 The shortcut measurements are computed from every decoded silhouette frame in
 each recording. Raw participant data remains under ``data/`` and is ignored by
@@ -20,7 +20,7 @@ import numpy as np
 from PIL import Image
 
 from cody_jepa.data import (
-    GFC_FACTOR_COLUMNS,
+    FACTOR_COLUMNS,
     RECORDING_HIERARCHY_COLUMNS,
     SHORTCUT_FEATURE_COLUMNS,
     summarize_healthgait_manifest,
@@ -30,7 +30,7 @@ from cody_jepa.data.frames import contiguous_window_starts, list_frame_paths
 
 
 PROJECT_ROOT = Path.cwd()
-GFC_WINDOWS_PER_RECORDING = 3
+MIN_WINDOWS_PER_RECORDING = 3
 TRIAL_PATTERN = re.compile(r"^(WoJ|WJ)_([12])(?:_|$)")
 DIRECTION_BY_SUFFIX = {"1": "R2L", "2": "L2R"}
 MANIFEST_COLUMNS = (
@@ -38,7 +38,7 @@ MANIFEST_COLUMNS = (
     "modality",
     "gait_system",
     "trial",
-    *GFC_FACTOR_COLUMNS,
+    *FACTOR_COLUMNS,
     *RECORDING_HIERARCHY_COLUMNS,
     "frame_dir",
     "num_frames",
@@ -131,7 +131,7 @@ def build_rows(args: argparse.Namespace) -> list[dict[str, object]]:
             continue
         frames = list_frame_paths(trial_dir)
         if len(contiguous_window_starts(frames, args.clip_length)) < (
-            GFC_WINDOWS_PER_RECORDING
+            MIN_WINDOWS_PER_RECORDING
         ):
             continue
         relative = trial_dir.relative_to(modality_root)

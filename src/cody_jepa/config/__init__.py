@@ -1,2 +1,0 @@
-"""Typed experiment configuration."""
-

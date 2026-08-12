@@ -2,7 +2,7 @@
 """Export frozen EMA-target features from a trained model.
 
 Example:
-    uv run python scripts/export_features.py --checkpoint outputs/run/best.pt \
+    uv run cody-jepa-export-features --checkpoint outputs/run/best.pt \
         --manifest data/healthgait/manifests/silhouette_subject_split_seed0.csv \
         --output outputs/features.npz
 """
@@ -18,14 +18,14 @@ from cody_jepa.data import (
     build_healthgait_datasets_from_config,
     build_sequential_healthgait_loaders,
 )
-from cody_jepa.probes import (
+from cody_jepa.evaluation import (
     FEATURE_FORMULA,
     FEATURE_SOURCE,
     build_frozen_target_encoder,
     export_frozen_features,
     write_feature_table,
 )
-from cody_jepa.single_stream_jepa import load_checkpoint, resolve_device
+from cody_jepa.training import load_checkpoint, resolve_device
 
 
 def parse_args():

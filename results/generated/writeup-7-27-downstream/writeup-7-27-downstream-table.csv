@@ -1,9 +1,0 @@
-run_id,Closed-set identity accuracy,Held-out identity retrieval accuracy,Gait-system balanced accuracy
-a00-baseline,10.63%,2.94%,93.27%
-a01-lr3e-5,9.78%,2.82%,93.11%
-a02-lr3e-4,7.66%,2.82%,93.16%
-a03-ema0.995,8.77%,3.00%,93.00%
-a04-mask-light,10.31%,3.06%,93.75%
-a05-mask-heavy,10.74%,2.88%,92.90%
-a06-pred-depth3,10.26%,3.06%,93.32%
-a07-clip-var,7.71%,4.04%,89.26%

@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-"""Evaluate the paper's linear probes from an exported feature table.
+"""Evaluate linear probes from an exported feature table.
 
 Example:
-    uv run python scripts/eval_probes.py \
+    uv run cody-jepa-eval-probes \
         --features outputs/features.npz --output-dir outputs/probes
 """
 
@@ -12,12 +12,8 @@ from pathlib import Path
 import argparse
 import json
 
-from cody_jepa.probes import (
-    FEATURE_SOURCE,
-    evaluate_all_probes,
-    read_feature_table,
-    write_probe_results,
-)
+from cody_jepa.evaluation import FEATURE_SOURCE, read_feature_table
+from cody_jepa.evaluation.probes import evaluate_all_probes, write_probe_results
 
 
 def parse_args():

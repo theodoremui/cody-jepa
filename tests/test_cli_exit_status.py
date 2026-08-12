@@ -108,34 +108,6 @@ class ConsoleExitStatusTest(unittest.TestCase):
         self.assertIsNone(raised.exception.code)
         run.assert_called_once()
 
-    def test_train_gaitlu_study_success_exits_zero(self):
-        from cody_jepa.cli.train_gaitlu_study import main
-
-        with (
-            patch(
-                "cody_jepa.cli.train_gaitlu_study.run_registered_training",
-                return_value={"model_label": "ladder-0-small"},
-            ) as run,
-            self.assertRaises(SystemExit) as raised,
-        ):
-            sys.exit(
-                main(
-                    [
-                        "--registry",
-                        "training_registry.csv",
-                        "--config",
-                        "config.json",
-                        "--data-root",
-                        "prepared",
-                        "--output-root",
-                        "runs",
-                    ]
-                )
-            )
-
-        self.assertIsNone(raised.exception.code)
-        run.assert_called_once()
-
 
 if __name__ == "__main__":
     unittest.main()
