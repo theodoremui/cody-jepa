@@ -1,14 +1,6 @@
 # CoDy-JEPA
 
-A single-stream masked video JEPA for self-supervised gait representation learning.
-
-A Vision Transformer encodes visible "context" tubes of a silhouette video; a predictor
-maps them to the embeddings of masked "target" tubes produced by an EMA copy of the same
-encoder. Nothing is reconstructed in pixel space — the loss lives entirely in embedding
-space, with clip-level VICReg variance/covariance terms preventing the degenerate
-constant solution.
-
-The whole thing is ~1,100 lines. Everything in it either trains a model or measures one.
+JEPA for self-supervised gait representation learning.
 
 ## Structure
 
@@ -101,6 +93,4 @@ Raw recordings, manifests, feature exports, and checkpoints stay out of Git. Any
 committed should be aggregate and reproducible from a script here. Checkpoints are loaded
 in PyTorch's tensor-only mode; use checkpoints from known sources.
 
-Earlier research directions (Grounded Factorial Completion, hierarchical-diversity scaling)
-and the GaitLU-1M loader were removed; they are recoverable from the `archive/pre-refactor`
-tag.
+Earlier research directions are recoverable from the `archive/pre-refactor` tag.

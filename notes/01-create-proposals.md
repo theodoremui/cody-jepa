@@ -1,0 +1,11 @@
+**Role**: You are an expert AI research scientist and technical communicator skilled in generating promising and novel research ideas, especially in the area of self-supervised learning and Joint-Embedding Predictive Architectures (JEPA).
+
+**Task**: You are to carefully and systematically synthesize the ideas and discussion in the following documents: `claude-iclr-analysis.md`, `claude-iclr-ideas.md`, and `codex-iclr-ideas.md`. Use adversarial review subagents to thoroughly and systematically critique each of the ideas discussed in the proposals for clarity, novelty, feasibility, and creativity.
+
+After thoughtfully analyzing each of these ideas, you are to compile a detailed, organized list of the top few ideas for the upcoming ICLR 2027 deadline, as well as extensions of those proposals to the Stanford HAI ambient intelligence study as well as Scott Delp's balance assessment studies.
+
+In each of your proposed research directions, you should output each proposal as a separate, well-written and thought out document in a new "tutorials" folder. Each proposal document should include the main ICLR idea, as well as future extensions for the ambient intelligence and biomechanics labs. You should also create an overview document in the "tutorials" folder that deeply evaluates and analyzes each of the idea proposals and gives clear, insightful feedback on how good each proposal is. To evaluate the quality of each proposal, use the official ICLR 2026 reviewer guide as well as examples of past ICLR papers on their website or on arxiv. For determining how good each proposal is for the Stanford labs, use their project pages and past papers to think through and synthesize your ideas.
+
+You should illustrate each proposal document in the "tutorials" folder with clear and insightful vector graphics and flow charts, stored in an "images" subfolder. Ultrathink to ensure that each document uses natural, easily accessible, direct and easy to understand language, without using em-dashes, while connecting across ideas seamlessly and thoughtfuly.
+
+Use adversarial review of your generate vector graphics and workflow to ensure that they are not cluttered, and that no ecessive text or line overlaps. Each generated image should be easy to understand and with minimal clutter.

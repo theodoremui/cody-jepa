@@ -1,0 +1,43 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 750 320" width="750" height="320" font-family="system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif">
+  <rect x="0.5" y="0.5" width="749" height="319" rx="10" fill="#ffffff" stroke="#e2e8f0"/>
+
+  <text x="28" y="36" font-size="16.5" font-weight="600" fill="#0f172a">Nearly all of it is just position</text>
+  <text x="28" y="57" font-size="11" fill="#64748b">Every clip carries the same grid of positions, so the position effect is identical in every clip and no readout has to learn it</text>
+
+  <!-- legend, spaced so no label reaches the next swatch -->
+  <rect x="212" y="72" width="12" height="12" rx="2.5" fill="#d97706"/>
+  <text x="230" y="82" font-size="10.5" fill="#64748b">position</text>
+
+  <rect x="300" y="72" width="12" height="12" rx="2.5" fill="#cbd5e1"/>
+  <text x="318" y="82" font-size="10.5" fill="#64748b">within-clip content, &#947;</text>
+
+  <rect x="460" y="72" width="12" height="12" rx="2.5" fill="#059669"/>
+  <text x="478" y="82" font-size="10.5" fill="#64748b">between-clip, &#946;</text>
+
+  <text x="720" y="104" font-size="10" fill="#94a3b8" text-anchor="end">&#946;, exact value</text>
+
+  <!-- bars run 212 to 640, so 428 units is 100 percent -->
+
+  <text x="200" y="129" font-size="11.5" fill="#334155" text-anchor="end">random weights</text>
+  <rect x="212" y="112" width="412.6" height="26" fill="#d97706"/>
+  <rect x="624.6" y="112" width="15.4" height="26" fill="#cbd5e1"/>
+  <text x="222" y="129" font-size="10.5" font-weight="600" fill="#ffffff">96.4%</text>
+  <text x="720" y="129" font-size="11" fill="#475569" text-anchor="end">0.025%</text>
+
+  <text x="200" y="185" font-size="11.5" font-weight="600" fill="#0f172a" text-anchor="end">trained, no regulariser</text>
+  <rect x="212" y="168" width="392.5" height="26" fill="#d97706"/>
+  <rect x="604.5" y="168" width="35.5" height="26" fill="#cbd5e1"/>
+  <text x="222" y="185" font-size="10.5" font-weight="600" fill="#ffffff">91.7%</text>
+  <text x="720" y="185" font-size="11" font-weight="600" fill="#0f172a" text-anchor="end">0.063%</text>
+
+  <text x="200" y="241" font-size="11.5" fill="#334155" text-anchor="end">trained, clip-axis variance</text>
+  <rect x="212" y="224" width="355.7" height="26" fill="#d97706"/>
+  <rect x="567.7" y="224" width="27.6" height="26" fill="#cbd5e1"/>
+  <rect x="595.3" y="224" width="44.7" height="26" fill="#059669"/>
+  <text x="222" y="241" font-size="10.5" font-weight="600" fill="#ffffff">83.1%</text>
+  <text x="720" y="241" font-size="11" fill="#475569" text-anchor="end">10.4%</text>
+
+  <rect x="28" y="262" width="694" height="42" rx="6" fill="#f8fafc" stroke="#e2e8f0"/>
+  <text x="42" y="280" font-size="10.5" fill="#64748b">Position dominates before any training, so it is mostly the encoder&#8217;s own positional embedding, not something the objective added.</text>
+  <text x="42" y="296" font-size="10.5" fill="#64748b">&#946; is too small to draw as a segment in the first two rows, so the exact values are listed on the right.</text>
+</svg>

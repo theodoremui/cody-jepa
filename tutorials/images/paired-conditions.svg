@@ -1,0 +1,51 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 750 396" width="750" height="396" font-family="system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif">
+  <rect x="0.5" y="0.5" width="749" height="395" rx="10" fill="#ffffff" stroke="#e2e8f0"/>
+
+  <text x="28" y="36" font-size="16.5" font-weight="600" fill="#0f172a">What Health&#38;Gait actually gives you</text>
+  <text x="28" y="57" font-size="11" fill="#64748b">Four cells per person, and three honest caveats that change what you may claim</text>
+
+  <!-- column headers -->
+  <text x="150" y="98" font-size="11.5" font-weight="600" fill="#334155" text-anchor="middle">usual pace</text>
+  <text x="286" y="98" font-size="11.5" font-weight="600" fill="#334155" text-anchor="middle">fast pace</text>
+
+  <!-- row labels -->
+  <text x="74" y="138" font-size="11.5" font-weight="600" fill="#334155" text-anchor="end">no jacket</text>
+  <text x="74" y="206" font-size="11.5" font-weight="600" fill="#334155" text-anchor="end">jacket</text>
+
+  <!-- cells -->
+  <rect x="88" y="112" width="124" height="52" rx="7" fill="#eff6ff" stroke="#93c5fd"/>
+  <text x="150" y="143" font-size="11.5" fill="#1e40af" text-anchor="middle">796 segments</text>
+
+  <rect x="224" y="112" width="124" height="52" rx="7" fill="#eff6ff" stroke="#93c5fd"/>
+  <text x="286" y="143" font-size="11.5" fill="#1e40af" text-anchor="middle">796 segments</text>
+
+  <rect x="88" y="180" width="124" height="52" rx="7" fill="#f5f3ff" stroke="#c4b5fd"/>
+  <text x="150" y="211" font-size="11.5" fill="#5b21b6" text-anchor="middle">768 segments</text>
+
+  <rect x="224" y="180" width="124" height="52" rx="7" fill="#f5f3ff" stroke="#c4b5fd"/>
+  <text x="286" y="211" font-size="11.5" fill="#5b21b6" text-anchor="middle">770 segments</text>
+
+  <text x="88" y="258" font-size="10.5" fill="#94a3b8">398 participants &#183; 3,130 segments</text>
+  <text x="88" y="273" font-size="10.5" fill="#94a3b8">30 Hz &#183; one corridor, one camera</text>
+
+  <!-- caveats -->
+  <rect x="400" y="106" width="322" height="60" rx="7" fill="#fffbeb" stroke="#fcd34d"/>
+  <text x="416" y="126" font-size="11" font-weight="600" fill="#b45309">Speed was never randomised</text>
+  <text x="416" y="143" font-size="10.5" fill="#92400e">Everyone walked usual first, then was asked to repeat it</text>
+  <text x="416" y="158" font-size="10.5" fill="#92400e">fast. Order, practice and fatigue ride along with speed.</text>
+
+  <rect x="400" y="176" width="322" height="60" rx="7" fill="#fffbeb" stroke="#fcd34d"/>
+  <text x="416" y="196" font-size="11" font-weight="600" fill="#b45309">The jacket is the participant&#8217;s own, and optional</text>
+  <text x="416" y="213" font-size="10.5" fill="#92400e">Recorded whenever possible, so 54 segments are missing</text>
+  <text x="416" y="228" font-size="10.5" fill="#92400e">and the missingness is not random. It is not a weighted vest.</text>
+
+  <rect x="400" y="246" width="322" height="60" rx="7" fill="#fef2f2" stroke="#fca5a5"/>
+  <text x="416" y="266" font-size="11" font-weight="600" fill="#b91c1c">Direction is not a third factor</text>
+  <text x="416" y="283" font-size="10.5" fill="#991b1b">The two directions are the two halves of one walk, split</text>
+  <text x="416" y="298" font-size="10.5" fill="#991b1b">after recording. Treat them as correlated segments.</text>
+
+  <!-- bottom rule -->
+  <rect x="28" y="326" width="694" height="46" rx="7" fill="#f1f5f9" stroke="#cbd5e1"/>
+  <text x="44" y="346" font-size="11" font-weight="600" fill="#334155">So call these paired conditions, never interventions.</text>
+  <text x="44" y="363" font-size="10.5" fill="#64748b">Everything downstream still works. What changes is the wording, and the covariates you must report.</text>
+</svg>

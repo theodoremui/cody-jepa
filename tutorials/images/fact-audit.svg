@@ -1,0 +1,49 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 750 436" width="750" height="436" font-family="system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif">
+  <rect x="0.5" y="0.5" width="749" height="435" rx="10" fill="#ffffff" stroke="#e2e8f0"/>
+
+  <text x="28" y="36" font-size="16.5" font-weight="600" fill="#0f172a">What survived checking</text>
+  <text x="28" y="57" font-size="11" fill="#64748b">Load-bearing claims from the three source documents, checked against the published paper and the files on disk</text>
+
+  <line x1="28" y1="76" x2="722" y2="76" stroke="#e2e8f0"/>
+
+  <g font-size="11.5" fill="#334155">
+    <text x="28" y="104">The jacket is a weighted vest</text>
+    <text x="28" y="146">Frame rate is undocumented, so avoid absolute-time claims</text>
+    <text x="28" y="188">Four co-registered renderings of the same event at 960 by 540</text>
+    <text x="28" y="230">The segmentation gives 24 part labels plus surface coordinates</text>
+    <text x="28" y="272">Speed, jacket and direction are assigned interventions</text>
+    <text x="28" y="314">The blank-context diagnostic is buggy, zero means mid-gray</text>
+    <text x="28" y="356">The eleven-run sweep found nothing, all inside two standard errors</text>
+    <text x="28" y="398">ICLR 2027: abstract September 18, paper September 25</text>
+  </g>
+
+  <g font-size="10.5" font-weight="600" text-anchor="middle">
+    <rect x="596" y="90" width="80" height="20" rx="10" fill="#fef2f2" stroke="#fca5a5"/>
+    <text x="636" y="104" fill="#b91c1c">refuted</text>
+    <rect x="596" y="132" width="80" height="20" rx="10" fill="#fef2f2" stroke="#fca5a5"/>
+    <text x="636" y="146" fill="#b91c1c">refuted</text>
+    <rect x="596" y="174" width="80" height="20" rx="10" fill="#fef2f2" stroke="#fca5a5"/>
+    <text x="636" y="188" fill="#b91c1c">refuted</text>
+    <rect x="596" y="216" width="80" height="20" rx="10" fill="#fef2f2" stroke="#fca5a5"/>
+    <text x="636" y="230" fill="#b91c1c">refuted</text>
+    <rect x="596" y="258" width="80" height="20" rx="10" fill="#fef2f2" stroke="#fca5a5"/>
+    <text x="636" y="272" fill="#b91c1c">refuted</text>
+    <rect x="596" y="300" width="80" height="20" rx="10" fill="#fef2f2" stroke="#fca5a5"/>
+    <text x="636" y="314" fill="#b91c1c">refuted</text>
+    <rect x="596" y="342" width="80" height="20" rx="10" fill="#fef2f2" stroke="#fca5a5"/>
+    <text x="636" y="356" fill="#b91c1c">refuted</text>
+    <rect x="596" y="384" width="80" height="20" rx="10" fill="#f0fdf4" stroke="#86efac"/>
+    <text x="636" y="398" fill="#166534">confirmed</text>
+  </g>
+
+  <g font-size="10" fill="#94a3b8">
+    <text x="28" y="120">the participant&#8217;s own jacket, worn whenever possible, so 54 segments are missing and not at random</text>
+    <text x="28" y="162">30 Hz in the source paper, and an fps column already sits in the repository manifest</text>
+    <text x="28" y="204">flow is 480 by 270 with a different frame count; only silhouette and segmentation are aligned</text>
+    <text x="28" y="246">this release uses 14 flat colour-coded parts and carries no surface coordinates</text>
+    <text x="28" y="288">usual was always recorded before fast, with no counterbalancing; direction is one walk split in two</text>
+    <text x="28" y="330">the only normalisation in this codebase divides by 255, so zero really is black</text>
+    <text x="28" y="372">true for the two-class probe only; pooled rank spans a factor of sixteen across the same runs</text>
+    <text x="28" y="414">verified on three official conference pages that agree with each other</text>
+  </g>
+</svg>

@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 750 372" width="750" height="372" font-family="system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif">
+  <rect x="0.5" y="0.5" width="749" height="371" rx="10" fill="#ffffff" stroke="#e2e8f0"/>
+
+  <text x="28" y="36" font-size="16.5" font-weight="600" fill="#0f172a">Where the curve stops climbing is the answer</text>
+  <text x="28" y="57" font-size="11" fill="#64748b">A schematic of the measurement, not a result. Finding the shape is the whole experiment.</text>
+
+  <line x1="92" y1="286" x2="700" y2="286" stroke="#94a3b8" stroke-width="1.2"/>
+  <line x1="92" y1="88" x2="92" y2="286" stroke="#94a3b8" stroke-width="1.2"/>
+
+  <text x="396" y="316" font-size="11" fill="#475569" text-anchor="middle">how much the model is allowed to observe</text>
+  <text x="-187" y="30" transform="rotate(-90)" font-size="11" fill="#475569" text-anchor="middle">prediction quality</text>
+
+  <path d="M 92 258 C 156 244, 218 180, 300 157 C 400 134, 520 128, 700 125 L 700 262 L 92 262 Z" fill="#dbeafe" opacity="0.5"/>
+  <line x1="92" y1="262" x2="700" y2="262" stroke="#dc2626" stroke-width="1.8" stroke-dasharray="6 4"/>
+  <text x="696" y="278" font-size="10.5" fill="#dc2626" text-anchor="end">position-only oracle, given no video at all</text>
+  <path d="M 92 258 C 156 244, 218 180, 300 157 C 400 134, 520 128, 700 125" stroke="#2563eb" stroke-width="2.4" fill="none"/>
+
+  <line x1="300" y1="157" x2="300" y2="286" stroke="#059669" stroke-width="1.4" stroke-dasharray="4 4"/>
+  <circle cx="300" cy="157" r="6.5" fill="#059669" stroke="#ffffff" stroke-width="2"/>
+
+  <text x="318" y="192" font-size="11.5" font-weight="600" fill="#047857">minimum sufficient state</text>
+  <text x="318" y="209" font-size="10.5" fill="#059669">more history buys almost nothing after this point</text>
+
+  <rect x="28" y="332" width="694" height="26" rx="6" fill="#f8fafc" stroke="#e2e8f0"/>
+  <text x="42" y="349" font-size="10.5" fill="#64748b">The shaded band is what the video actually contributes. Read the horizontal axis three ways: frames of history, body regions, or pixels.</text>
+</svg>

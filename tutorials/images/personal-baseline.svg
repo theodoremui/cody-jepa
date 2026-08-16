@@ -1,0 +1,61 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 750 368" width="750" height="368" font-family="system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif">
+  <defs>
+    <marker id="pb" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#94a3b8"/>
+    </marker>
+  </defs>
+
+  <rect x="0.5" y="0.5" width="749" height="367" rx="10" fill="#ffffff" stroke="#e2e8f0"/>
+
+  <text x="28" y="36" font-size="16.5" font-weight="600" fill="#0f172a">Keep the person, send the change</text>
+  <text x="28" y="57" font-size="11" fill="#64748b">The signal that makes mobility change detectable is the same signal that identifies the resident</text>
+
+  <!-- home zone -->
+  <rect x="28" y="80" width="330" height="216" rx="9" fill="#f0fdf4" stroke="#86efac"/>
+  <text x="46" y="104" font-size="12" font-weight="600" fill="#166534">stays in the home</text>
+
+  <rect x="46" y="118" width="120" height="40" rx="6" fill="#ffffff" stroke="#bbf7d0"/>
+  <text x="106" y="143" font-size="10.5" fill="#166534" text-anchor="middle">camera</text>
+
+  <line x1="166" y1="138" x2="200" y2="138" stroke="#94a3b8" stroke-width="1.4" marker-end="url(#pb)"/>
+
+  <rect x="208" y="118" width="132" height="40" rx="6" fill="#ffffff" stroke="#bbf7d0"/>
+  <text x="274" y="136" font-size="10.5" fill="#166534" text-anchor="middle">motion features,</text>
+  <text x="274" y="150" font-size="10.5" fill="#166534" text-anchor="middle">frames discarded</text>
+
+  <line x1="274" y1="158" x2="274" y2="186" stroke="#94a3b8" stroke-width="1.4" marker-end="url(#pb)"/>
+
+  <rect x="46" y="194" width="294" height="42" rx="6" fill="#ffffff" stroke="#bbf7d0"/>
+  <text x="193" y="212" font-size="11" font-weight="600" fill="#166534" text-anchor="middle">this resident&#8217;s own baseline, never transmitted</text>
+  <text x="193" y="228" font-size="10.5" fill="#15803d" text-anchor="middle">how they walked last month, and the month before</text>
+
+  <text x="46" y="262" font-size="10.5" fill="#15803d">The baseline is the identifying part. That is exactly why</text>
+  <text x="46" y="277" font-size="10.5" fill="#15803d">it is the part that should never leave the building.</text>
+
+  <!-- boundary -->
+  <line x1="376" y1="76" x2="376" y2="300" stroke="#94a3b8" stroke-width="1.6" stroke-dasharray="6 5"/>
+  <text x="376" y="70" font-size="10" fill="#64748b" text-anchor="middle">the boundary</text>
+
+  <line x1="340" y1="215" x2="410" y2="215" stroke="#94a3b8" stroke-width="1.6" marker-end="url(#pb)"/>
+
+  <!-- leaves -->
+  <rect x="418" y="80" width="304" height="216" rx="9" fill="#faf5ff" stroke="#d8b4fe"/>
+  <text x="436" y="104" font-size="12" font-weight="600" fill="#6b21a8">leaves the home</text>
+
+  <rect x="436" y="118" width="268" height="34" rx="6" fill="#ffffff" stroke="#e9d5ff"/>
+  <text x="450" y="140" font-size="10.5" fill="#6b21a8">how far today sits from this person&#8217;s normal</text>
+
+  <rect x="436" y="160" width="268" height="34" rx="6" fill="#ffffff" stroke="#e9d5ff"/>
+  <text x="450" y="182" font-size="10.5" fill="#6b21a8">how sure the system is about that</text>
+
+  <rect x="436" y="202" width="268" height="34" rx="6" fill="#ffffff" stroke="#e9d5ff"/>
+  <text x="450" y="224" font-size="10.5" fill="#6b21a8">when it was measured, and whether the sensor worked</text>
+
+  <text x="436" y="262" font-size="10.5" fill="#7e22ce">No embedding, no frames, no template. A clinician still</text>
+  <text x="436" y="277" font-size="10.5" fill="#7e22ce">sees a trend, because a trend is all they needed.</text>
+
+  <!-- attacker -->
+  <rect x="28" y="312" width="694" height="40" rx="7" fill="#fef2f2" stroke="#fca5a5"/>
+  <text x="44" y="329" font-size="11" font-weight="600" fill="#b91c1c">The claim only counts if an adaptive attacker cannot undo it</text>
+  <text x="44" y="345" font-size="10.5" fill="#991b1b">Retrain the recogniser on the protected stream, test linkability across sessions and membership, and report at low false-positive rates.</text>
+</svg>

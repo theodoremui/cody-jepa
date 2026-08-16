@@ -1,0 +1,67 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 750 340" width="750" height="340" font-family="system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif">
+  <defs>
+    <marker id="g1" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#2563eb"/>
+    </marker>
+    <marker id="g2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#7c3aed"/>
+    </marker>
+    <marker id="g3" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#94a3b8"/>
+    </marker>
+  </defs>
+
+  <rect x="0.5" y="0.5" width="749" height="339" rx="10" fill="#ffffff" stroke="#e2e8f0"/>
+
+  <text x="28" y="36" font-size="16.5" font-weight="600" fill="#0f172a">Two questions you can only ask with paired data</text>
+  <text x="28" y="57" font-size="11" fill="#64748b">Both live in the frozen embedding space. Neither needs any training.</text>
+
+  <!-- left panel: transport -->
+  <rect x="28" y="76" width="330" height="236" rx="9" fill="#f8fafc" stroke="#e2e8f0"/>
+  <text x="46" y="100" font-size="12.5" font-weight="600" fill="#0f172a">Transport</text>
+  <text x="46" y="117" font-size="10.5" fill="#64748b">Does one person&#8217;s change move another person?</text>
+
+  <circle cx="88" cy="168" r="6" fill="#475569"/>
+  <text x="88" y="157" font-size="10.5" fill="#475569" text-anchor="middle">Ana, usual</text>
+  <line x1="96" y1="166" x2="188" y2="150" stroke="#2563eb" stroke-width="2" marker-end="url(#g1)"/>
+  <circle cx="196" cy="148" r="6" fill="#2563eb"/>
+  <text x="212" y="143" font-size="10.5" fill="#2563eb">Ana, fast</text>
+
+  <circle cx="88" cy="252" r="6" fill="#475569"/>
+  <text x="88" y="272" font-size="10.5" fill="#475569" text-anchor="middle">Ben, usual</text>
+  <line x1="96" y1="250" x2="188" y2="234" stroke="#2563eb" stroke-width="2" stroke-dasharray="5 4" marker-end="url(#g1)"/>
+  <circle cx="196" cy="232" r="6" fill="#ffffff" stroke="#2563eb" stroke-width="2"/>
+  <circle cx="228" cy="222" r="6" fill="#475569"/>
+  <text x="244" y="226" font-size="10.5" fill="#475569">Ben, fast</text>
+
+  <text x="150" y="200" font-size="10" fill="#94a3b8" text-anchor="middle">apply Ana&#8217;s arrow to Ben</text>
+  <text x="196" y="299" font-size="10.5" fill="#334155" text-anchor="middle">the gap is the answer</text>
+
+  <!-- right panel: composition -->
+  <rect x="392" y="76" width="330" height="236" rx="9" fill="#f8fafc" stroke="#e2e8f0"/>
+  <text x="410" y="100" font-size="12.5" font-weight="600" fill="#0f172a">Composition</text>
+  <text x="410" y="117" font-size="10.5" fill="#64748b">Do two changes add up when applied together?</text>
+
+  <circle cx="446" cy="252" r="6" fill="#475569"/>
+  <text x="446" y="272" font-size="10.5" fill="#475569" text-anchor="middle">usual, no jacket</text>
+
+  <line x1="454" y1="250" x2="556" y2="250" stroke="#2563eb" stroke-width="2" marker-end="url(#g1)"/>
+  <text x="508" y="242" font-size="10" fill="#2563eb" text-anchor="middle">faster</text>
+  <circle cx="564" cy="250" r="5" fill="#2563eb"/>
+
+  <line x1="452" y1="244" x2="452" y2="176" stroke="#7c3aed" stroke-width="2" marker-end="url(#g2)"/>
+  <text x="428" y="212" font-size="10" fill="#7c3aed" text-anchor="middle">jacket</text>
+  <circle cx="452" cy="168" r="5" fill="#7c3aed"/>
+
+  <line x1="570" y1="244" x2="570" y2="176" stroke="#7c3aed" stroke-width="2" stroke-dasharray="5 4" marker-end="url(#g2)"/>
+  <line x1="458" y1="168" x2="556" y2="168" stroke="#2563eb" stroke-width="2" stroke-dasharray="5 4" marker-end="url(#g1)"/>
+
+  <circle cx="570" cy="168" r="6" fill="#ffffff" stroke="#475569" stroke-width="2"/>
+  <circle cx="628" cy="134" r="6" fill="#475569"/>
+  <line x1="576" y1="164" x2="620" y2="139" stroke="#94a3b8" stroke-width="1.6" stroke-dasharray="3 3" marker-end="url(#g3)"/>
+
+  <circle cx="416" cy="294" r="5.5" fill="#ffffff" stroke="#475569" stroke-width="2"/>
+  <text x="428" y="298" font-size="10" fill="#64748b">where the two arrows land</text>
+  <circle cx="580" cy="294" r="5.5" fill="#475569"/>
+  <text x="592" y="298" font-size="10" fill="#64748b">what really happens</text>
+</svg>

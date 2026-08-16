@@ -1,0 +1,55 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 750 372" width="750" height="372" font-family="system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif">
+  <defs>
+    <marker id="ro" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#94a3b8"/>
+    </marker>
+    <marker id="roRed" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#dc2626"/>
+    </marker>
+  </defs>
+
+  <rect x="0.5" y="0.5" width="749" height="371" rx="10" fill="#ffffff" stroke="#e2e8f0"/>
+
+  <text x="28" y="36" font-size="16.5" font-weight="600" fill="#0f172a">The same question, in a biomechanics lab</text>
+  <text x="28" y="57" font-size="11" fill="#64748b">Push someone while they walk. What is the least you need to know beforehand to predict what happens next?</text>
+
+  <!-- inputs -->
+  <rect x="28" y="90" width="176" height="46" rx="7" fill="#f0fdf4" stroke="#86efac"/>
+  <text x="116" y="110" font-size="11" font-weight="600" fill="#166534" text-anchor="middle">state just before</text>
+  <text x="116" y="126" font-size="10.5" fill="#15803d" text-anchor="middle">joint angles, forces, phase</text>
+
+  <rect x="28" y="150" width="176" height="46" rx="7" fill="#eff6ff" stroke="#93c5fd"/>
+  <text x="116" y="170" font-size="11" font-weight="600" fill="#1e40af" text-anchor="middle">the push itself</text>
+  <text x="116" y="186" font-size="10.5" fill="#1d4ed8" text-anchor="middle">direction, size, timing</text>
+
+  <rect x="28" y="210" width="176" height="46" rx="7" fill="#faf5ff" stroke="#d8b4fe"/>
+  <text x="116" y="230" font-size="11" font-weight="600" fill="#6b21a8" text-anchor="middle">this person&#8217;s own baseline</text>
+  <text x="116" y="246" font-size="10.5" fill="#7e22ce" text-anchor="middle">how they usually walk</text>
+
+  <line x1="204" y1="113" x2="266" y2="160" stroke="#94a3b8" stroke-width="1.4" marker-end="url(#ro)"/>
+  <line x1="204" y1="173" x2="266" y2="173" stroke="#94a3b8" stroke-width="1.4" marker-end="url(#ro)"/>
+  <line x1="204" y1="233" x2="266" y2="186" stroke="#94a3b8" stroke-width="1.4" marker-end="url(#ro)"/>
+
+  <rect x="274" y="146" width="112" height="56" rx="7" fill="#1e293b"/>
+  <text x="330" y="170" font-size="11.5" font-weight="600" fill="#ffffff" text-anchor="middle">response</text>
+  <text x="330" y="187" font-size="11.5" font-weight="600" fill="#ffffff" text-anchor="middle">operator</text>
+
+  <line x1="386" y1="174" x2="448" y2="174" stroke="#94a3b8" stroke-width="1.4" marker-end="url(#ro)"/>
+
+  <!-- output -->
+  <rect x="456" y="106" width="266" height="136" rx="7" fill="#f8fafc" stroke="#cbd5e1"/>
+  <text x="474" y="130" font-size="11.5" font-weight="600" fill="#0f172a">a distribution, not a single number</text>
+  <text x="474" y="153" font-size="10.5" fill="#475569">where and when the first recovery step lands</text>
+  <text x="474" y="171" font-size="10.5" fill="#475569">how many steps it takes to settle</text>
+  <text x="474" y="189" font-size="10.5" fill="#475569">whole-body angular momentum through recovery</text>
+  <text x="474" y="207" font-size="10.5" fill="#475569">margin of stability, where it is trustworthy</text>
+  <text x="474" y="228" font-size="10.5" font-style="italic" fill="#64748b">each with a calibrated interval</text>
+
+  <!-- control -->
+  <rect x="28" y="272" width="694" height="40" rx="7" fill="#fef2f2" stroke="#fca5a5"/>
+  <text x="44" y="290" font-size="11" font-weight="600" fill="#b91c1c">The control that decides whether any of this matters</text>
+  <text x="44" y="306" font-size="10.5" fill="#991b1b">Give the model the push and nothing else. If that predicts the outcome just as well, the person&#8217;s state added nothing.</text>
+
+  <text x="28" y="340" font-size="10.5" fill="#64748b">Runs on public perturbation data. Ten healthy adults, hundreds of correlated trials, so split by person and hold out whole</text>
+  <text x="28" y="356" font-size="10.5" fill="#64748b">push directions. Recovery is not a fall, and an artificial impairment is not a disease. Say both out loud.</text>
+</svg>
