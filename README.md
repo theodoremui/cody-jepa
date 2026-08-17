@@ -1,6 +1,6 @@
 # CoDy-JEPA
 
-JEPA for self-supervised gait representation learning.
+Counterfactual Dynamical Joint-Embedding Predictive Architectures for self-supervised gait representation learning.
 
 ## Structure
 
